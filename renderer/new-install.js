@@ -62,6 +62,10 @@ window.Launcher.newInstall = {
     container.innerHTML = "";
     document.getElementById("btn-save").disabled = true;
 
+    // Hide install path for sources that don't need it
+    const pathField = document.getElementById("inst-path").closest(".field");
+    pathField.style.display = source.skipInstall ? "none" : "";
+
     source.fields.forEach((f) => container.appendChild(this._createFieldEl(f)));
 
     // Initialize text fields with defaults, then start loading from the first loadable field
@@ -75,6 +79,11 @@ window.Launcher.newInstall = {
     const firstLoadable = source.fields.findIndex((f) => f.type !== "text");
     if (firstLoadable >= 0) {
       await this._loadFieldOptions(firstLoadable);
+    }
+
+    // Sources with only text fields and skipInstall can be saved immediately
+    if (source.skipInstall && source.fields.every((f) => f.type === "text")) {
+      document.getElementById("btn-save").disabled = false;
     }
   },
 
@@ -229,11 +238,32 @@ window.Launcher.newInstall = {
 
   async _save() {
     if (!this._currentSource) return;
+    // Sync text field values into selections before building
+    this._currentSource.fields.forEach((f) => {
+      if (f.type === "text") {
+        const input = document.getElementById(`sf-${f.id}`);
+        if (input) this._selections[f.id] = { value: input.value };
+      }
+    });
     const instData = await window.api.buildInstallation(
       this._currentSource.id, this._selections
     );
     const name = document.getElementById("inst-name").value.trim() ||
       `ComfyUI (${instData.version || this._currentSource.label})`;
+
+    if (this._currentSource.skipInstall) {
+      const result = await window.api.addInstallation({
+        name, installPath: "", status: "installed", ...instData,
+      });
+      if (!result.ok) {
+        await window.Launcher.modal.alert({ title: "Cannot Add", message: result.message });
+        return;
+      }
+      window.Launcher.showView("list");
+      window.Launcher.list.render();
+      return;
+    }
+
     const installPath = document.getElementById("inst-path").value;
     const result = await window.api.addInstallation({ name, installPath, ...instData });
     if (!result.ok) {

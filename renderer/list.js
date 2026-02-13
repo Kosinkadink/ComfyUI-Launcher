@@ -17,10 +17,11 @@ window.Launcher.list = {
       const card = document.createElement("div");
       card.className = "instance-card";
       const statusTag = inst.status === "failed" ? ' · <span class="status-failed">Install Failed</span>' : "";
-      const argsStr = inst.launchArgs || "";
-      const launchMeta = inst.launchMode
-        ? `${esc(inst.launchMode)}${argsStr ? " · " + esc(argsStr) : ""}`
-        : "";
+      const launchMeta = inst.listPreview
+        ? esc(inst.listPreview)
+        : inst.launchMode
+          ? `${esc(inst.launchMode)}${inst.launchArgs ? " · " + esc(inst.launchArgs) : ""}`
+          : "";
       card.innerHTML = `
         <div class="instance-info">
           <div class="instance-name">${esc(inst.name)}</div>

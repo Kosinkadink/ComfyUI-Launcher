@@ -146,18 +146,6 @@ module.exports = {
     return null;
   },
 
-  getSettingsSections(settings) {
-    return [
-      {
-        title: "Portable Downloads",
-        fields: [
-          { id: "cacheDir", label: "Cache Directory", type: "path", value: settings.cacheDir, openable: true },
-          { id: "maxCachedFiles", label: "Max Cached Downloads", type: "number", value: settings.maxCachedFiles, min: 1, max: 50 },
-        ],
-      },
-    ];
-  },
-
   async handleAction(actionId, installation) {
     return { ok: false, message: `Action "${actionId}" not yet implemented.` };
   },

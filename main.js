@@ -61,6 +61,7 @@ function showComfyWindow() {
 }
 
 function stopComfyUI() {
+  ipc.notifyStopped();
   if (comfyProcess) {
     killProcessTree(comfyProcess);
     comfyProcess = null;
@@ -91,17 +92,19 @@ function quitApp() {
   app.exit(0);
 }
 
-function onLaunch({ port, process: proc, installation, mode }) {
+function onLaunch({ port, url, process: proc, installation, mode }) {
   comfyProcess = proc;
+  const comfyUrl = url || `http://127.0.0.1:${port}`;
 
   if (mode === "console") {
     // Console mode: launcher stays visible, renderer switches to console view
-    // Process exit is handled by the console view via stop-comfyui IPC
-    proc.on("exit", () => {
-      if (comfyProcess === proc) {
-        comfyProcess = null;
-      }
-    });
+    if (proc) {
+      proc.on("exit", () => {
+        if (comfyProcess === proc) {
+          comfyProcess = null;
+        }
+      });
+    }
     return;
   }
 
@@ -116,19 +119,26 @@ function onLaunch({ port, process: proc, installation, mode }) {
     minWidth: 800,
     minHeight: 600,
     icon: APP_ICON,
-    title: `ComfyUI — ${installation.name}`,
+    title: installation.name,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
     },
   });
   comfyWindow.setMenuBarVisibility(false);
-  comfyWindow.loadURL(`http://127.0.0.1:${port}`);
+  comfyWindow.webContents.on("did-create-window", (childWindow) => {
+    childWindow.setIcon(APP_ICON);
+  });
+  comfyWindow.webContents.on("page-title-updated", (e, title) => {
+    e.preventDefault();
+    comfyWindow.setTitle(`${title} — ${installation.name}`);
+  });
+  comfyWindow.loadURL(comfyUrl);
 
   comfyWindow.on("close", (e) => {
-    if (!comfyProcess) return;
+    if (!proc && !comfyWindow) return;
     e.preventDefault();
-    const behavior = settings.get("onComfyClose") || "tray";
+    const behavior = proc ? (settings.get("onComfyClose") || "tray") : "launcher";
     if (behavior === "tray") {
       comfyWindow.hide();
     } else if (behavior === "launcher") {
@@ -142,27 +152,29 @@ function onLaunch({ port, process: proc, installation, mode }) {
     comfyWindow = null;
   });
 
-  if ((settings.get("onComfyClose") || "tray") === "tray") {
+  if (proc && (settings.get("onComfyClose") || "tray") === "tray") {
     createTray(installation.name);
   }
 
-  proc.on("exit", () => {
-    if (comfyProcess === proc) {
-      comfyProcess = null;
-      if (comfyWindow && !comfyWindow.isDestroyed()) {
-        comfyWindow.destroy();
-        comfyWindow = null;
+  if (proc) {
+    proc.on("exit", () => {
+      if (comfyProcess === proc) {
+        comfyProcess = null;
+        if (comfyWindow && !comfyWindow.isDestroyed()) {
+          comfyWindow.destroy();
+          comfyWindow = null;
+        }
+        if (tray) {
+          tray.destroy();
+          tray = null;
+        }
+        if (launcherWindow && !launcherWindow.isDestroyed()) {
+          launcherWindow.show();
+          launcherWindow.focus();
+        }
       }
-      if (tray) {
-        tray.destroy();
-        tray = null;
-      }
-      if (launcherWindow && !launcherWindow.isDestroyed()) {
-        launcherWindow.show();
-        launcherWindow.focus();
-      }
-    }
-  });
+    });
+  }
 }
 
 app.whenReady().then(() => {

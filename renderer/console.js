@@ -4,11 +4,18 @@ window.Launcher.console = {
   _unsubOutput: null,
   _unsubExited: null,
 
-  show({ installationId, port, initialOutput }) {
+  show({ installationId, port, url, initialOutput }) {
     document.getElementById("console-title").textContent = "ComfyUI Console";
     const terminal = document.getElementById("console-terminal");
     terminal.textContent = initialOutput || "";
     terminal.scrollTop = terminal.scrollHeight;
+
+    const comfyUrl = url || `http://127.0.0.1:${port || 8188}`;
+    const isRemote = !!url;
+
+    if (isRemote) {
+      terminal.textContent += `Connected to ${comfyUrl}\n`;
+    }
 
     window.Launcher.showView("console");
 
@@ -34,11 +41,11 @@ window.Launcher.console = {
 
     const browserBtn = document.getElementById("btn-console-browser");
     browserBtn.onclick = () => {
-      window.api.openPath(`http://127.0.0.1:${port || 8188}`);
+      window.api.openPath(comfyUrl);
     };
 
     const stopBtn = document.getElementById("btn-console-stop");
-    stopBtn.textContent = "Stop";
+    stopBtn.textContent = isRemote ? "Disconnect" : "Stop";
     stopBtn.className = "danger";
     stopBtn.onclick = async () => {
       await window.api.stopComfyUI();

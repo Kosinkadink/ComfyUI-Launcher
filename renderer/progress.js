@@ -60,7 +60,7 @@ window.Launcher.progress = {
       if (result.ok) {
         if (result.mode === "console") {
           const initialOutput = document.getElementById("progress-terminal")?.textContent || "";
-          window.Launcher.console.show({ installationId, port: result.port, initialOutput });
+          window.Launcher.console.show({ installationId, port: result.port, url: result.url, initialOutput });
         } else {
           window.Launcher.showView("list");
           window.Launcher.list.render();
