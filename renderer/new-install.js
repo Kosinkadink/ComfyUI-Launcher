@@ -1,0 +1,254 @@
+window.Launcher = window.Launcher || {};
+
+window.Launcher.newInstall = {
+  _sources: [],
+  _currentSource: null,
+  _selections: {},
+  _detectedGPU: null,
+
+  init() {
+    document.getElementById("btn-new").onclick = async () => {
+      document.getElementById("inst-name").value = "";
+      this._selections = {};
+      document.getElementById("btn-save").disabled = true;
+      const pathInput = document.getElementById("inst-path");
+      pathInput.value = await window.api.getDefaultInstallDir();
+      this._detectedGPU = await window.api.detectGPU();
+      const gpuEl = document.getElementById("detected-gpu");
+      const gpuLabels = { nvidia: "NVIDIA", amd: "AMD", intel: "Intel", mps: "Apple Silicon" };
+      gpuEl.textContent = this._detectedGPU
+        ? `Detected GPU: ${gpuLabels[this._detectedGPU] || this._detectedGPU}`
+        : "No supported GPU detected";
+      window.Launcher.showView("new");
+      this._initSources();
+    };
+
+    document.getElementById("btn-browse").onclick = async () => {
+      const pathInput = document.getElementById("inst-path");
+      const chosen = await window.api.browseFolder(pathInput.value);
+      if (chosen) pathInput.value = chosen;
+    };
+
+    document.getElementById("btn-new-back").onclick = () => {
+      window.Launcher.showView("list");
+    };
+
+    document.getElementById("btn-save").onclick = () => this._save();
+  },
+
+  async _initSources() {
+    const sourceEl = document.getElementById("source");
+    if (this._sources.length > 0) {
+      this._selectSource(this._sources[sourceEl.value || 0]);
+      return;
+    }
+    this._sources = await window.api.getSources();
+    sourceEl.innerHTML = "";
+    this._sources.forEach((s, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = s.label;
+      sourceEl.appendChild(opt);
+    });
+    sourceEl.disabled = this._sources.length <= 1;
+    sourceEl.onchange = () => this._selectSource(this._sources[sourceEl.value]);
+    if (this._sources.length > 0) this._selectSource(this._sources[0]);
+  },
+
+  async _selectSource(source) {
+    this._currentSource = source;
+    this._selections = {};
+    const container = document.getElementById("source-fields");
+    container.innerHTML = "";
+    document.getElementById("btn-save").disabled = true;
+
+    source.fields.forEach((f) => container.appendChild(this._createFieldEl(f)));
+
+    // Initialize text fields with defaults, then start loading from the first loadable field
+    source.fields.forEach((f) => {
+      if (f.type === "text" && f.defaultValue !== undefined) {
+        document.getElementById(`sf-${f.id}`).value = f.defaultValue;
+        this._selections[f.id] = { value: f.defaultValue };
+      }
+    });
+
+    const firstLoadable = source.fields.findIndex((f) => f.type !== "text");
+    if (firstLoadable >= 0) {
+      await this._loadFieldOptions(firstLoadable);
+    }
+  },
+
+  _createFieldEl(field) {
+    const div = document.createElement("div");
+    div.className = "field";
+    const label = document.createElement("label");
+    label.htmlFor = `sf-${field.id}`;
+    label.textContent = field.label;
+    div.appendChild(label);
+
+    if (field.type === "text") {
+      const row = document.createElement("div");
+      row.className = "path-input";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.id = `sf-${field.id}`;
+      input.value = field.defaultValue || "";
+      input.placeholder = field.defaultValue || "";
+      row.appendChild(input);
+
+      if (field.action) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = field.action.label;
+        btn.id = `sf-${field.id}-action`;
+        btn.onclick = () => this._onTextAction(field);
+        row.appendChild(btn);
+      }
+
+      const errorEl = document.createElement("div");
+      errorEl.id = `sf-${field.id}-error`;
+      errorEl.className = "field-error";
+
+      div.appendChild(row);
+      div.appendChild(errorEl);
+    } else {
+      const select = document.createElement("select");
+      select.id = `sf-${field.id}`;
+      select.disabled = true;
+      select.innerHTML = "<option>Loading…</option>";
+      div.appendChild(select);
+    }
+
+    return div;
+  },
+
+  _onTextAction(field) {
+    const input = document.getElementById(`sf-${field.id}`);
+    const errorEl = document.getElementById(`sf-${field.id}-error`);
+    errorEl.textContent = "";
+    this._selections[field.id] = { value: input.value };
+
+    // Find the first select field after this text field and reload from there
+    const source = this._currentSource;
+    const fieldIndex = source.fields.findIndex((f) => f.id === field.id);
+    const nextLoadable = source.fields.findIndex((f, i) => i > fieldIndex && f.type !== "text");
+    if (nextLoadable >= 0) {
+      this._loadFieldOptions(nextLoadable);
+    }
+  },
+
+  async _loadFieldOptions(fieldIndex) {
+    const source = this._currentSource;
+    if (!source) return;
+    const field = source.fields[fieldIndex];
+    const select = document.getElementById(`sf-${field.id}`);
+    const saveBtn = document.getElementById("btn-save");
+    select.disabled = true;
+    select.innerHTML = "<option>Loading…</option>";
+
+    // Clear downstream select fields
+    for (let i = fieldIndex + 1; i < source.fields.length; i++) {
+      const df = source.fields[i];
+      if (df.type === "text") continue;
+      const ds = document.getElementById(`sf-${df.id}`);
+      ds.disabled = true;
+      ds.innerHTML = "<option>—</option>";
+      delete this._selections[df.id];
+    }
+    saveBtn.disabled = true;
+
+    // Clear any previous error on the error target field
+    const clearTarget = field.errorTarget || (() => {
+      for (let i = fieldIndex - 1; i >= 0; i--) {
+        if (source.fields[i].type === "text") return source.fields[i].id;
+      }
+      return null;
+    })();
+    if (clearTarget) {
+      const errorEl = document.getElementById(`sf-${clearTarget}-error`);
+      if (errorEl) errorEl.textContent = "";
+    }
+
+    try {
+      const options = await window.api.getFieldOptions(
+        source.id, field.id, this._selections
+      );
+      select.innerHTML = "";
+      if (options.length === 0) {
+        select.innerHTML = "<option>No options available</option>";
+        return;
+      }
+      let defaultIndex = 0;
+      if (this._detectedGPU && field.id === "asset") {
+        const gpuMatch = options.findIndex((opt) =>
+          opt.label.toLowerCase().includes(this._detectedGPU)
+        );
+        if (gpuMatch >= 0) defaultIndex = gpuMatch;
+      }
+      options.forEach((opt, i) => {
+        const el = document.createElement("option");
+        el.value = i;
+        el.textContent = opt.label;
+        select.appendChild(el);
+      });
+      select.value = defaultIndex;
+      select.disabled = false;
+      this._selections[field.id] = options[defaultIndex];
+
+      select.onchange = () => {
+        this._selections[field.id] = options[select.value];
+        const nextSelect = source.fields.findIndex((f, i) => i > fieldIndex && f.type !== "text");
+        if (nextSelect >= 0) {
+          this._loadFieldOptions(nextSelect);
+        } else {
+          saveBtn.disabled = false;
+        }
+      };
+
+      const nextSelect = source.fields.findIndex((f, i) => i > fieldIndex && f.type !== "text");
+      if (nextSelect >= 0) {
+        await this._loadFieldOptions(nextSelect);
+      } else {
+        saveBtn.disabled = false;
+      }
+    } catch (err) {
+      select.innerHTML = "<option>—</option>";
+      // Show error on the declared errorTarget, or fall back to preceding text field
+      let errorFieldId = field.errorTarget;
+      if (!errorFieldId) {
+        for (let i = fieldIndex - 1; i >= 0; i--) {
+          if (source.fields[i].type === "text") {
+            errorFieldId = source.fields[i].id;
+            break;
+          }
+        }
+      }
+      if (errorFieldId) {
+        const errorEl = document.getElementById(`sf-${errorFieldId}-error`);
+        if (errorEl) errorEl.textContent = err.message;
+      } else {
+        select.innerHTML = `<option>Error: ${err.message}</option>`;
+      }
+    }
+  },
+
+  async _save() {
+    if (!this._currentSource) return;
+    const instData = await window.api.buildInstallation(
+      this._currentSource.id, this._selections
+    );
+    const name = document.getElementById("inst-name").value.trim() ||
+      `ComfyUI (${instData.version || this._currentSource.label})`;
+    const installPath = document.getElementById("inst-path").value;
+    const result = await window.api.addInstallation({ name, installPath, ...instData });
+    if (!result.ok) {
+      await window.Launcher.modal.alert({ title: "Cannot Add", message: result.message });
+      return;
+    }
+    window.Launcher.progress.show({
+      installationId: result.entry.id,
+      title: "Installing…",
+      apiCall: () => window.api.installInstance(result.entry.id),
+    });
+  },
+};

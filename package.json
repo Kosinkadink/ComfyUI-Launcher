@@ -1,0 +1,15 @@
+{
+  "name": "comfyui-launcher",
+  "version": "0.1.0",
+  "description": "ComfyUI Launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^34.0.0"
+  },
+  "dependencies": {
+    "7zip-bin": "^5.2.0"
+  }
+}
