@@ -49,7 +49,7 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/Comfy_Logo_x256.png",
+      "icon": "assets/Comfy_Logo_x512.png",
       "category": "public.app-category.developer-tools"
     },
     "linux": {
