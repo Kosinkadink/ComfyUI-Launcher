@@ -69,11 +69,11 @@ window.Launcher.settings = {
           select.onchange = () => window.api.setSetting(f.id, select.value);
           field.appendChild(select);
         } else if (f.type === "boolean") {
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.checked = !!f.value;
-          checkbox.onchange = () => window.api.setSetting(f.id, checkbox.checked);
-          field.appendChild(checkbox);
+          const toggle = document.createElement("input");
+          toggle.type = "checkbox";
+          toggle.checked = !!f.value;
+          toggle.onchange = () => window.api.setSetting(f.id, toggle.checked);
+          field.appendChild(toggle);
         } else if (f.type === "number") {
           const input = document.createElement("input");
           input.type = "number";

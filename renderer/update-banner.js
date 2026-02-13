@@ -56,12 +56,15 @@ window.Launcher.updateBanner = {
   },
 
   _showError(banner, err) {
-    const { esc } = window.Launcher;
     banner.innerHTML = `
-      <span class="update-text">Update failed: ${esc(err.message)}</span>
+      <span class="update-text">Update check failed</span>
+      <button id="btn-update-details">Details</button>
       <button id="btn-update-retry">Retry</button>
       <button id="btn-update-error-dismiss">Dismiss</button>`;
     banner.style.display = "flex";
+    document.getElementById("btn-update-details").onclick = () => {
+      window.Launcher.modal.alert({ title: "Update Error", message: err.message });
+    };
     document.getElementById("btn-update-retry").onclick = () => {
       banner.style.display = "none";
       window.api.checkForUpdate();

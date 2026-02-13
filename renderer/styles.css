@@ -101,7 +101,31 @@ select, input[type="text"], input[type="number"] {
 }
 select:focus, input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
 select:disabled, input:disabled { opacity: 0.4; }
-input[type="checkbox"] { width: auto; margin-top: 8px; accent-color: var(--accent); }
+input[type="checkbox"] {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+input[type="checkbox"]:checked { background: var(--accent); }
+input[type="checkbox"]:checked::after { transform: translateX(16px); }
 .field { display: flex; flex-direction: column; margin-bottom: 14px; }
 .path-input {
   display: flex;
