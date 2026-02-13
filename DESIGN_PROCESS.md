@@ -25,7 +25,7 @@ Each source module (`sources/<name>.js`) defines:
 - `probeInstallation(dirPath)` *(optional)* — examines a directory and returns source-specific metadata if it recognizes the contents (e.g., portable checks for `python_embeded`, git checks for `.git`). Returns `null` if unrecognized. Used by "Track Existing" to auto-detect source type.
 - `getSettingsSections(settings)` *(optional)* — defines settings fields for this source. Fields declare `type` (`path`, `number`), `id` (settings key), and current `value`. The renderer builds the form generically.
 - `handleAction(actionId, installation)` — executes source-specific actions
-- `getLaunchCommand(installation)` — returns `{ cmd, args, cwd, port }` describing how to start this ComfyUI installation, or `null` if launch is not supported. The launcher uses this to spawn the process, poll the port, then open a browser window.
+- `getLaunchCommand(installation)` — returns `{ cmd, args, cwd, port }` describing how to start this ComfyUI installation, or `null` if launch is not supported. The launcher uses this to spawn the process, poll the port, then open an app window.
 - `install(installation, tools)` *(optional)* — performs the actual installation (download, extract, etc.). Receives shared tools `{ sendProgress, download, cache, extract }` from ipc.js rather than importing lib modules directly, keeping sources decoupled from infrastructure.
 
 The renderer never contains source-specific knowledge. If it needs to behave differently per source, that behavior must be declared in the source's data (see principle 3).

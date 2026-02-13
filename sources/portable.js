@@ -36,7 +36,7 @@ module.exports = {
   defaultLaunchArgs: "--windows-standalone-build --disable-auto-launch",
 
   getDefaults() {
-    return { launchArgs: this.defaultLaunchArgs, launchMode: "browser" };
+    return { launchArgs: this.defaultLaunchArgs, launchMode: "window" };
   },
 
   buildInstallation(selections) {
@@ -45,7 +45,7 @@ module.exports = {
       asset: selections.asset?.data?.name || "",
       downloadUrl: selections.asset?.value || "",
       launchArgs: this.defaultLaunchArgs,
-      launchMode: "browser",
+      launchMode: "window",
     };
   },
 
@@ -88,9 +88,9 @@ module.exports = {
         title: "Launch Settings",
         fields: [
           { id: "launchArgs", label: "Startup Arguments", value: installation.launchArgs ?? this.defaultLaunchArgs, editable: true },
-          { id: "launchMode", label: "Launch Mode", value: installation.launchMode || "browser", editable: true,
+          { id: "launchMode", label: "Launch Mode", value: installation.launchMode || "window", editable: true,
             editType: "select", options: [
-              { value: "browser", label: "Browser window" },
+              { value: "window", label: "App window" },
               { value: "console", label: "Console only" },
             ] },
         ],
@@ -142,7 +142,7 @@ module.exports = {
   },
 
   probeInstallation(dirPath) {
-    if (findPortableRoot(dirPath)) return { version: "unknown", asset: "", launchArgs: this.defaultLaunchArgs, launchMode: "browser" };
+    if (findPortableRoot(dirPath)) return { version: "unknown", asset: "", launchArgs: this.defaultLaunchArgs, launchMode: "window" };
     return null;
   },
 

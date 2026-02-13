@@ -95,7 +95,7 @@ module.exports = {
   defaultLaunchArgs: "--disable-auto-launch",
 
   getDefaults() {
-    return { launchArgs: this.defaultLaunchArgs, launchMode: "browser" };
+    return { launchArgs: this.defaultLaunchArgs, launchMode: "window" };
   },
 
   buildInstallation(selections) {
@@ -104,7 +104,7 @@ module.exports = {
       variant: selections.variant?.data?.variantId || "",
       downloadUrl: selections.variant?.value || "",
       launchArgs: this.defaultLaunchArgs,
-      launchMode: "browser",
+      launchMode: "window",
     };
   },
 
@@ -149,9 +149,9 @@ module.exports = {
         title: "Launch Settings",
         fields: [
           { id: "launchArgs", label: "Startup Arguments", value: installation.launchArgs ?? this.defaultLaunchArgs, editable: true },
-          { id: "launchMode", label: "Launch Mode", value: installation.launchMode || "browser", editable: true,
+          { id: "launchMode", label: "Launch Mode", value: installation.launchMode || "window", editable: true,
             editType: "select", options: [
-              { value: "browser", label: "Browser window" },
+              { value: "window", label: "App window" },
               { value: "console", label: "Console only" },
             ] },
         ],
@@ -209,7 +209,7 @@ module.exports = {
   probeInstallation(dirPath) {
     const envExists = fs.existsSync(path.join(dirPath, "standalone-env"));
     const mainExists = fs.existsSync(path.join(dirPath, "ComfyUI", "main.py"));
-    if (envExists && mainExists) return { version: "unknown", variant: "", launchArgs: this.defaultLaunchArgs, launchMode: "browser" };
+    if (envExists && mainExists) return { version: "unknown", variant: "", launchArgs: this.defaultLaunchArgs, launchMode: "window" };
     return null;
   },
 

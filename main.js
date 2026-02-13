@@ -105,7 +105,7 @@ function onLaunch({ port, process: proc, installation, mode }) {
     return;
   }
 
-  // Browser mode: hide launcher, open ComfyUI window
+  // App window mode: hide launcher, open ComfyUI in an embedded window
   if (launcherWindow && !launcherWindow.isDestroyed()) {
     launcherWindow.hide();
   }
