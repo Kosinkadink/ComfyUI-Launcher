@@ -38,7 +38,7 @@
       "renderer/**/*",
       "assets/**/*"
     ],
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "ComfyUI-Launcher-${version}-${os}-${arch}.${ext}",
     "win": {
       "target": "nsis",
       "icon": "assets/Comfy_Logo_x256.png"
