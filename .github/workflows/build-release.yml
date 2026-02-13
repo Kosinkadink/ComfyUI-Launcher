@@ -17,13 +17,16 @@ jobs:
         include:
           - os: windows-latest
             args: --win
+            platform: win
           - os: macos-latest
             args: --mac
+            platform: mac
           - os: ubuntu-latest
             args: --linux
+            platform: linux
 
     runs-on: ${{ matrix.os }}
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.platform }})
 
     steps:
       - name: Checkout
@@ -35,6 +38,13 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
       - name: Install dependencies
         run: npm ci
 
@@ -44,12 +54,13 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.os }}
+          name: dist-${{ matrix.platform }}
           path: |
             dist/*.exe
             dist/*.dmg
             dist/*.AppImage
             dist/*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   release:
