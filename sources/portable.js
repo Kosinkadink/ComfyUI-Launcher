@@ -68,7 +68,7 @@ module.exports = {
     const installed = installation.status === "installed";
     return [
       { id: "launch", label: "Launch", style: "primary", enabled: installed,
-        showProgress: true, progressTitle: "Starting ComfyUI…" },
+        showProgress: true, progressTitle: "Starting ComfyUI…", cancellable: true },
     ];
   },
 
@@ -99,7 +99,7 @@ module.exports = {
         title: "Actions",
         actions: [
           { id: "launch", label: "Launch", style: "primary", enabled: installation.status === "installed",
-            showProgress: true, progressTitle: "Starting ComfyUI…" },
+            showProgress: true, progressTitle: "Starting ComfyUI…", cancellable: true },
           { id: "check-update", label: "Check for Update", style: "default", enabled: false },
           deleteAction(installation),
           untrackAction(),

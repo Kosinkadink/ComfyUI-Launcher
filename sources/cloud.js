@@ -1,4 +1,6 @@
-const { deleteAction, untrackAction } = require("../lib/actions");
+const { untrackAction } = require("../lib/actions");
+
+const DEFAULT_URL = "https://cloud.comfy.org/";
 
 function parseUrl(raw) {
   const trimmed = (raw || "").trim();
@@ -16,13 +18,13 @@ function parseUrl(raw) {
 }
 
 module.exports = {
-  id: "remote",
-  label: "Remote Connection",
+  id: "cloud",
+  label: "Cloud",
 
   skipInstall: true,
 
   fields: [
-    { id: "url", label: "ComfyUI URL", type: "text", defaultValue: "http://localhost:8188" },
+    { id: "url", label: "ComfyUI URL", type: "text", defaultValue: DEFAULT_URL },
   ],
 
   getDefaults() {
@@ -30,10 +32,10 @@ module.exports = {
   },
 
   buildInstallation(selections) {
-    const url = selections.url?.value || "http://localhost:8188";
+    const url = selections.url?.value || DEFAULT_URL;
     const parsed = parseUrl(url);
     return {
-      version: "remote",
+      version: "cloud",
       remoteUrl: parsed ? parsed.href : url,
       launchMode: "window",
     };

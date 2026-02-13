@@ -110,6 +110,7 @@ window.Launcher.detail = {
         installationId: instId,
         title: action.progressTitle || `${action.label}…`,
         apiCall: () => window.api.runAction(instId, action.id),
+        cancellable: !!action.cancellable,
       });
       return;
     }

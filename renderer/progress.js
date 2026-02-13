@@ -3,9 +3,13 @@ window.Launcher = window.Launcher || {};
 window.Launcher.progress = {
   _unsubscribe: null,
 
-  show({ installationId, title, apiCall }) {
+  show({ installationId, title, apiCall, cancellable }) {
     document.getElementById("progress-title").textContent = title || "Working…";
     const container = document.getElementById("progress-content");
+    const cancelBtn = document.getElementById("btn-progress-cancel");
+    cancelBtn.style.display = cancellable ? "" : "none";
+    cancelBtn.onclick = cancellable ? () => window.api.cancelLaunch() : null;
+
     container.innerHTML = `
       <div class="progress-status" id="progress-status">Starting…</div>
       <div class="progress-bar-track">
@@ -45,14 +49,17 @@ window.Launcher.progress = {
       this._cleanup();
       const statusEl = document.getElementById("progress-status");
       if (statusEl) statusEl.textContent = `Error: ${msg}`;
-      const container = document.getElementById("progress-content");
-      const btn = document.createElement("button");
-      btn.textContent = "Back";
-      btn.onclick = () => {
+      const backBtn = document.getElementById("btn-progress-cancel");
+      backBtn.textContent = "← Back";
+      backBtn.className = "";
+      backBtn.style.display = "";
+      backBtn.onclick = () => {
+        backBtn.style.display = "none";
+        backBtn.textContent = "Cancel";
+        backBtn.className = "danger";
         window.Launcher.showView("list");
         window.Launcher.list.render();
       };
-      container.appendChild(btn);
     };
 
     return apiCall().then((result) => {
@@ -82,5 +89,8 @@ window.Launcher.progress = {
       this._unsubComfy();
       this._unsubComfy = null;
     }
+    const cancelBtn = document.getElementById("btn-progress-cancel");
+    cancelBtn.style.display = "none";
+    cancelBtn.onclick = null;
   },
 };
