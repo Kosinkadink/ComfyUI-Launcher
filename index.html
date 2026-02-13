@@ -13,6 +13,7 @@
 
   <!-- Instance List View -->
   <div id="view-list" class="view active">
+    <div id="update-banner" class="update-banner" style="display:none"></div>
     <div class="toolbar">
       <h2>Installations</h2>
       <div class="toolbar-actions">
@@ -136,6 +137,7 @@
   <script src="renderer/console.js"></script>
   <script src="renderer/settings.js"></script>
   <script src="renderer/track.js"></script>
+  <script src="renderer/update-banner.js"></script>
   <script>
     window.api.getResolvedTheme().then((t) => window.Launcher.applyTheme(t));
     window.api.onThemeChanged((t) => window.Launcher.applyTheme(t));
@@ -143,6 +145,7 @@
     window.Launcher.newInstall.init();
     window.Launcher.settings.init();
     window.Launcher.track.init();
+    window.Launcher.updateBanner.init();
     document.getElementById("btn-settings").onclick = () => window.Launcher.settings.show();
     window.Launcher.list.render();
   </script>

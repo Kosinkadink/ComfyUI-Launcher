@@ -2,14 +2,60 @@
   "name": "comfyui-launcher",
   "version": "0.1.0",
   "description": "ComfyUI Launcher",
+  "repository": "github:Kosinkadink/ComfyUI-Launcher",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
   "devDependencies": {
-    "electron": "^34.0.0"
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8"
   },
   "dependencies": {
-    "7zip-bin": "^5.2.0"
+    "7zip-bin": "^5.2.0",
+    "electron-updater": "^6.7.3"
+  },
+  "build": {
+    "appId": "com.kosinkadink.comfyui-launcher",
+    "productName": "ComfyUI Launcher",
+    "publish": {
+      "provider": "github",
+      "owner": "Kosinkadink",
+      "repo": "ComfyUI-Launcher"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "installations.js",
+      "settings.js",
+      "lib/**/*",
+      "sources/**/*",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/Comfy_Logo_x256.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/Comfy_Logo_x256.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "assets/Comfy_Logo_x256.png",
+      "category": "Development"
+    }
   }
 }

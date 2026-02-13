@@ -4,7 +4,7 @@ const { execFile } = require("child_process");
 const { fetchJSON } = require("../lib/fetch");
 const { deleteAction, untrackAction } = require("../lib/actions");
 
-const RELEASE_REPO = "kosinkadink/ComfyUI-Launcher";
+const RELEASE_REPO = "Kosinkadink/ComfyUI-Launcher-Environments";
 
 const VARIANT_LABELS = {
   "win-nvidia-cu130": "NVIDIA (CUDA 13.0)",

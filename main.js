@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu } = require("electron");
 const path = require("path");
 const ipc = require("./lib/ipc");
+const updater = require("./lib/updater");
 const settings = require("./settings");
 const { killProcessTree } = require("./lib/process");
 
@@ -166,6 +167,7 @@ function onLaunch({ port, process: proc, installation, mode }) {
 
 app.whenReady().then(() => {
   ipc.register({ onLaunch, onStop: stopComfyUI });
+  updater.register();
   createLauncherWindow();
 });
 

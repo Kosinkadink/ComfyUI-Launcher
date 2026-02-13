@@ -101,6 +101,7 @@ select, input[type="text"], input[type="number"] {
 }
 select:focus, input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
 select:disabled, input:disabled { opacity: 0.4; }
+input[type="checkbox"] { width: auto; margin-top: 8px; accent-color: var(--accent); }
 .field { display: flex; flex-direction: column; margin-bottom: 14px; }
 .path-input {
   display: flex;
@@ -299,3 +300,19 @@ select:disabled, input:disabled { opacity: 0.4; }
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Update banner */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.update-banner .update-text { flex: 1; color: var(--text); }
+.update-banner .update-text strong { color: var(--accent); }
+.update-banner button { flex-shrink: 0; }
