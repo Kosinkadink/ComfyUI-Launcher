@@ -38,6 +38,9 @@
       "renderer/**/*",
       "assets/**/*"
     ],
+    "asarUnpack": [
+      "node_modules/7zip-bin/**/*"
+    ],
     "artifactName": "ComfyUI-Launcher-${version}-${os}-${arch}.${ext}",
     "win": {
       "target": "nsis",
