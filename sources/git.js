@@ -75,6 +75,7 @@ module.exports = {
         title: "Actions",
         actions: [
           { id: "launch", label: "Launch", style: "primary", enabled: false },
+          { id: "open-folder", label: "Open Directory", style: "default", enabled: !!installation.installPath },
           { id: "pull", label: "Git Pull", style: "default", enabled: false },
           deleteAction(installation),
           untrackAction(),

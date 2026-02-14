@@ -94,6 +94,7 @@ module.exports = {
         actions: [
           { id: "launch", label: "Launch", style: "primary", enabled: installation.status === "installed",
             showProgress: true, progressTitle: "Starting ComfyUI…", cancellable: true },
+          { id: "open-folder", label: "Open Directory", style: "default", enabled: !!installation.installPath },
           { id: "check-update", label: "Check for Update", style: "default", enabled: false },
           deleteAction(installation),
           untrackAction(),
