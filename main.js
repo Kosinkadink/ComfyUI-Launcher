@@ -151,7 +151,7 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, "preload-comfy.js"),
+
     },
   });
   comfyWindow.setMenuBarVisibility(false);
@@ -163,6 +163,26 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
     comfyWindow.setTitle(`${title} — ${installation.name}`);
   });
   comfyWindow.loadURL(comfyUrl);
+
+  comfyWindow.webContents.on("before-input-event", (e, input) => {
+    if (input.type !== "keyDown") return;
+    if (input.key === "F5" || (input.key === "r" && (input.control || input.meta))) {
+      e.preventDefault();
+      comfyWindow.loadURL(comfyUrl);
+    }
+  });
+
+  // When navigation fails (server restarting), retry after a delay
+  let failRetryTimer = null;
+  comfyWindow.webContents.on("did-fail-load", (_e, _code, _desc, _url, isMainFrame) => {
+    if (!isMainFrame || failRetryTimer) return;
+    failRetryTimer = setTimeout(() => {
+      failRetryTimer = null;
+      if (comfyWindow && !comfyWindow.isDestroyed()) {
+        comfyWindow.loadURL(comfyUrl);
+      }
+    }, 2000);
+  });
 
   comfyWindow.on("close", (e) => {
     e.preventDefault();
