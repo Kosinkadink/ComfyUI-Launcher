@@ -3,7 +3,7 @@ const path = require("path");
 const ipc = require("./lib/ipc");
 const updater = require("./lib/updater");
 const settings = require("./settings");
-const { killProcessTree } = require("./lib/process");
+
 const i18n = require("./lib/i18n");
 
 const APP_ICON = path.join(__dirname, "assets", "Comfy_Logo_x256.png");
@@ -31,10 +31,8 @@ function createLauncherWindow() {
   launcherWindow.loadFile("index.html");
 
   launcherWindow.on("close", () => {
-    if (comfyProcess) {
-      killProcessTree(comfyProcess);
-      comfyProcess = null;
-    }
+    comfyProcess = null;
+    ipc.stopRunning();
   });
 }
 
@@ -61,12 +59,9 @@ function showComfyWindow() {
   }
 }
 
-function stopComfyUI() {
-  ipc.notifyStopped();
-  if (comfyProcess) {
-    killProcessTree(comfyProcess);
-    comfyProcess = null;
-  }
+async function stopComfyUI() {
+  comfyProcess = null;
+  await ipc.stopRunning();
   if (comfyWindow && !comfyWindow.isDestroyed()) {
     comfyWindow.destroy();
     comfyWindow = null;
@@ -82,10 +77,8 @@ function stopComfyUI() {
 }
 
 function quitApp() {
-  if (comfyProcess) {
-    killProcessTree(comfyProcess);
-    comfyProcess = null;
-  }
+  comfyProcess = null;
+  ipc.stopRunning();
   if (tray) {
     tray.destroy();
     tray = null;
@@ -93,17 +86,51 @@ function quitApp() {
   app.exit(0);
 }
 
+function onComfyExited() {
+  comfyProcess = null;
+  if (comfyWindow && !comfyWindow.isDestroyed()) {
+    comfyWindow.destroy();
+    comfyWindow = null;
+  }
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    launcherWindow.show();
+    launcherWindow.focus();
+  }
+}
+
+let _comfyUrl = null;
+let _comfyPort = null;
+
+function onComfyRestarted({ process: proc } = {}) {
+  comfyProcess = proc || null;
+  // Reload the ComfyUI window after the server is back up
+  if (comfyWindow && !comfyWindow.isDestroyed() && _comfyPort) {
+    const { waitForPort } = require("./lib/process");
+    waitForPort(_comfyPort, "127.0.0.1", { timeoutMs: 120000 })
+      .then(() => {
+        if (comfyWindow && !comfyWindow.isDestroyed()) {
+          comfyWindow.loadURL(_comfyUrl);
+        }
+      })
+      .catch(() => {});
+  }
+}
+
 function onLaunch({ port, url, process: proc, installation, mode }) {
   comfyProcess = proc;
   const comfyUrl = url || `http://127.0.0.1:${port}`;
+  _comfyUrl = comfyUrl;
+  _comfyPort = port;
 
   if (mode === "console") {
     // Console mode: launcher stays visible, renderer switches to console view
     if (proc) {
       proc.on("exit", () => {
-        if (comfyProcess === proc) {
-          comfyProcess = null;
-        }
+        if (comfyProcess === proc) comfyProcess = null;
       });
     }
     return;
@@ -124,6 +151,7 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, "preload-comfy.js"),
     },
   });
   comfyWindow.setMenuBarVisibility(false);
@@ -137,9 +165,8 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
   comfyWindow.loadURL(comfyUrl);
 
   comfyWindow.on("close", (e) => {
-    if (!proc && !comfyWindow) return;
     e.preventDefault();
-    const behavior = proc ? (settings.get("onComfyClose") || "tray") : "launcher";
+    const behavior = settings.get("onComfyClose") || "tray";
     if (behavior === "tray") {
       comfyWindow.hide();
     } else if (behavior === "launcher") {
@@ -153,27 +180,13 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
     comfyWindow = null;
   });
 
-  if (proc && (settings.get("onComfyClose") || "tray") === "tray") {
+  if ((settings.get("onComfyClose") || "tray") === "tray") {
     createTray(installation.name);
   }
 
   if (proc) {
     proc.on("exit", () => {
-      if (comfyProcess === proc) {
-        comfyProcess = null;
-        if (comfyWindow && !comfyWindow.isDestroyed()) {
-          comfyWindow.destroy();
-          comfyWindow = null;
-        }
-        if (tray) {
-          tray.destroy();
-          tray = null;
-        }
-        if (launcherWindow && !launcherWindow.isDestroyed()) {
-          launcherWindow.show();
-          launcherWindow.focus();
-        }
-      }
+      if (comfyProcess === proc) comfyProcess = null;
     });
   }
 }
@@ -181,14 +194,14 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
 app.whenReady().then(() => {
   const locale = settings.get("language") || app.getLocale().split("-")[0];
   i18n.init(locale);
-  ipc.register({ onLaunch, onStop: stopComfyUI });
+  ipc.register({ onLaunch, onStop: stopComfyUI, onComfyExited: onComfyExited, onComfyRestarted: onComfyRestarted });
   updater.register();
   createLauncherWindow();
 });
 
 app.on("window-all-closed", () => {
   // Don't quit if ComfyUI is still running (tray mode or console mode)
-  if (!tray && !comfyProcess) {
+  if (!tray && !comfyProcess && !ipc.getRunningPort()) {
     app.quit();
   }
 });

@@ -3,7 +3,6 @@ window.Launcher = window.Launcher || {};
 window.Launcher.console = {
   _unsubOutput: null,
   _unsubExited: null,
-
   show({ installationId, port, url, initialOutput }) {
     document.getElementById("console-title").textContent = window.t("console.title");
     const terminal = document.getElementById("console-terminal");

@@ -222,7 +222,7 @@ module.exports = {
     ];
   },
 
-  defaultLaunchArgs: "--disable-auto-launch",
+  defaultLaunchArgs: "--disable-auto-launch --enable-manager",
 
   get installSteps() {
     return [

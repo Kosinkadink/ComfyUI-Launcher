@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("comfy-exited", handler);
   },
   stopComfyUI: () => ipcRenderer.invoke("stop-comfyui"),
+  restartCore: () => ipcRenderer.invoke("restart-core"),
   cancelLaunch: () => ipcRenderer.invoke("cancel-launch"),
   getListActions: (installationId) =>
     ipcRenderer.invoke("get-list-actions", installationId),
