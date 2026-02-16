@@ -4,6 +4,7 @@ const ipc = require("./lib/ipc");
 const updater = require("./lib/updater");
 const settings = require("./settings");
 const { killProcessTree } = require("./lib/process");
+const i18n = require("./lib/i18n");
 
 const APP_ICON = path.join(__dirname, "assets", "Comfy_Logo_x256.png");
 
@@ -44,10 +45,10 @@ function createTray(installationName) {
   tray.setToolTip(`ComfyUI — ${installationName}`);
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: "Show ComfyUI", click: () => showComfyWindow() },
+    { label: i18n.t("tray.showComfyUI"), click: () => showComfyWindow() },
     { type: "separator" },
-    { label: "Stop and Return to Launcher", click: () => stopComfyUI() },
-    { label: "Quit", click: () => quitApp() },
+    { label: i18n.t("tray.stopReturn"), click: () => stopComfyUI() },
+    { label: i18n.t("tray.quit"), click: () => quitApp() },
   ]);
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => showComfyWindow());
@@ -178,6 +179,8 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
 }
 
 app.whenReady().then(() => {
+  const locale = settings.get("language") || app.getLocale().split("-")[0];
+  i18n.init(locale);
   ipc.register({ onLaunch, onStop: stopComfyUI });
   updater.register();
   createLauncherWindow();

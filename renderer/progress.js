@@ -4,14 +4,14 @@ window.Launcher.progress = {
   _unsubscribe: null,
 
   show({ installationId, title, apiCall, cancellable, returnTo }) {
-    document.getElementById("progress-title").textContent = title || "Working…";
+    document.getElementById("progress-title").textContent = title || window.t("progress.working");
     const container = document.getElementById("progress-content");
     const cancelBtn = document.getElementById("btn-progress-cancel");
     cancelBtn.style.display = cancellable ? "" : "none";
     cancelBtn.onclick = cancellable ? () => window.api.cancelLaunch() : null;
 
     container.innerHTML = `
-      <div class="progress-status" id="progress-status">Starting…</div>
+      <div class="progress-status" id="progress-status">${window.t("progress.starting")}</div>
       <div class="progress-bar-track">
         <div class="progress-bar-fill" id="progress-fill"></div>
       </div>
@@ -177,21 +177,21 @@ window.Launcher.progress = {
         const activeEl = container.querySelector(".progress-step.active");
         if (activeEl) {
           const status = activeEl.querySelector(".progress-step-status");
-          if (status) status.textContent = `Error: ${msg}`;
+          if (status) status.textContent = window.t("progress.error", { message: msg });
           const barTrack = activeEl.querySelector(".progress-bar-track");
           if (barTrack) barTrack.style.display = "none";
         }
       } else {
         const statusEl = document.getElementById("progress-status");
-        if (statusEl) statusEl.textContent = `Error: ${msg}`;
+        if (statusEl) statusEl.textContent = window.t("progress.error", { message: msg });
       }
       const backBtn = document.getElementById("btn-progress-cancel");
-      backBtn.textContent = "← Back";
-      backBtn.className = "";
+      backBtn.textContent = window.t("progress.back");
+      backBtn.className = "back-btn";
       backBtn.style.display = "";
       backBtn.onclick = () => {
         backBtn.style.display = "none";
-        backBtn.textContent = "Cancel";
+        backBtn.textContent = window.t("progress.cancel");
         backBtn.className = "danger";
         if (returnTo === "detail" && window.Launcher.detail._current) {
           window.Launcher.detail.show(window.Launcher.detail._current);

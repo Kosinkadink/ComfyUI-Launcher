@@ -44,7 +44,7 @@ window.Launcher.settings = {
           input.readOnly = true;
           const btn = document.createElement("button");
           btn.type = "button";
-          btn.textContent = "Browse…";
+          btn.textContent = window.t("newInstall.browse");
           btn.onclick = async () => {
             const dir = await window.api.browseFolder(input.value);
             if (dir) {
@@ -57,7 +57,7 @@ window.Launcher.settings = {
           if (f.openable) {
             const openBtn = document.createElement("button");
             openBtn.type = "button";
-            openBtn.textContent = "Open";
+            openBtn.textContent = window.t("settings.open");
             openBtn.onclick = () => window.api.openPath(input.value);
             row.appendChild(openBtn);
           }

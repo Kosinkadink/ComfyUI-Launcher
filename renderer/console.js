@@ -5,7 +5,7 @@ window.Launcher.console = {
   _unsubExited: null,
 
   show({ installationId, port, url, initialOutput }) {
-    document.getElementById("console-title").textContent = "ComfyUI Console";
+    document.getElementById("console-title").textContent = window.t("console.title");
     const terminal = document.getElementById("console-terminal");
     terminal.textContent = initialOutput || "";
     terminal.scrollTop = terminal.scrollHeight;
@@ -14,7 +14,7 @@ window.Launcher.console = {
     const isRemote = !!url;
 
     if (isRemote) {
-      terminal.textContent += `Connected to ${comfyUrl}\n`;
+      terminal.textContent += window.t("console.connectedTo", { url: comfyUrl }) + "\n";
     }
 
     window.Launcher.showView("console");
@@ -28,11 +28,11 @@ window.Launcher.console = {
     this._unsubExited = window.api.onComfyExited((data) => {
       if (data.installationId !== installationId) return;
       this._cleanup();
-      terminal.textContent += "\n\n--- Process exited ---\n";
+      terminal.textContent += window.t("console.processExited");
       terminal.scrollTop = terminal.scrollHeight;
       const stopBtn = document.getElementById("btn-console-stop");
-      stopBtn.textContent = "Back";
-      stopBtn.className = "";
+      stopBtn.textContent = window.t("console.back");
+      stopBtn.className = "back-btn";
       stopBtn.onclick = () => {
         window.Launcher.showView("list");
         window.Launcher.list.render();
@@ -45,7 +45,7 @@ window.Launcher.console = {
     };
 
     const stopBtn = document.getElementById("btn-console-stop");
-    stopBtn.textContent = isRemote ? "Disconnect" : "Stop";
+    stopBtn.textContent = isRemote ? window.t("console.disconnect") : window.t("console.stop");
     stopBtn.className = "danger";
     stopBtn.onclick = async () => {
       await window.api.stopComfyUI();

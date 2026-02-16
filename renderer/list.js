@@ -10,8 +10,8 @@ window.Launcher.list = {
     el.innerHTML = "";
 
     if (installations.length === 0) {
-      el.innerHTML =
-        '<div class="empty-state">No installations yet.<br>Click <strong>+ New Install</strong> to get started.</div>';
+      const msg = window.t("list.empty");
+      el.innerHTML = '<div class="empty-state">' + msg.replace(/\n/g, "<br>").replace(/\*\*(.+?)\*\*/g, (_, s) => `<strong>${window.Launcher.esc(s)}</strong>`) + '</div>';
       return;
     }
 
@@ -26,7 +26,7 @@ window.Launcher.list = {
           ? `${esc(inst.launchMode)}${inst.launchArgs ? " · " + esc(inst.launchArgs) : ""}`
           : "";
       card.innerHTML = `
-        <div class="drag-handle" title="Drag to reorder"><span></span><span></span><span></span></div>
+        <div class="drag-handle" title="${window.t("list.dragToReorder")}"><span></span><span></span><span></span></div>
         <div class="instance-info">
           <div class="instance-name">${esc(inst.name)}</div>
           <div class="instance-meta">${esc(inst.sourceLabel)}${inst.version ? " · " + esc(inst.version) : ""}${statusTag}</div>
@@ -78,7 +78,7 @@ window.Launcher.list = {
 
       const viewBtn = document.createElement("button");
       viewBtn.className = "view-btn";
-      viewBtn.textContent = "View";
+      viewBtn.textContent = window.t("list.view");
       viewBtn.onclick = () => window.Launcher.detail.show(inst);
       actionsEl.appendChild(viewBtn);
 

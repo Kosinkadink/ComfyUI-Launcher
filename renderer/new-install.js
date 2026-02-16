@@ -22,11 +22,11 @@ window.Launcher.newInstall = {
       pathInput.value = await this._installDirPromise;
 
       const gpuEl = document.getElementById("detected-gpu");
-      gpuEl.textContent = "Detecting GPU…";
+      gpuEl.textContent = window.t("newInstall.detectingGpu");
       const gpu = await this._gpuPromise;
       gpuEl.textContent = gpu
-        ? `Detected GPU: ${gpu.label}`
-        : "No supported GPU detected";
+        ? window.t("newInstall.detectedGpu", { label: gpu.label })
+        : window.t("newInstall.noGpuDetected");
     };
 
     document.getElementById("btn-browse").onclick = async () => {
@@ -130,7 +130,7 @@ window.Launcher.newInstall = {
       const select = document.createElement("select");
       select.id = `sf-${field.id}`;
       select.disabled = true;
-      select.innerHTML = "<option>Loading…</option>";
+      select.innerHTML = `<option>${window.Launcher.esc(window.t("newInstall.loading"))}</option>`;
       div.appendChild(select);
     }
 
@@ -159,7 +159,7 @@ window.Launcher.newInstall = {
     const select = document.getElementById(`sf-${field.id}`);
     const saveBtn = document.getElementById("btn-save");
     select.disabled = true;
-    select.innerHTML = "<option>Loading…</option>";
+    select.innerHTML = `<option>${window.Launcher.esc(window.t("newInstall.loading"))}</option>`;
 
     // Clear downstream select fields
     for (let i = fieldIndex + 1; i < source.fields.length; i++) {
@@ -190,7 +190,7 @@ window.Launcher.newInstall = {
       );
       select.innerHTML = "";
       if (options.length === 0) {
-        select.innerHTML = "<option>No options available</option>";
+        select.innerHTML = `<option>${window.Launcher.esc(window.t("newInstall.noOptions"))}</option>`;
         return;
       }
       let defaultIndex = options.findIndex((opt) => opt.recommended);
@@ -262,7 +262,7 @@ window.Launcher.newInstall = {
         name, installPath: "", status: "installed", ...instData,
       });
       if (!result.ok) {
-        await window.Launcher.modal.alert({ title: "Cannot Add", message: result.message });
+        await window.Launcher.modal.alert({ title: window.t("errors.cannotAdd"), message: result.message });
         return;
       }
       window.Launcher.showView("list");
@@ -273,12 +273,12 @@ window.Launcher.newInstall = {
     const installPath = document.getElementById("inst-path").value;
     const result = await window.api.addInstallation({ name, installPath, ...instData });
     if (!result.ok) {
-      await window.Launcher.modal.alert({ title: "Cannot Add", message: result.message });
+      await window.Launcher.modal.alert({ title: window.t("errors.cannotAdd"), message: result.message });
       return;
     }
     window.Launcher.progress.show({
       installationId: result.entry.id,
-      title: "Installing…",
+      title: window.t("newInstall.installing"),
       apiCall: () => window.api.installInstance(result.entry.id),
     });
   },

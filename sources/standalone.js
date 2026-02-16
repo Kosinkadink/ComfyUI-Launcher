@@ -5,6 +5,7 @@ const { deleteAction, untrackAction } = require("../lib/actions");
 const { downloadAndExtract, downloadAndExtractMulti } = require("../lib/installer");
 const { deleteDir } = require("../lib/delete");
 const { parseArgs } = require("../lib/util");
+const { t } = require("../lib/i18n");
 
 const RELEASE_REPO = "Kosinkadink/ComfyUI-Launcher-Environments";
 const ENVS_DIR = "envs";
@@ -209,20 +210,24 @@ function recommendVariant(variantId, gpu) {
 
 module.exports = {
   id: "standalone",
-  label: "Standalone",
+  get label() { return t("standalone.label"); },
 
-  fields: [
-    { id: "release", label: "Release", type: "select" },
-    { id: "variant", label: "Environment Variant", type: "select" },
-  ],
+  get fields() {
+    return [
+      { id: "release", label: t("standalone.release"), type: "select" },
+      { id: "variant", label: t("standalone.variant"), type: "select" },
+    ];
+  },
 
   defaultLaunchArgs: "--disable-auto-launch",
 
-  installSteps: [
-    { phase: "download", label: "Download" },
-    { phase: "extract", label: "Extract" },
-    { phase: "setup", label: "Set up environment" },
-  ],
+  get installSteps() {
+    return [
+      { phase: "download", label: t("standalone.download") },
+      { phase: "extract", label: t("standalone.extract") },
+      { phase: "setup", label: t("standalone.setupEnv") },
+    ];
+  },
 
   getDefaults() {
     return { launchArgs: this.defaultLaunchArgs, launchMode: "window" };
@@ -262,8 +267,8 @@ module.exports = {
   getListActions(installation) {
     const installed = installation.status === "installed";
     return [
-      { id: "launch", label: "Launch", style: "primary", enabled: installed,
-        showProgress: true, progressTitle: "Starting ComfyUI…", cancellable: true },
+      { id: "launch", label: t("actions.launch"), style: "primary", enabled: installed,
+        showProgress: true, progressTitle: t("standalone.startingComfyUI"), cancellable: true },
     ];
   },
 
@@ -277,57 +282,57 @@ module.exports = {
       label: name,
       active: name === activeEnv,
       actions: [
-        ...(name !== activeEnv ? [{ id: "env-activate", label: "Set Active", style: "default", data: { env: name } }] : []),
-        { id: "env-delete", label: "Delete", style: "danger", enabled: name !== activeEnv, data: { env: name },
-          showProgress: true, progressTitle: `Deleting Environment "${name}"…`,
-          disabledMessage: "Cannot delete the active environment. Set another environment as active first.",
-          confirm: { title: "Delete Environment", message: `Delete environment "${name}"? This cannot be undone.` } },
+        ...(name !== activeEnv ? [{ id: "env-activate", label: t("standalone.setActive"), style: "default", data: { env: name } }] : []),
+        { id: "env-delete", label: t("standalone.deleteEnv"), style: "danger", enabled: name !== activeEnv, data: { env: name },
+          showProgress: true, progressTitle: t("standalone.deletingEnv", { env: name }),
+          disabledMessage: t("standalone.cannotDeleteActive"),
+          confirm: { title: t("standalone.deleteEnvConfirmTitle"), message: t("standalone.deleteEnvConfirmMessage", { env: name }) } },
       ],
     }));
 
     return [
       {
-        title: "Installation Info",
+        title: t("standalone.installInfo"),
         fields: [
-          { label: "Install Method", value: installation.sourceLabel },
-          { label: "ComfyUI", value: installation.version },
-          { label: "Release", value: installation.releaseTag || "—" },
-          { label: "Variant", value: installation.variant ? getVariantLabel(installation.variant) : "—" },
-          { label: "Python", value: installation.pythonVersion || "—" },
-          { label: "Location", value: installation.installPath || "—" },
-          { label: "Installed", value: new Date(installation.createdAt).toLocaleDateString() },
+          { label: t("standalone.installMethod"), value: installation.sourceLabel },
+          { label: t("standalone.comfyui"), value: installation.version },
+          { label: t("standalone.release"), value: installation.releaseTag || "—" },
+          { label: t("standalone.variant"), value: installation.variant ? getVariantLabel(installation.variant) : "—" },
+          { label: t("standalone.python"), value: installation.pythonVersion || "—" },
+          { label: t("standalone.location"), value: installation.installPath || "—" },
+          { label: t("standalone.installed"), value: new Date(installation.createdAt).toLocaleDateString() },
         ],
       },
       {
-        title: "Python Environments",
+        title: t("standalone.pythonEnvs"),
         description: hasEnvs
-          ? `Active: ${activeEnv}`
-          : "No virtual environments created yet.",
+          ? t("standalone.activeEnv", { env: activeEnv })
+          : t("standalone.noEnvs"),
         items: envItems,
         actions: [
-          { id: "env-create", label: "New Environment", style: "default", enabled: installed,
-            showProgress: true, progressTitle: 'Creating Environment "{env}"…',
-            prompt: { title: "New Environment", message: "Enter a name for the new environment.", placeholder: "my-env", field: "env", confirmLabel: "Create", required: "Please enter an environment name." } },
+          { id: "env-create", label: t("standalone.newEnv"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("standalone.creatingEnv"),
+            prompt: { title: t("standalone.newEnvTitle"), message: t("standalone.newEnvMessage"), placeholder: t("standalone.newEnvPlaceholder"), field: "env", confirmLabel: t("standalone.newEnvCreate"), required: t("standalone.newEnvRequired") } },
         ],
       },
       {
-        title: "Launch Settings",
+        title: t("standalone.launchSettings"),
         fields: [
-          { id: "launchArgs", label: "Startup Arguments", value: installation.launchArgs ?? this.defaultLaunchArgs, editable: true },
-          { id: "launchMode", label: "Launch Mode", value: installation.launchMode || "window", editable: true,
+          { id: "launchArgs", label: t("standalone.startupArgs"), value: installation.launchArgs ?? this.defaultLaunchArgs, editable: true },
+          { id: "launchMode", label: t("standalone.launchMode"), value: installation.launchMode || "window", editable: true,
             editType: "select", options: [
-              { value: "window", label: "App window" },
-              { value: "console", label: "Console only" },
+              { value: "window", label: t("standalone.launchModeWindow") },
+              { value: "console", label: t("standalone.launchModeConsole") },
             ] },
         ],
       },
       {
         title: "Actions",
         actions: [
-          { id: "launch", label: "Launch", style: "primary", enabled: installed,
-            showProgress: true, progressTitle: "Starting ComfyUI…", cancellable: true },
-          { id: "open-folder", label: "Open Directory", style: "default", enabled: !!installation.installPath },
-          { id: "check-update", label: "Check for Update", style: "default", enabled: false },
+          { id: "launch", label: t("actions.launch"), style: "primary", enabled: installed,
+            showProgress: true, progressTitle: t("standalone.startingComfyUI"), cancellable: true },
+          { id: "open-folder", label: t("actions.openDirectory"), style: "default", enabled: !!installation.installPath },
+          { id: "check-update", label: t("actions.checkForUpdate"), style: "default", enabled: false },
           deleteAction(installation),
           untrackAction(),
         ],

@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("api", {
   browseFolder: (defaultPath) => ipcRenderer.invoke("browse-folder", defaultPath),
   openPath: (targetPath) => ipcRenderer.invoke("open-path", targetPath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  getLocaleMessages: () => ipcRenderer.invoke("get-locale-messages"),
+  getAvailableLocales: () => ipcRenderer.invoke("get-available-locales"),
   getInstallations: () => ipcRenderer.invoke("get-installations"),
   addInstallation: (data) => ipcRenderer.invoke("add-installation", data),
   reorderInstallations: (orderedIds) => ipcRenderer.invoke("reorder-installations", orderedIds),

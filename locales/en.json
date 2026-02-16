@@ -1,0 +1,178 @@
+{
+  "_label": "English",
+
+  "list": {
+    "title": "Installations",
+    "trackExisting": "Track Existing",
+    "newInstall": "New Install",
+    "empty": "No installations yet.\nClick **+ New Install** to get started.",
+    "view": "View",
+    "dragToReorder": "Drag to reorder"
+  },
+
+  "newInstall": {
+    "title": "New Installation",
+    "back": "Back",
+    "name": "Name",
+    "namePlaceholder": "e.g. ComfyUI Main",
+    "installMethod": "Install Method",
+    "installLocation": "Install Location",
+    "browse": "Browse…",
+    "addInstallation": "Add Installation",
+    "loading": "Loading…",
+    "detectingGpu": "Detecting GPU…",
+    "detectedGpu": "Detected GPU: {label}",
+    "noGpuDetected": "No supported GPU detected",
+    "noOptions": "No options available",
+    "installing": "Installing…"
+  },
+
+  "detail": {
+    "back": "Back"
+  },
+
+  "track": {
+    "title": "Track Existing Installation",
+    "back": "Back",
+    "installDir": "Installation Directory",
+    "selectDir": "Select a directory…",
+    "browse": "Browse…",
+    "detectedType": "Detected Type",
+    "browseDirFirst": "Browse to a directory first",
+    "detecting": "Detecting…",
+    "noDetected": "No known installation detected",
+    "name": "Name",
+    "namePlaceholder": "e.g. ComfyUI Main",
+    "trackInstallation": "Track Installation",
+    "cannotTrack": "Cannot Track"
+  },
+
+  "progress": {
+    "working": "Working…",
+    "cancel": "Cancel",
+    "starting": "Starting…",
+    "back": "Back",
+    "error": "Error: {message}"
+  },
+
+  "console": {
+    "title": "ComfyUI Console",
+    "openInBrowser": "Open in Browser",
+    "stop": "Stop",
+    "disconnect": "Disconnect",
+    "connectedTo": "Connected to {url}",
+    "processExited": "\n\n--- Process exited ---\n",
+    "back": "Back"
+  },
+
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "general": "General",
+    "theme": "Theme",
+    "themeSystem": "Match system",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "onComfyClose": "When ComfyUI window is closed",
+    "closeTray": "Minimize to system tray",
+    "closeLauncher": "Stop and return to launcher",
+    "closeQuit": "Quit the app",
+    "autoUpdate": "Check for updates on startup",
+    "downloads": "Downloads",
+    "cacheDir": "Cache Directory",
+    "maxCachedFiles": "Max Cached Downloads",
+    "open": "Open",
+    "about": "About",
+    "version": "Version",
+    "platform": "Platform",
+    "language": "Language"
+  },
+
+  "update": {
+    "available": "Update available: **v{version}**",
+    "download": "Download",
+    "dismiss": "Dismiss",
+    "downloading": "Downloading update… {transferred} / {total} MB ({percent}%)",
+    "ready": "Update **v{version}** ready to install",
+    "restartUpdate": "Restart & Update",
+    "later": "Later",
+    "checkFailed": "Update check failed",
+    "details": "Details",
+    "retry": "Retry",
+    "updateError": "Update Error"
+  },
+
+  "modal": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "areYouSure": "Are you sure?",
+    "required": "This field is required."
+  },
+
+  "tray": {
+    "showComfyUI": "Show ComfyUI",
+    "stopReturn": "Stop and Return to Launcher",
+    "quit": "Quit"
+  },
+
+  "actions": {
+    "launch": "Launch",
+    "openDirectory": "Open Directory",
+    "checkForUpdate": "Check for Update",
+    "delete": "Delete Installation",
+    "deleteConfirmTitle": "Delete Installation",
+    "deleteConfirmMessage": "This will permanently delete the installation and all its files. This cannot be undone.",
+    "untrack": "Untrack",
+    "untrackConfirmTitle": "Untrack Installation",
+    "untrackConfirmMessage": "This will remove the installation from the launcher. The files will not be deleted."
+  },
+
+  "standalone": {
+    "label": "Standalone",
+    "installInfo": "Installation Info",
+    "installMethod": "Install Method",
+    "comfyui": "ComfyUI",
+    "release": "Release",
+    "variant": "Environment Variant",
+    "python": "Python",
+    "location": "Location",
+    "installed": "Installed",
+    "pythonEnvs": "Python Environments",
+    "activeEnv": "Active: {env}",
+    "noEnvs": "No virtual environments created yet.",
+    "newEnv": "New Environment",
+    "newEnvTitle": "New Environment",
+    "newEnvMessage": "Enter a name for the new environment.",
+    "newEnvPlaceholder": "my-env",
+    "newEnvCreate": "Create",
+    "newEnvRequired": "Please enter an environment name.",
+    "creatingEnv": "Creating Environment \"{env}\"…",
+    "deletingEnv": "Deleting Environment \"{env}\"…",
+    "setActive": "Set Active",
+    "deleteEnv": "Delete",
+    "cannotDeleteActive": "Cannot delete the active environment. Set another environment as active first.",
+    "deleteEnvConfirmTitle": "Delete Environment",
+    "deleteEnvConfirmMessage": "Delete environment \"{env}\"? This cannot be undone.",
+    "launchSettings": "Launch Settings",
+    "startupArgs": "Startup Arguments",
+    "launchMode": "Launch Mode",
+    "launchModeWindow": "App window",
+    "launchModeConsole": "Console only",
+    "startingComfyUI": "Starting ComfyUI…",
+    "download": "Download",
+    "extract": "Extract",
+    "setupEnv": "Set up environment"
+  },
+
+  "errors": {
+    "noLaunchSupport": "This source does not support launching yet.",
+    "noEnvFound": "Cannot launch: no Python environment found. Create one first.",
+    "alreadyRunning": "ComfyUI is already running. Stop it before launching again.",
+    "cannotAdd": "Cannot Add",
+    "dirNotExist": "Directory does not exist: {path}",
+    "cannotOpenDir": "Could not open directory: {error}",
+    "launchCancelled": "Launch cancelled.",
+    "cannotConnect": "Could not connect to {url}. Make sure ComfyUI is running at that address."
+  }
+}

@@ -28,10 +28,11 @@ window.Launcher.updateBanner = {
 
   _showAvailable(banner, info) {
     const { esc } = window.Launcher;
+    const availText = window.t("update.available", { version: info.version }).replace(/\*\*(.+?)\*\*/g, (_, s) => `<strong>${esc(s)}</strong>`);
     banner.innerHTML = `
-      <span class="update-text">Update available: <strong>v${esc(info.version)}</strong></span>
-      <button class="primary" id="btn-update-download">Download</button>
-      <button id="btn-update-dismiss">Dismiss</button>`;
+      <span class="update-text">${availText}</span>
+      <button class="primary" id="btn-update-download">${esc(window.t("update.download"))}</button>
+      <button id="btn-update-dismiss">${esc(window.t("update.dismiss"))}</button>`;
     banner.style.display = "flex";
     document.getElementById("btn-update-download").onclick = () => window.api.downloadUpdate();
     document.getElementById("btn-update-dismiss").onclick = () => { banner.style.display = "none"; };
@@ -40,30 +41,32 @@ window.Launcher.updateBanner = {
   _showDownloading(banner, progress) {
     const { esc } = window.Launcher;
     banner.innerHTML = `
-      <span class="update-text">Downloading update… ${esc(progress.transferred)} / ${esc(progress.total)} MB (${progress.percent}%)</span>`;
+      <span class="update-text">${esc(window.t("update.downloading", { transferred: progress.transferred, total: progress.total, percent: progress.percent }))}</span>`;
     banner.style.display = "flex";
   },
 
   _showReady(banner, info) {
     const { esc } = window.Launcher;
+    const readyText = window.t("update.ready", { version: info.version }).replace(/\*\*(.+?)\*\*/g, (_, s) => `<strong>${esc(s)}</strong>`);
     banner.innerHTML = `
-      <span class="update-text">Update <strong>v${esc(info.version)}</strong> ready to install</span>
-      <button class="primary" id="btn-update-install">Restart & Update</button>
-      <button id="btn-update-later">Later</button>`;
+      <span class="update-text">${readyText}</span>
+      <button class="primary" id="btn-update-install">${esc(window.t("update.restartUpdate"))}</button>
+      <button id="btn-update-later">${esc(window.t("update.later"))}</button>`;
     banner.style.display = "flex";
     document.getElementById("btn-update-install").onclick = () => window.api.installUpdate();
     document.getElementById("btn-update-later").onclick = () => { banner.style.display = "none"; };
   },
 
   _showError(banner, err) {
+    const { esc } = window.Launcher;
     banner.innerHTML = `
-      <span class="update-text">Update check failed</span>
-      <button id="btn-update-details">Details</button>
-      <button id="btn-update-retry">Retry</button>
-      <button id="btn-update-error-dismiss">Dismiss</button>`;
+      <span class="update-text">${esc(window.t("update.checkFailed"))}</span>
+      <button id="btn-update-details">${esc(window.t("update.details"))}</button>
+      <button id="btn-update-retry">${esc(window.t("update.retry"))}</button>
+      <button id="btn-update-error-dismiss">${esc(window.t("update.dismiss"))}</button>`;
     banner.style.display = "flex";
     document.getElementById("btn-update-details").onclick = () => {
-      window.Launcher.modal.alert({ title: "Update Error", message: err.message });
+      window.Launcher.modal.alert({ title: window.t("update.updateError"), message: err.message });
     };
     document.getElementById("btn-update-retry").onclick = () => {
       banner.style.display = "none";

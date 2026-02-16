@@ -9,11 +9,11 @@
   <!-- Instance List View -->
   <div id="view-list" class="view active">
     <div class="toolbar">
-      <h2>Installations</h2>
+      <h2 data-i18n="list.title">Installations</h2>
       <div class="toolbar-actions">
         <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
-        <button id="btn-track">Track Existing</button>
-        <button class="primary" id="btn-new">+ New Install</button>
+        <button id="btn-track" data-i18n="list.trackExisting">Track Existing</button>
+        <button class="primary add-btn" id="btn-new" data-i18n="list.newInstall">New Install</button>
       </div>
     </div>
     <div class="view-list-scroll">
@@ -25,43 +25,43 @@
   <!-- New Install View -->
   <div id="view-new" class="view">
     <div class="toolbar">
-      <h2>New Installation</h2>
-      <button id="btn-new-back">← Back</button>
+      <h2 data-i18n="newInstall.title">New Installation</h2>
+      <button id="btn-new-back" class="back-btn" data-i18n="newInstall.back">Back</button>
     </div>
     <div class="view-scroll">
       <div id="detected-gpu" class="detected-hardware"></div>
 
       <div class="field">
-        <label for="inst-name">Name</label>
+        <label for="inst-name" data-i18n="newInstall.name">Name</label>
         <input type="text" id="inst-name" placeholder="e.g. ComfyUI Main">
       </div>
 
       <div class="field">
-        <label for="source">Install Method</label>
+        <label for="source" data-i18n="newInstall.installMethod">Install Method</label>
         <select id="source" disabled><option>Loading…</option></select>
       </div>
 
       <div id="source-fields"></div>
 
       <div class="field">
-        <label for="inst-path">Install Location</label>
+        <label for="inst-path" data-i18n="newInstall.installLocation">Install Location</label>
         <div class="path-input">
           <input type="text" id="inst-path" placeholder="Loading…" readonly>
-          <button id="btn-browse" type="button">Browse…</button>
+          <button id="btn-browse" type="button" data-i18n="newInstall.browse">Browse…</button>
         </div>
       </div>
     </div>
     <div class="view-bottom">
-      <button class="primary" id="btn-save" disabled>Add Installation</button>
+      <button class="primary" id="btn-save" disabled data-i18n="newInstall.addInstallation">Add Installation</button>
     </div>
   </div>
 
   <!-- Progress View -->
   <div id="view-progress" class="view">
     <div class="toolbar">
-      <h2 id="progress-title">Working…</h2>
+      <h2 id="progress-title" data-i18n="progress.working">Working…</h2>
       <div class="toolbar-actions">
-        <button class="danger" id="btn-progress-cancel" style="display:none">Cancel</button>
+        <button class="danger" id="btn-progress-cancel" style="display:none" data-i18n="progress.cancel">Cancel</button>
       </div>
     </div>
     <div class="view-scroll" id="progress-content"></div>
@@ -71,7 +71,7 @@
   <div id="view-detail" class="view">
     <div class="toolbar">
       <h2 id="detail-title"></h2>
-      <button id="btn-detail-back">← Back</button>
+      <button id="btn-detail-back" class="back-btn" data-i18n="detail.back">Back</button>
     </div>
     <div class="view-scroll" id="detail-sections"></div>
     <div id="detail-bottom-actions"></div>
@@ -80,42 +80,42 @@
   <!-- Track Existing View -->
   <div id="view-track" class="view">
     <div class="toolbar">
-      <h2>Track Existing Installation</h2>
-      <button id="btn-track-back">← Back</button>
+      <h2 data-i18n="track.title">Track Existing Installation</h2>
+      <button id="btn-track-back" class="back-btn" data-i18n="track.back">Back</button>
     </div>
     <div class="view-scroll">
       <div class="field">
-        <label for="track-path">Installation Directory</label>
+        <label for="track-path" data-i18n="track.installDir">Installation Directory</label>
         <div class="path-input">
           <input type="text" id="track-path" placeholder="Select a directory…" readonly>
-          <button id="btn-track-browse" type="button">Browse…</button>
+          <button id="btn-track-browse" type="button" data-i18n="track.browse">Browse…</button>
         </div>
       </div>
 
       <div class="field">
-        <label for="track-source">Detected Type</label>
+        <label for="track-source" data-i18n="track.detectedType">Detected Type</label>
         <select id="track-source" disabled><option>Browse to a directory first</option></select>
       </div>
 
       <div class="field">
-        <label for="track-name">Name</label>
+        <label for="track-name" data-i18n="track.name">Name</label>
         <input type="text" id="track-name" placeholder="e.g. ComfyUI Main">
       </div>
 
       <div id="track-detail"></div>
     </div>
     <div class="view-bottom">
-      <button class="primary" id="btn-track-save" disabled>Track Installation</button>
+      <button class="primary" id="btn-track-save" disabled data-i18n="track.trackInstallation">Track Installation</button>
     </div>
   </div>
 
   <!-- Console View -->
   <div id="view-console" class="view">
     <div class="toolbar">
-      <h2 id="console-title">ComfyUI Console</h2>
+      <h2 id="console-title" data-i18n="console.title">ComfyUI Console</h2>
       <div class="toolbar-actions">
-        <button id="btn-console-browser">Open in Browser</button>
-        <button class="danger" id="btn-console-stop">Stop</button>
+        <button id="btn-console-browser" data-i18n="console.openInBrowser">Open in Browser</button>
+        <button class="danger" id="btn-console-stop" data-i18n="console.stop">Stop</button>
       </div>
     </div>
     <div class="terminal-output" id="console-terminal"></div>
@@ -124,12 +124,13 @@
   <!-- Settings View -->
   <div id="view-settings" class="view">
     <div class="toolbar">
-      <h2>Settings</h2>
-      <button id="btn-settings-back">← Back</button>
+      <h2 data-i18n="settings.title">Settings</h2>
+      <button id="btn-settings-back" class="back-btn" data-i18n="settings.back">Back</button>
     </div>
     <div class="view-scroll" id="settings-sections"></div>
   </div>
 
+  <script src="renderer/i18n.js"></script>
   <script src="renderer/util.js"></script>
   <script src="renderer/modal.js"></script>
   <script src="renderer/list.js"></script>
@@ -141,6 +142,7 @@
   <script src="renderer/track.js"></script>
   <script src="renderer/update-banner.js"></script>
   <script>
+    window.api.getLocaleMessages().then((msgs) => window.Launcher.i18n.init(msgs));
     window.api.getResolvedTheme().then((t) => window.Launcher.applyTheme(t));
     window.api.onThemeChanged((t) => window.Launcher.applyTheme(t));
     window.Launcher.detail.init();

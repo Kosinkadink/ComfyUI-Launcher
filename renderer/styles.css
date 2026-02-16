@@ -79,6 +79,8 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 button.danger { color: var(--danger); border-color: var(--danger); }
 button.danger:hover { background: var(--danger); color: var(--bg); }
 button.looks-disabled { opacity: 0.4; }
+button.back-btn::before { content: "← "; }
+button.add-btn::before { content: "+ "; }
 
 /* Forms */
 label { font-size: 13px; color: var(--text-muted); }

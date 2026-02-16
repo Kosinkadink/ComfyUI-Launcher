@@ -37,7 +37,7 @@ window.Launcher.track = {
     document.getElementById("track-path").value = "";
     document.getElementById("track-name").value = "";
     document.getElementById("track-source").disabled = true;
-    document.getElementById("track-source").innerHTML = "<option>Browse to a directory first</option>";
+    document.getElementById("track-source").innerHTML = `<option>${window.Launcher.esc(window.t("track.browseDirFirst"))}</option>`;
     document.getElementById("track-detail").innerHTML = "";
     document.getElementById("btn-track-save").disabled = true;
     this._probeResults = [];
@@ -50,13 +50,13 @@ window.Launcher.track = {
     const detailEl = document.getElementById("track-detail");
 
     sourceSelect.disabled = true;
-    sourceSelect.innerHTML = "<option>Detecting…</option>";
+    sourceSelect.innerHTML = `<option>${window.Launcher.esc(window.t("track.detecting"))}</option>`;
     detailEl.innerHTML = "";
 
     this._probeResults = await window.api.probeInstallation(dirPath);
 
     if (this._probeResults.length === 0) {
-      sourceSelect.innerHTML = "<option>No known installation detected</option>";
+      sourceSelect.innerHTML = `<option>${window.Launcher.esc(window.t("track.noDetected"))}</option>`;
       this._selectedProbe = null;
       this._updateSaveState();
       return;
@@ -120,7 +120,7 @@ window.Launcher.track = {
 
     const result = await window.api.trackInstallation(data);
     if (!result.ok) {
-      await window.Launcher.modal.alert({ title: "Cannot Track", message: result.message });
+      await window.Launcher.modal.alert({ title: window.t("track.cannotTrack"), message: result.message });
       return;
     }
     window.Launcher.showView("list");

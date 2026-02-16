@@ -41,7 +41,8 @@
       "lib/**/*",
       "sources/**/*",
       "renderer/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "locales/**/*"
     ],
     "asarUnpack": [
       "node_modules/7zip-bin/**/*"
