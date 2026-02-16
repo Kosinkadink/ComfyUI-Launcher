@@ -92,7 +92,7 @@
     "available": "Update available: **v{version}**",
     "download": "Download",
     "dismiss": "Dismiss",
-    "downloading": "Downloading update… {transferred} / {total} MB ({percent}%)",
+    "downloading": "Downloading update… {progress}",
     "ready": "Update **v{version}** ready to install",
     "restartUpdate": "Restart & Update",
     "later": "Later",
@@ -163,6 +163,13 @@
     "download": "Download",
     "extract": "Extract",
     "setupEnv": "Set up environment"
+  },
+
+  "installer": {
+    "cachedDownload": "Using cached download",
+    "startingDownload": "Starting download…",
+    "downloading": "Downloading… {progress}",
+    "extracting": "Extracting… {progress}"
   },
 
   "errors": {

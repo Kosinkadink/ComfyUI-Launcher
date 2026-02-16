@@ -21,6 +21,7 @@ window.Launcher.progress = {
 
     let steps = null;
     let activePhase = null;
+    const lastStatus = {};
 
     const renderSteps = () => {
       const terminalContent = document.getElementById("progress-terminal")?.textContent || "";
@@ -65,6 +66,12 @@ window.Launcher.progress = {
         detail.appendChild(status);
         detail.appendChild(barTrack);
         stepEl.appendChild(detail);
+
+        const summary = document.createElement("div");
+        summary.className = "progress-step-summary";
+        summary.style.display = "none";
+        stepEl.appendChild(summary);
+
         stepsContainer.appendChild(stepEl);
       });
 
@@ -82,6 +89,7 @@ window.Launcher.progress = {
       if (stepIndex === -1) return;
 
       activePhase = data.phase;
+      lastStatus[data.phase] = data.status || data.phase;
 
       steps.forEach((step, i) => {
         const stepEl = container.querySelector(`.progress-step[data-phase="${step.phase}"]`);
@@ -91,15 +99,21 @@ window.Launcher.progress = {
         const detail = stepEl.querySelector(".progress-step-detail");
         const status = stepEl.querySelector(".progress-step-status");
         const barFill = stepEl.querySelector(".progress-bar-fill");
+        const summary = stepEl.querySelector(".progress-step-summary");
 
         if (i < stepIndex) {
           stepEl.className = "progress-step done";
           indicator.textContent = "✓";
           detail.style.display = "none";
+          if (lastStatus[step.phase]) {
+            summary.textContent = lastStatus[step.phase];
+            summary.style.display = "";
+          }
         } else if (i === stepIndex) {
           stepEl.className = "progress-step active";
           indicator.textContent = String(i + 1);
           detail.style.display = "";
+          summary.style.display = "none";
           status.textContent = data.status || data.phase;
           if (data.percent >= 0) {
             barFill.style.width = `${data.percent}%`;
@@ -112,6 +126,7 @@ window.Launcher.progress = {
           stepEl.className = "progress-step";
           indicator.textContent = String(i + 1);
           detail.style.display = "none";
+          summary.style.display = "none";
         }
       });
     };
@@ -123,6 +138,11 @@ window.Launcher.progress = {
         stepEl.className = "progress-step done";
         stepEl.querySelector(".progress-step-indicator").textContent = "✓";
         stepEl.querySelector(".progress-step-detail").style.display = "none";
+        const summary = stepEl.querySelector(".progress-step-summary");
+        if (lastStatus[step.phase]) {
+          summary.textContent = lastStatus[step.phase];
+          summary.style.display = "";
+        }
       });
     };
 

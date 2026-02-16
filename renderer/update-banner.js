@@ -41,7 +41,7 @@ window.Launcher.updateBanner = {
   _showDownloading(banner, progress) {
     const { esc } = window.Launcher;
     banner.innerHTML = `
-      <span class="update-text">${esc(window.t("update.downloading", { transferred: progress.transferred, total: progress.total, percent: progress.percent }))}</span>`;
+      <span class="update-text">${esc(window.t("update.downloading", { progress: `${progress.transferred} / ${progress.total} MB (${progress.percent}%)` }))}</span>`;
     banner.style.display = "flex";
   },
 

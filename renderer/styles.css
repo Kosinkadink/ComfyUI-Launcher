@@ -387,6 +387,13 @@ h2[contenteditable]:focus { border-bottom-color: var(--accent); }
   margin-bottom: 6px;
   user-select: text;
 }
+.progress-step-summary {
+  margin-left: 32px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-faint);
+  user-select: text;
+}
 
 /* Terminal output */
 .terminal-output {

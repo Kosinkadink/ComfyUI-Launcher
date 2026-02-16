@@ -483,7 +483,7 @@ module.exports = {
           if (assets.length === 0) return null;
           const totalBytes = assets.reduce((sum, a) => sum + a.size, 0);
           const sizeMB = (totalBytes / 1048576).toFixed(0);
-          const downloadFiles = assets.map((a) => ({ url: a.browser_download_url, filename: a.name }));
+          const downloadFiles = assets.map((a) => ({ url: a.browser_download_url, filename: a.name, size: a.size }));
           const downloadUrl = downloadFiles.length === 1 ? downloadFiles[0].url : "";
           return {
             value: downloadFiles.length > 0 ? m.id : "",
