@@ -30,7 +30,12 @@ window.Launcher.settings = {
         label.textContent = f.label;
         field.appendChild(label);
 
-        if (f.type === "path") {
+        if (f.readonly) {
+          const val = document.createElement("div");
+          val.className = "detail-field-value";
+          val.textContent = f.value;
+          field.appendChild(val);
+        } else if (f.type === "path") {
           const row = document.createElement("div");
           row.className = "path-input";
           const input = document.createElement("input");
@@ -95,6 +100,22 @@ window.Launcher.settings = {
       });
 
       sec.appendChild(fieldsWrap);
+
+      if (section.actions) {
+        const bar = document.createElement("div");
+        bar.className = "detail-actions";
+        bar.style.marginTop = "8px";
+        section.actions.forEach((a) => {
+          const btn = document.createElement("button");
+          btn.textContent = a.label;
+          btn.onclick = () => {
+            if (a.url) window.api.openExternal(a.url);
+          };
+          bar.appendChild(btn);
+        });
+        sec.appendChild(bar);
+      }
+
       container.appendChild(sec);
     });
 

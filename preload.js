@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("api", {
   detectGPU: () => ipcRenderer.invoke("detect-gpu"),
   browseFolder: (defaultPath) => ipcRenderer.invoke("browse-folder", defaultPath),
   openPath: (targetPath) => ipcRenderer.invoke("open-path", targetPath),
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
   getInstallations: () => ipcRenderer.invoke("get-installations"),
   addInstallation: (data) => ipcRenderer.invoke("add-installation", data),
   reorderInstallations: (orderedIds) => ipcRenderer.invoke("reorder-installations", orderedIds),
