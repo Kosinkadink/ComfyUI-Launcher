@@ -81,12 +81,13 @@ async function copyDirWithProgress(src, dest, onProgress) {
   let copied = 0;
   const step = Math.max(1, Math.floor(total / 100));
   const concurrency = 50;
-  const createdDirs = new Set();
+  const dirPromises = new Map();
 
-  const ensureDir = async (dir) => {
-    if (createdDirs.has(dir)) return;
-    createdDirs.add(dir);
-    await fs.promises.mkdir(dir, { recursive: true });
+  const ensureDir = (dir) => {
+    if (dirPromises.has(dir)) return dirPromises.get(dir);
+    const p = fs.promises.mkdir(dir, { recursive: true });
+    dirPromises.set(dir, p);
+    return p;
   };
 
   let i = 0;
