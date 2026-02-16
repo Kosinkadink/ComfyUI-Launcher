@@ -112,9 +112,9 @@ function onComfyRestarted({ process: proc } = {}) {
     const { waitForPort } = require("./lib/process");
     waitForPort(_comfyPort, "127.0.0.1", { timeoutMs: 120000 })
       .then(() => {
-        if (comfyWindow && !comfyWindow.isDestroyed()) {
-          comfyWindow.loadURL(_comfyUrl);
-        }
+        if (!comfyWindow || comfyWindow.isDestroyed()) return;
+        comfyWindow.webContents.stop();
+        comfyWindow.loadURL(_comfyUrl);
       })
       .catch(() => {});
   }
@@ -151,7 +151,6 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-
     },
   });
   comfyWindow.setMenuBarVisibility(false);
@@ -164,24 +163,45 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
   });
   comfyWindow.loadURL(comfyUrl);
 
+  // Reload ComfyUI — stop any in-flight loads first to avoid ERR_ABORTED loops.
+  const reloadComfy = () => {
+    if (!comfyWindow || comfyWindow.isDestroyed()) return;
+    comfyWindow.webContents.stop();
+    comfyWindow.loadURL(comfyUrl);
+  };
+
+  // ComfyUI sets a beforeunload handler that silently blocks navigation in
+  // Electron. Always allow unload — we manage the process lifecycle.
+  comfyWindow.webContents.on("will-prevent-unload", (e) => {
+    e.preventDefault();
+  });
+
+  // F5 / Ctrl+R refresh — handled at the webContents level so it only
+  // fires when this window is focused (unlike globalShortcut).
   comfyWindow.webContents.on("before-input-event", (e, input) => {
     if (input.type !== "keyDown") return;
     if (input.key === "F5" || (input.key === "r" && (input.control || input.meta))) {
       e.preventDefault();
-      comfyWindow.loadURL(comfyUrl);
+      reloadComfy();
     }
   });
 
-  // When navigation fails (server restarting), retry after a delay
+  // When main frame navigation fails (server restarting), retry after a delay.
+  // Ignore ERR_ABORTED (-3) which fires when a navigation is superseded.
   let failRetryTimer = null;
-  comfyWindow.webContents.on("did-fail-load", (_e, _code, _desc, _url, isMainFrame) => {
-    if (!isMainFrame || failRetryTimer) return;
+  comfyWindow.webContents.on("did-fail-load", (_e, code, _desc, _url, isMainFrame) => {
+    if (!isMainFrame || code === -3 || failRetryTimer) return;
     failRetryTimer = setTimeout(() => {
       failRetryTimer = null;
       if (comfyWindow && !comfyWindow.isDestroyed()) {
         comfyWindow.loadURL(comfyUrl);
       }
     }, 2000);
+  });
+
+  // Recover from renderer crashes
+  comfyWindow.webContents.on("render-process-gone", () => {
+    reloadComfy();
   });
 
   comfyWindow.on("close", (e) => {
