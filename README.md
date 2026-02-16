@@ -66,6 +66,20 @@ chmod +x ComfyUI-Launcher-*.AppImage
 ./ComfyUI-Launcher-*.AppImage --no-sandbox
 ```
 
+## Releasing
+
+Pushing a version tag triggers the **Build & Release** workflow, which builds for Windows, macOS, and Linux, then creates a draft GitHub Release with all artifacts.
+
+```bash
+# Tag the current commit with the new version
+git tag v0.1.0
+
+# Push the tag to trigger the release workflow
+git push origin v0.1.0
+```
+
+The workflow sets the app version from the tag automatically. Once the builds finish, go to the [Releases](../../releases) page to review and publish the draft.
+
 ## Data Locations
 
 | Purpose | Path |
