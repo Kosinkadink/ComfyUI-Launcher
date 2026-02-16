@@ -211,7 +211,10 @@ h2[contenteditable]:focus { border-bottom-color: var(--accent); }
 }
 
 .view { display: none; }
-.view.active { display: block; overflow-y: auto; flex: 1; min-height: 0; padding-right: 8px; }
+.view.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.view-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 8px; }
+.view-bottom { flex-shrink: 0; display: flex; gap: 10px; padding-top: 12px; }
+.view-list-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 8px; }
 
 /* Detail sections */
 .detail-section { margin-bottom: 18px; }
@@ -275,6 +278,7 @@ h2[contenteditable]:focus { border-bottom-color: var(--accent); }
   padding: 3px 10px;
 }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#detail-bottom-actions { flex-shrink: 0; padding-top: 12px; }
 
 /* Settings */
 .settings-section { margin-bottom: 18px; }
@@ -397,13 +401,6 @@ h2[contenteditable]:focus { border-bottom-color: var(--accent); }
   max-height: 300px;
   user-select: text;
 }
-#view-console {
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-#view-console.active { display: flex; }
 #console-terminal {
   max-height: none;
   flex: 1;
@@ -465,7 +462,7 @@ h2[contenteditable]:focus { border-bottom-color: var(--accent); }
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  margin-bottom: 12px;
+  margin-top: 16px;
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--surface);

@@ -25,10 +25,48 @@ window.Launcher.detail = {
     };
     const container = document.getElementById("detail-sections");
     container.innerHTML = "";
+    const bottomContainer = document.getElementById("detail-bottom-actions");
+    bottomContainer.innerHTML = "";
 
     const sections = await window.api.getDetailSections(inst.id);
 
-    sections.forEach((section) => {
+    // Separate the last "Actions" section to pin it at the bottom
+    let bottomSection = null;
+    const mainSections = [];
+    for (const section of sections) {
+      if (section.title === "Actions" && section.actions && !section.fields && !section.items) {
+        bottomSection = section;
+      } else {
+        mainSections.push(section);
+      }
+    }
+
+    if (bottomSection) {
+      const bar = document.createElement("div");
+      bar.className = "detail-actions";
+      bottomSection.actions.forEach((a) => {
+        const btn = document.createElement("button");
+        btn.textContent = a.label;
+        if (a.style === "primary") btn.className = "primary";
+        if (a.style === "danger") btn.className = "danger";
+        if (a.enabled === false && !a.disabledMessage) {
+          btn.disabled = true;
+        } else if (a.enabled === false && a.disabledMessage) {
+          btn.classList.add("looks-disabled");
+        }
+        btn.onclick = () => {
+          if (a.enabled === false && a.disabledMessage) {
+            window.Launcher.modal.alert({ title: a.label, message: a.disabledMessage });
+            return;
+          }
+          this._runAction(a);
+        };
+        bar.appendChild(btn);
+      });
+      bottomContainer.appendChild(bar);
+    }
+
+    mainSections.forEach((section) => {
       const sec = document.createElement("div");
       sec.className = "detail-section";
 
@@ -158,7 +196,7 @@ window.Launcher.detail = {
     });
 
     showView("detail");
-    document.getElementById("view-detail").scrollTop = 0;
+    document.getElementById("detail-sections").scrollTop = 0;
   },
 
   async _runAction(action) {
@@ -204,10 +242,10 @@ window.Launcher.detail = {
       showView("list");
       list.render();
     } else if (result.navigate === "detail") {
-      const view = document.getElementById("view-detail");
-      const scrollY = view ? view.scrollTop : 0;
+      const scrollEl = document.getElementById("detail-sections");
+      const scrollY = scrollEl ? scrollEl.scrollTop : 0;
       await this.show(this._current);
-      if (view) view.scrollTop = scrollY;
+      if (scrollEl) scrollEl.scrollTop = scrollY;
     } else if (result.message) {
       await modal.alert({ title: action.label, message: result.message });
     }

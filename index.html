@@ -8,7 +8,6 @@
 <body>
   <!-- Instance List View -->
   <div id="view-list" class="view active">
-    <div id="update-banner" class="update-banner" style="display:none"></div>
     <div class="toolbar">
       <h2>Installations</h2>
       <div class="toolbar-actions">
@@ -17,7 +16,10 @@
         <button class="primary" id="btn-new">+ New Install</button>
       </div>
     </div>
-    <div id="instance-list" class="instance-list"></div>
+    <div class="view-list-scroll">
+      <div id="instance-list" class="instance-list"></div>
+    </div>
+    <div id="update-banner" class="update-banner" style="display:none"></div>
   </div>
 
   <!-- New Install View -->
@@ -26,30 +28,30 @@
       <h2>New Installation</h2>
       <button id="btn-new-back">← Back</button>
     </div>
+    <div class="view-scroll">
+      <div id="detected-gpu" class="detected-hardware"></div>
 
-    <div id="detected-gpu" class="detected-hardware"></div>
+      <div class="field">
+        <label for="inst-name">Name</label>
+        <input type="text" id="inst-name" placeholder="e.g. ComfyUI Main">
+      </div>
 
-    <div class="field">
-      <label for="inst-name">Name</label>
-      <input type="text" id="inst-name" placeholder="e.g. ComfyUI Main">
-    </div>
+      <div class="field">
+        <label for="source">Install Method</label>
+        <select id="source" disabled><option>Loading…</option></select>
+      </div>
 
-    <div class="field">
-      <label for="source">Install Method</label>
-      <select id="source" disabled><option>Loading…</option></select>
-    </div>
+      <div id="source-fields"></div>
 
-    <div id="source-fields"></div>
-
-    <div class="field">
-      <label for="inst-path">Install Location</label>
-      <div class="path-input">
-        <input type="text" id="inst-path" placeholder="Loading…" readonly>
-        <button id="btn-browse" type="button">Browse…</button>
+      <div class="field">
+        <label for="inst-path">Install Location</label>
+        <div class="path-input">
+          <input type="text" id="inst-path" placeholder="Loading…" readonly>
+          <button id="btn-browse" type="button">Browse…</button>
+        </div>
       </div>
     </div>
-
-    <div class="form-actions">
+    <div class="view-bottom">
       <button class="primary" id="btn-save" disabled>Add Installation</button>
     </div>
   </div>
@@ -62,7 +64,7 @@
         <button class="danger" id="btn-progress-cancel" style="display:none">Cancel</button>
       </div>
     </div>
-    <div id="progress-content"></div>
+    <div class="view-scroll" id="progress-content"></div>
   </div>
 
   <!-- Instance Detail View -->
@@ -71,7 +73,8 @@
       <h2 id="detail-title"></h2>
       <button id="btn-detail-back">← Back</button>
     </div>
-    <div id="detail-sections"></div>
+    <div class="view-scroll" id="detail-sections"></div>
+    <div id="detail-bottom-actions"></div>
   </div>
 
   <!-- Track Existing View -->
@@ -80,28 +83,28 @@
       <h2>Track Existing Installation</h2>
       <button id="btn-track-back">← Back</button>
     </div>
-
-    <div class="field">
-      <label for="track-path">Installation Directory</label>
-      <div class="path-input">
-        <input type="text" id="track-path" placeholder="Select a directory…" readonly>
-        <button id="btn-track-browse" type="button">Browse…</button>
+    <div class="view-scroll">
+      <div class="field">
+        <label for="track-path">Installation Directory</label>
+        <div class="path-input">
+          <input type="text" id="track-path" placeholder="Select a directory…" readonly>
+          <button id="btn-track-browse" type="button">Browse…</button>
+        </div>
       </div>
+
+      <div class="field">
+        <label for="track-source">Detected Type</label>
+        <select id="track-source" disabled><option>Browse to a directory first</option></select>
+      </div>
+
+      <div class="field">
+        <label for="track-name">Name</label>
+        <input type="text" id="track-name" placeholder="e.g. ComfyUI Main">
+      </div>
+
+      <div id="track-detail"></div>
     </div>
-
-    <div class="field">
-      <label for="track-source">Detected Type</label>
-      <select id="track-source" disabled><option>Browse to a directory first</option></select>
-    </div>
-
-    <div class="field">
-      <label for="track-name">Name</label>
-      <input type="text" id="track-name" placeholder="e.g. ComfyUI Main">
-    </div>
-
-    <div id="track-detail"></div>
-
-    <div class="form-actions">
+    <div class="view-bottom">
       <button class="primary" id="btn-track-save" disabled>Track Installation</button>
     </div>
   </div>
@@ -124,7 +127,7 @@
       <h2>Settings</h2>
       <button id="btn-settings-back">← Back</button>
     </div>
-    <div id="settings-sections"></div>
+    <div class="view-scroll" id="settings-sections"></div>
   </div>
 
   <script src="renderer/util.js"></script>
