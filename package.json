@@ -2,6 +2,10 @@
   "name": "comfyui-launcher",
   "version": "0.1.3",
   "description": "ComfyUI Launcher",
+  "author": {
+    "name": "Jedrzej Kosinski",
+    "email": "kosinkadink@users.noreply.github.com"
+  },
   "repository": "github:Kosinkadink/ComfyUI-Launcher",
   "main": "main.js",
   "scripts": {
