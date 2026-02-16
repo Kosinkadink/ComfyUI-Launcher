@@ -2,8 +2,9 @@ const fs = require("fs");
 const path = require("path");
 const { fetchJSON } = require("../lib/fetch");
 const { deleteAction, untrackAction } = require("../lib/actions");
+const { downloadAndExtract, downloadAndExtractMulti } = require("../lib/installer");
 const { deleteDir } = require("../lib/delete");
-const { parseArgs, formatTime } = require("../lib/util");
+const { parseArgs } = require("../lib/util");
 
 const RELEASE_REPO = "Kosinkadink/ComfyUI-Launcher-Environments";
 const ENVS_DIR = "envs";
@@ -224,7 +225,8 @@ module.exports = {
       version: manifest?.comfyui_ref || selections.release?.value || "unknown",
       releaseTag: selections.release?.value || "unknown",
       variant: selections.variant?.data?.variantId || "",
-      downloadUrls: selections.variant?.data?.downloadUrls || [],
+      downloadUrl: selections.variant?.data?.downloadUrl || "",
+      downloadFiles: selections.variant?.data?.downloadFiles || [],
       pythonVersion: manifest?.python_version || "",
       launchArgs: this.defaultLaunchArgs,
       launchMode: "window",
@@ -324,44 +326,16 @@ module.exports = {
     ];
   },
 
-  async install(installation, { sendProgress, download, cache, extract }) {
-    const urls = installation.downloadUrls || [];
-    if (urls.length === 0) throw new Error("No download URLs available.");
-
-    const cacheFolder = `${installation.releaseTag}_${installation.variant}`;
-    const filenames = urls.map((url) => url.split("/").pop());
-
-    if (cache.isCached(cacheFolder)) {
-      sendProgress("download", { percent: 100, status: "Using cached download" });
-      cache.touch(cacheFolder);
-    } else {
-      for (let i = 0; i < urls.length; i++) {
-        const partLabel = urls.length > 1 ? ` (part ${i + 1}/${urls.length})` : "";
-        sendProgress("download", { percent: 0, status: `Starting download…${partLabel}` });
-        const cachePath = cache.getCachePath(cacheFolder, filenames[i]);
-        await download(urls[i], cachePath, (p) => {
-          const speed = `${p.speedMBs.toFixed(1)} MB/s`;
-          const elapsed = formatTime(p.elapsedSecs);
-          const eta = p.etaSecs >= 0 ? formatTime(p.etaSecs) : "—";
-          sendProgress("download", {
-            percent: p.percent,
-            status: `Downloading${partLabel}… ${p.receivedMB} / ${p.totalMB} MB  ·  ${speed}  ·  ${elapsed} elapsed  ·  ${eta} remaining`,
-          });
-        });
-      }
-      cache.evict();
+  async install(installation, tools) {
+    const files = installation.downloadFiles;
+    if (files && files.length > 0) {
+      const cacheDir = `${installation.releaseTag}_${installation.variant}`;
+      await downloadAndExtractMulti(files, installation.installPath, cacheDir, tools);
+    } else if (installation.downloadUrl) {
+      const filename = installation.downloadUrl.split("/").pop();
+      const cacheKey = `${installation.releaseTag}_${filename}`;
+      await downloadAndExtract(installation.downloadUrl, installation.installPath, cacheKey, tools);
     }
-
-    sendProgress("extract", { percent: 0, status: "Extracting…" });
-    const primaryPath = cache.getCachePath(cacheFolder, filenames[0]);
-    await extract(primaryPath, installation.installPath, (p) => {
-      const elapsed = formatTime(p.elapsedSecs);
-      const eta = p.etaSecs >= 0 ? formatTime(p.etaSecs) : "—";
-      sendProgress("extract", {
-        percent: p.percent,
-        status: `Extracting… ${p.percent}%  ·  ${elapsed} elapsed  ·  ${eta} remaining`,
-      });
-    });
   },
 
   async postInstall(installation, { sendProgress, update }) {
@@ -480,11 +454,12 @@ module.exports = {
           if (assets.length === 0) return null;
           const totalBytes = assets.reduce((sum, a) => sum + a.size, 0);
           const sizeMB = (totalBytes / 1048576).toFixed(0);
-          const downloadUrls = assets.map((a) => a.browser_download_url);
+          const downloadFiles = assets.map((a) => ({ url: a.browser_download_url, filename: a.name }));
+          const downloadUrl = downloadFiles.length === 1 ? downloadFiles[0].url : "";
           return {
-            value: downloadUrls[0],
+            value: downloadFiles.length > 0 ? m.id : "",
             label: `${getVariantLabel(m.id)}  —  ComfyUI ${m.comfyui_ref}  ·  Python ${m.python_version}  ·  ${sizeMB} MB`,
-            data: { variantId: m.id, manifest: m, downloadUrls },
+            data: { variantId: m.id, manifest: m, downloadFiles, downloadUrl },
             recommended: recommendVariant(m.id, gpu),
           };
         })
