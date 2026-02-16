@@ -2,6 +2,30 @@
 
 An Electron app for managing multiple ComfyUI installations.
 
+## Running
+
+### Windows
+
+Run the NSIS installer (`.exe`) and launch from the Start Menu or desktop shortcut.
+
+### macOS
+
+Open the `.dmg`, drag ComfyUI Launcher to Applications, and launch from there.
+
+### Linux
+
+**`.deb` (Debian/Ubuntu):**
+```bash
+sudo apt install ./ComfyUI-Launcher-*.deb
+```
+Then launch from your application menu.
+
+**AppImage:**
+```bash
+chmod +x ComfyUI-Launcher-*.AppImage
+./ComfyUI-Launcher-*.AppImage --no-sandbox
+```
+
 ## Development
 
 ### Prerequisites
@@ -41,30 +65,6 @@ npm run dist:linux    # Linux (AppImage, .deb)
 ```
 
 Build output is written to the `dist/` directory.
-
-## Running
-
-### Windows
-
-Run the NSIS installer (`.exe`) and launch from the Start Menu or desktop shortcut.
-
-### macOS
-
-Open the `.dmg`, drag ComfyUI Launcher to Applications, and launch from there.
-
-### Linux
-
-**`.deb` (Debian/Ubuntu):**
-```bash
-sudo apt install ./ComfyUI-Launcher-*.deb
-```
-Then launch from your application menu.
-
-**AppImage:**
-```bash
-chmod +x ComfyUI-Launcher-*.AppImage
-./ComfyUI-Launcher-*.AppImage --no-sandbox
-```
 
 ## Releasing
 
