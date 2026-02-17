@@ -164,7 +164,7 @@
   },
 
   "portable": {
-    "label": "Portable Release",
+    "label": "Portable",
     "package": "Portable Package",
     "version": "Version",
     "packageLabel": "Package"
