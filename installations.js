@@ -28,7 +28,7 @@ async function add(installation) {
     createdAt: new Date().toISOString(),
     ...installation,
   };
-  installations.push(entry);
+  installations.unshift(entry);
   await save(installations);
   return entry;
 }
@@ -62,4 +62,18 @@ async function reorder(orderedIds) {
   await save(reordered);
 }
 
-module.exports = { list, add, remove, update, get, reorder };
+async function seedDefaults(defaults) {
+  const installations = await load();
+  if (installations.length > 0) return;
+  for (const entry of defaults) {
+    installations.push({
+      id: `inst-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      status: "installed",
+      ...entry,
+    });
+  }
+  if (installations.length > 0) await save(installations);
+}
+
+module.exports = { list, add, remove, update, get, reorder, seedDefaults };

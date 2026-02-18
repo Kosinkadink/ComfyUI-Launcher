@@ -3,32 +3,77 @@ window.Launcher = window.Launcher || {};
 window.Launcher.list = {
   _dragSrcEl: null,
   _renderGen: 0,
+  _filter: "all",
+
+  _sourceCategory: {
+    standalone: "local",
+    portable: "local",
+    git: "local",
+    remote: "remote",
+    cloud: "cloud",
+  },
+
+  _matchesFilter(inst) {
+    if (this._filter === "all") return true;
+    return this._sourceCategory[inst.sourceId] === this._filter;
+  },
+
+  _buildInstallPrompt() {
+    const div = document.createElement("div");
+    div.className = "empty-state";
+    const title = document.createElement("div");
+    title.style.cssText = "font-weight: 700; color: var(--text-faint);";
+    title.textContent = window.t("list.empty");
+    div.appendChild(title);
+    const hint = document.createElement("div");
+    hint.textContent = window.t("list.emptyHint");
+    hint.style.marginTop = "4px";
+    div.appendChild(hint);
+    const btn = document.createElement("button");
+    btn.className = "accent add-btn";
+    btn.style.marginTop = "8px";
+    btn.innerHTML = `<svg width="14" height="14"><use href="#icon-plus"/></svg> ${window.Launcher.esc(window.t("list.newInstall"))}`;
+    btn.onclick = () => document.getElementById("btn-new").click();
+    div.appendChild(btn);
+    return div;
+  },
+
+  setFilter(filter) {
+    this._filter = filter;
+    document.querySelectorAll("#list-filter-tabs .filter-tab").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.filter === filter);
+    });
+    this.render();
+  },
 
   async render() {
     const gen = ++this._renderGen;
     const { esc, showView } = window.Launcher;
     const el = document.getElementById("instance-list");
-    const installations = await window.api.getInstallations();
+    const allInstallations = await window.api.getInstallations();
     if (gen !== this._renderGen) return;
     el.innerHTML = "";
 
+    const installations = allInstallations.filter((inst) => this._matchesFilter(inst));
+    const hasLocal = allInstallations.some((inst) => this._sourceCategory[inst.sourceId] === "local");
+
     if (installations.length === 0) {
-      const msg = window.t("list.empty");
-      el.innerHTML = '<div class="empty-state">' + msg.replace(/\n/g, "<br>").replace(/\*\*(.+?)\*\*/g, (_, s) => `<strong>${window.Launcher.esc(s)}</strong>`) + '</div>';
+      if (hasLocal) {
+        el.innerHTML = '<div class="empty-state">' + esc(window.t("list.emptyFilter")) + '</div>';
+      } else {
+        el.appendChild(this._buildInstallPrompt());
+      }
       return;
     }
 
     for (const inst of installations) {
-      const card = document.createElement("div");
-      card.className = "instance-card";
-      card.dataset.id = inst.id;
       const isRunning = window.Launcher.isInstanceRunning(inst.id);
       const activeSession = window.Launcher.getActiveSessionForInstallation(inst.id);
       const hasError = window.Launcher._errorInstances.has(inst.id);
       const runningTag = isRunning ? ` · <span class="status-running">${esc(window.t("list.running"))}</span>` : "";
       const errorTag = hasError ? ` · <span class="status-danger">${esc(window.t("running.crashed"))}</span>` : "";
       const statusTag = inst.statusTag ? ` · <span class="status-${inst.statusTag.style}">${esc(inst.statusTag.label)}</span>` : "";
-      const newTag = inst.seen === false ? ` · <span class="status-new">${esc(window.t("list.new"))}</span>` : "";
+      const newTag = inst.seen === false ? `<span class="status-new-wrap"> · <span class="status-new">${esc(window.t("list.new"))}</span></span>` : "";
       // Show in-progress status when there's an active session but not yet running
       const inProgressTag = (!isRunning && activeSession)
         ? ` · <span class="status-in-progress">${esc(activeSession.label)}</span>`
@@ -38,55 +83,54 @@ window.Launcher.list = {
         : inst.launchMode
           ? `${esc(inst.launchMode)}${inst.launchArgs ? " · " + esc(inst.launchArgs) : ""}`
           : "";
-      card.innerHTML = `
-        <div class="drag-handle" title="${window.t("list.dragToReorder")}"><span></span><span></span><span></span></div>
-        <div class="instance-info">
-          <div class="instance-name">${esc(inst.name)}</div>
-          <div class="instance-meta">${esc(inst.sourceLabel)}${inst.version ? " · " + esc(inst.version) : ""}${runningTag}${errorTag}${inProgressTag}${statusTag}${newTag}</div>
-          ${launchMeta ? `<div class="instance-meta">${launchMeta}</div>` : ""}
-        </div>
-        <div class="instance-actions"></div>`;
+
+      const { card, infoEl, actionsEl } = window.Launcher.buildCard({
+        installationId: inst.id,
+        name: inst.name,
+        metaHtml: `${esc(inst.sourceLabel)}${inst.version ? " · " + esc(inst.version) : ""}${runningTag}${errorTag}${inProgressTag}${statusTag}${newTag}`,
+        draggable: true,
+      });
+      if (launchMeta) {
+        const metaEl = document.createElement("div");
+        metaEl.className = "instance-meta";
+        metaEl.innerHTML = launchMeta;
+        infoEl.appendChild(metaEl);
+      }
+
+      // Add mini progress bar for in-progress operations
+      if (activeSession && !isRunning) {
+        infoEl.appendChild(window.Launcher.buildCardProgress(inst.id));
+      }
+
+      if (inst.seen === false) {
+        card.addEventListener("mousedown", () => {
+          if (inst.seen === false) {
+            inst.seen = true;
+            window.api.updateInstallation(inst.id, { seen: true });
+            const wrap = card.querySelector(".status-new-wrap");
+            if (wrap) wrap.remove();
+          }
+        });
+      }
 
       const handle = card.querySelector(".drag-handle");
       handle.addEventListener("mousedown", () => { card.draggable = true; });
       handle.addEventListener("mouseup", () => { card.draggable = false; });
       card.addEventListener("dragend", () => { card.draggable = false; });
 
-      const actionsEl = card.querySelector(".instance-actions");
-
       // In-progress (installing/launching/deleting) — show View Progress button
       if (activeSession) {
-        const sessionBtn = document.createElement("button");
-        sessionBtn.className = "primary";
-        sessionBtn.textContent = window.t("list.viewProgress");
-        sessionBtn.onclick = () => window.Launcher.progress.showOperation(inst.id);
-        actionsEl.appendChild(sessionBtn);
+        actionsEl.appendChild(window.Launcher.buildProgressBtn(inst.id));
       } else if (isRunning) {
         // Confirmed running — show Show Window (if app window mode), Console, Stop
         const runningInfo = window.Launcher._runningInstances.get(inst.id);
         if (runningInfo && runningInfo.mode !== "console") {
-          const focusBtn = document.createElement("button");
-          focusBtn.className = "primary";
-          focusBtn.textContent = window.t("running.showWindow");
-          focusBtn.onclick = () => window.api.focusComfyWindow(inst.id);
-          actionsEl.appendChild(focusBtn);
+          actionsEl.appendChild(window.Launcher.buildFocusBtn(inst.id));
         }
-        const consoleBtn = document.createElement("button");
-        consoleBtn.textContent = window.t("list.console");
-        consoleBtn.onclick = () => window.Launcher.console.show(inst.id);
-        actionsEl.appendChild(consoleBtn);
-        const stopBtn = document.createElement("button");
-        stopBtn.className = "danger";
-        stopBtn.textContent = window.t("console.stop");
-        stopBtn.onclick = async () => {
-          await window.api.stopComfyUI(inst.id);
-        };
-        actionsEl.appendChild(stopBtn);
+        actionsEl.appendChild(window.Launcher.buildConsoleBtn(inst.id));
+        actionsEl.appendChild(window.Launcher.buildStopBtn(inst.id));
       } else if (hasError) {
-        const consoleBtn = document.createElement("button");
-        consoleBtn.textContent = window.t("list.console");
-        consoleBtn.onclick = () => window.Launcher.console.show(inst.id);
-        actionsEl.appendChild(consoleBtn);
+        actionsEl.appendChild(window.Launcher.buildConsoleBtn(inst.id));
         const dismissBtn = document.createElement("button");
         dismissBtn.textContent = window.t("running.dismiss");
         dismissBtn.onclick = () => window.Launcher.clearErrorInstance(inst.id);
@@ -134,11 +178,7 @@ window.Launcher.list = {
         });
       }
 
-      const viewBtn = document.createElement("button");
-      viewBtn.className = "view-btn";
-      viewBtn.textContent = window.t("list.view");
-      viewBtn.onclick = () => window.Launcher.detail.show(inst);
-      actionsEl.appendChild(viewBtn);
+      actionsEl.appendChild(window.Launcher.buildManageBtn(inst));
 
       card.addEventListener("dragstart", (e) => {
         this._dragSrcEl = card;
@@ -177,6 +217,10 @@ window.Launcher.list = {
       });
 
       el.appendChild(card);
+    }
+
+    if (!hasLocal && this._filter === "all") {
+      el.appendChild(this._buildInstallPrompt());
     }
   },
 };

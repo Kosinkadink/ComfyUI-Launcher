@@ -15,11 +15,7 @@ window.Launcher.newInstall = {
       document.getElementById("inst-name").value = "";
       this._selections = {};
       document.getElementById("btn-save").disabled = true;
-      const goBack = () => { window.Launcher.showView("list"); window.Launcher.list.render(); };
-      window.Launcher.renderBreadcrumb(document.getElementById("new-install-title"), [
-        { label: window.t("sidebar.installations"), action: goBack },
-        { label: window.t("newInstall.title") },
-      ]);
+      document.getElementById("new-modal-title").textContent = window.t("newInstall.title");
       window.Launcher.showView("new");
       this._initSources();
 
@@ -266,7 +262,7 @@ window.Launcher.newInstall = {
         await window.Launcher.modal.alert({ title: window.t("errors.cannotAdd"), message: result.message });
         return;
       }
-      window.Launcher.showView("list");
+      window.Launcher.closeViewModal("new");
       window.Launcher.list.render();
       return;
     }
@@ -277,6 +273,7 @@ window.Launcher.newInstall = {
       await window.Launcher.modal.alert({ title: window.t("errors.cannotAdd"), message: result.message });
       return;
     }
+    window.Launcher.closeViewModal("new");
     window.Launcher.progress.show({
       installationId: result.entry.id,
       title: window.t("newInstall.installing"),

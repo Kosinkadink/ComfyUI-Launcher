@@ -7,11 +7,7 @@ window.Launcher.track = {
   init() {
     document.getElementById("btn-track").onclick = () => {
       this._reset();
-      const goBack = () => { window.Launcher.showView("list"); window.Launcher.list.render(); };
-      window.Launcher.renderBreadcrumb(document.getElementById("track-title"), [
-        { label: window.t("sidebar.installations"), action: goBack },
-        { label: window.t("track.title") },
-      ]);
+      document.getElementById("track-modal-title").textContent = window.t("track.title");
       window.Launcher.showView("track");
     };
 
@@ -124,7 +120,7 @@ window.Launcher.track = {
       await window.Launcher.modal.alert({ title: window.t("track.cannotTrack"), message: result.message });
       return;
     }
-    window.Launcher.showView("list");
+    window.Launcher.closeViewModal("track");
     window.Launcher.list.render();
   },
 };
