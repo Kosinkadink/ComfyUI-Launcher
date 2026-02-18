@@ -8,7 +8,7 @@ const defaults = {
   cacheDir: path.join(paths.cacheDir(), "download-cache"),
   maxCachedFiles: 8,
   onLauncherClose: "tray",
-  modelsDirs: [path.join(app.getPath("home"), "ComfyUI-Models")],
+  modelsDirs: [path.join(paths.homeDir(), "ComfyUI-Models")],
 };
 
 function load() {
