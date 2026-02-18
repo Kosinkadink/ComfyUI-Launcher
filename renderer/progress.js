@@ -222,7 +222,7 @@ window.Launcher.progress = {
       };
     };
 
-    return apiCall().then((result) => {
+    const handleResult = (result) => {
       this._cleanup();
       if (result.ok) {
         if (result.navigate === "detail" && window.Launcher.detail._current) {
@@ -234,10 +234,99 @@ window.Launcher.progress = {
           window.Launcher.showView("list");
           window.Launcher.list.render();
         }
+      } else if (result.portConflict) {
+        showPortConflict(result);
       } else {
         showError(result.message);
       }
-    }).catch((err) => {
+    };
+
+    const showPortConflict = (result) => {
+      const statusEl = document.getElementById("progress-status");
+      if (statusEl) statusEl.textContent = result.message;
+
+      const backBtn = document.getElementById("btn-progress-cancel");
+      backBtn.textContent = window.t("common.back");
+      backBtn.className = "back-btn";
+      backBtn.style.display = "";
+      backBtn.onclick = () => {
+        backBtn.style.display = "none";
+        backBtn.textContent = window.t("common.cancel");
+        backBtn.className = "danger";
+        if (returnTo === "detail" && window.Launcher.detail._current) {
+          window.Launcher.detail.show(window.Launcher.detail._current);
+        } else {
+          window.Launcher.showView("list");
+          window.Launcher.list.render();
+        }
+      };
+
+      // Add conflict resolution buttons
+      const actionsArea = document.createElement("div");
+      actionsArea.className = "progress-conflict-actions";
+
+      // "Use port X" button — if a next port was found
+      if (result.portConflict.nextPort) {
+        const usePortBtn = document.createElement("button");
+        usePortBtn.className = "primary";
+        usePortBtn.textContent = window.t("errors.portConflictUsePort", { port: result.portConflict.nextPort });
+        usePortBtn.onclick = () => {
+          actionsArea.remove();
+          backBtn.style.display = "none";
+          backBtn.textContent = window.t("common.cancel");
+          backBtn.className = "danger";
+          const portOverride = result.portConflict.nextPort;
+          this.show({
+            installationId, title, cancellable, returnTo,
+            apiCall: () => window.api.runAction(installationId, "launch", { portOverride }),
+          });
+        };
+        actionsArea.appendChild(usePortBtn);
+      }
+
+      // "Stop process and retry" button — only for ComfyUI processes
+      if (result.portConflict.isComfy) {
+        const killBtn = document.createElement("button");
+        killBtn.className = "danger";
+        killBtn.textContent = window.t("errors.portConflictKill");
+        killBtn.onclick = async () => {
+          const confirmed = await window.Launcher.modal.confirm({
+            title: window.t("errors.portConflictKillConfirmTitle"),
+            message: window.t("errors.portConflictKillConfirmMessage"),
+            confirmLabel: window.t("errors.portConflictKill"),
+            confirmStyle: "danger",
+          });
+          if (!confirmed) return;
+          killBtn.disabled = true;
+          killBtn.textContent = window.t("errors.portConflictKilling");
+          const killResult = await window.api.killPortProcess(result.portConflict.port);
+          if (killResult.ok) {
+            actionsArea.remove();
+            backBtn.style.display = "none";
+            backBtn.textContent = window.t("common.cancel");
+            backBtn.className = "danger";
+            this.show({ installationId, title, apiCall, cancellable, returnTo });
+          } else {
+            killBtn.disabled = false;
+            killBtn.textContent = window.t("errors.portConflictKill");
+            if (statusEl) statusEl.textContent = window.t("errors.portConflictKillFailed", { port: result.portConflict.port });
+          }
+        };
+        actionsArea.appendChild(killBtn);
+      }
+
+      const progressContent = document.getElementById("progress-content");
+      if (progressContent) {
+        const terminal = document.getElementById("progress-terminal");
+        if (terminal) {
+          progressContent.insertBefore(actionsArea, terminal);
+        } else {
+          progressContent.appendChild(actionsArea);
+        }
+      }
+    };
+
+    return apiCall().then(handleResult).catch((err) => {
       showError(err.message);
     });
   },

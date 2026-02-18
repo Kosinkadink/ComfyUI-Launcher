@@ -396,6 +396,13 @@ h2[contenteditable]:focus { border-bottom-color: var(--accent); }
   user-select: text;
 }
 
+/* Port conflict */
+.progress-conflict-actions {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
 /* Terminal output */
 .terminal-output {
   background: var(--terminal-bg);

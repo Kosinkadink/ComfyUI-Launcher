@@ -21,6 +21,9 @@
     "partitionShared": "Shared",
     "partitionUnique": "Unique to this install",
     "startingComfyUI": "Starting ComfyUI…",
+    "portConflict": "If Port is Busy",
+    "portConflictAsk": "Ask what to do",
+    "portConflictAuto": "Use next available port (asks if --port is set)",
     "download": "Download",
     "extract": "Extract"
   },
@@ -182,7 +185,8 @@
     "connectingTime": "Connecting to {url}… ({secs}s)",
     "starting": "Starting ComfyUI process…",
     "waiting": "Waiting for ComfyUI to be ready…",
-    "waitingTime": "Waiting for ComfyUI to be ready… ({secs}s)"
+    "waitingTime": "Waiting for ComfyUI to be ready… ({secs}s)",
+    "portBusyUsing": "Port {old} is busy — using port {new} instead…"
   },
 
   "errors": {
@@ -193,6 +197,15 @@
     "dirNotExist": "Directory does not exist: {path}",
     "cannotOpenDir": "Could not open directory: {error}",
     "launchCancelled": "Launch cancelled.",
-    "cannotConnect": "Could not connect to {url}. Make sure ComfyUI is running at that address."
+    "cannotConnect": "Could not connect to {url}. Make sure ComfyUI is running at that address.",
+    "portConflictLauncher": "Port {port} is already in use by \"{name}\", launched from another ComfyUI Launcher instance. Stop it first or change the port in Startup Arguments.",
+    "portConflictComfy": "Port {port} is already in use by {process}, which appears to be a ComfyUI instance. Stop it first or change the port in Startup Arguments.",
+    "portConflictOther": "Port {port} is already in use by {process}. Change the port in Startup Arguments to avoid conflicts.",
+    "portConflictUsePort": "Use port {port} instead",
+    "portConflictKill": "Stop process and retry",
+    "portConflictKillConfirmTitle": "Stop Existing Process",
+    "portConflictKillConfirmMessage": "This will forcefully stop the process currently using this port. Any unsaved work in that ComfyUI instance will be lost.",
+    "portConflictKilling": "Stopping…",
+    "portConflictKillFailed": "Could not free port {port}. The process may require manual termination."
   }
 }

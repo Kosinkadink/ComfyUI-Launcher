@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("api", {
   },
   stopComfyUI: () => ipcRenderer.invoke("stop-comfyui"),
   cancelLaunch: () => ipcRenderer.invoke("cancel-launch"),
+  killPortProcess: (port) => ipcRenderer.invoke("kill-port-process", port),
   getListActions: (installationId) =>
     ipcRenderer.invoke("get-list-actions", installationId),
   updateInstallation: (installationId, data) =>

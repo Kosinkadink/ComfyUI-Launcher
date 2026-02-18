@@ -233,7 +233,7 @@ module.exports = {
   },
 
   getDefaults() {
-    return { launchArgs: this.defaultLaunchArgs, launchMode: "window" };
+    return { launchArgs: this.defaultLaunchArgs, launchMode: "window", portConflict: "auto" };
   },
 
   buildInstallation(selections) {
@@ -332,6 +332,11 @@ module.exports = {
             editType: "select", options: [
               { value: "shared", label: t("common.partitionShared") },
               { value: "unique", label: t("common.partitionUnique") },
+            ] },
+          { id: "portConflict", label: t("common.portConflict"), value: installation.portConflict || "ask", editable: true,
+            editType: "select", options: [
+              { value: "ask", label: t("common.portConflictAsk") },
+              { value: "auto", label: t("common.portConflictAuto") },
             ] },
         ],
       },
