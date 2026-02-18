@@ -1,0 +1,274 @@
+{
+  "_label": "中文",
+
+  "sidebar": {
+    "installations": "安装",
+    "running": "运行中"
+  },
+
+  "running": {
+    "empty": "没有正在运行或进行中的任务。",
+    "instances": "运行中的实例",
+    "errors": "错误",
+    "crashed": "崩溃",
+    "exitCode": "退出代码 {code}",
+    "dismiss": "关闭",
+    "inProgress": "进行中",
+    "showWindow": "显示窗口"
+  },
+
+  "models": {
+    "title": "模型",
+    "directories": "共享目录",
+    "directoriesDesc": "所有安装共享的目录。第一个目录为主目录（ComfyUI 的默认目录）。",
+    "addDir": "添加目录",
+    "removeDir": "移除",
+    "primary": "主要",
+    "default": "默认",
+    "makePrimary": "设为主要"
+  },
+
+  "common": {
+    "back": "返回",
+    "browse": "浏览…",
+    "cancel": "取消",
+    "name": "名称",
+    "namePlaceholder": "例如 ComfyUI 主程序",
+    "installInfo": "安装信息",
+    "installMethod": "安装方式",
+    "release": "版本",
+    "location": "位置",
+    "installed": "已安装",
+    "launchSettings": "启动设置",
+    "startupArgs": "启动参数",
+    "launchMode": "启动模式",
+    "launchModeWindow": "应用窗口",
+    "launchModeConsole": "仅控制台",
+    "browserPartition": "浏览器缓存",
+    "partitionShared": "共享",
+    "partitionUnique": "此安装独享",
+    "startingComfyUI": "正在启动 ComfyUI…",
+    "portConflict": "端口被占用时",
+    "portConflictAsk": "询问处理方式",
+    "portConflictAuto": "使用下一个可用端口（设置了 --port 时会询问）",
+    "download": "下载",
+    "extract": "解压"
+  },
+
+  "list": {
+    "title": "安装",
+    "trackExisting": "跟踪现有安装",
+    "newInstall": "新建安装",
+    "empty": "暂无安装。",
+    "emptyHint": "安装或跟踪现有的 ComfyUI 版本。",
+    "emptyFilter": "没有匹配此筛选条件的安装。",
+    "view": "管理",
+    "new": "新建",
+    "running": "运行中",
+    "console": "控制台",
+    "viewProgress": "查看进度",
+    "dragToReorder": "拖动以重新排序",
+    "filterAll": "全部",
+    "filterLocal": "本地",
+    "filterRemote": "远程",
+    "filterCloud": "云端"
+  },
+
+  "newInstall": {
+    "title": "新建安装",
+    "installMethod": "安装方式",
+    "installLocation": "安装位置",
+    "addInstallation": "添加安装",
+    "loading": "加载中…",
+    "detectingGpu": "正在检测 GPU…",
+    "detectedGpu": "检测到 GPU：{label}",
+    "noGpuDetected": "未检测到支持的 GPU",
+    "noOptions": "没有可用选项",
+    "installing": "正在安装…"
+  },
+
+  "detail": {},
+
+  "track": {
+    "title": "跟踪现有安装",
+    "installDir": "安装目录",
+    "selectDir": "选择目录…",
+    "detectedType": "检测到的类型",
+    "browseDirFirst": "请先浏览选择目录",
+    "detecting": "正在检测…",
+    "noDetected": "未检测到已知安装",
+    "trackInstallation": "跟踪安装",
+    "cannotTrack": "无法跟踪"
+  },
+
+  "progress": {
+    "working": "处理中…",
+    "starting": "正在启动…",
+    "cancelling": "正在取消…",
+    "error": "错误：{message}"
+  },
+
+  "console": {
+    "title": "ComfyUI 控制台",
+    "openInBrowser": "在浏览器中打开",
+    "stop": "停止",
+    "disconnect": "断开连接",
+    "connectedTo": "已连接到 {url}",
+    "processExited": "进程已退出",
+    "processCrashed": "进程崩溃（退出代码 {code}）"
+  },
+
+  "settings": {
+    "title": "设置",
+    "general": "常规",
+    "theme": "主题",
+    "themeSystem": "跟随系统",
+    "themeDark": "深色",
+    "themeLight": "浅色",
+    "onLauncherClose": "关闭启动器时",
+    "closeTray": "最小化到托盘（保持实例运行）",
+    "closeQuit": "停止所有实例并退出",
+    "closeQuitTitle": "退出启动器",
+    "closeQuitMessage": "ComfyUI 实例仍在运行。退出将停止所有实例。",
+    "closeQuitConfirm": "退出",
+    "autoUpdate": "启动时检查更新",
+    "models": "共享模型",
+    "downloads": "下载",
+    "cacheDir": "缓存目录",
+    "maxCachedFiles": "最大缓存下载数",
+    "open": "打开",
+    "about": "关于",
+    "version": "版本",
+    "platform": "平台",
+    "language": "语言"
+  },
+
+  "update": {
+    "available": "有可用更新：**v{version}**",
+    "download": "下载",
+    "dismiss": "忽略",
+    "downloading": "正在下载更新… {progress}",
+    "ready": "更新 **v{version}** 已准备好安装",
+    "restartUpdate": "重启并更新",
+    "later": "稍后",
+    "checkFailed": "检查更新失败",
+    "details": "详情",
+    "retry": "重试",
+    "updateError": "更新错误"
+  },
+
+  "modal": {
+    "ok": "确定",
+    "confirm": "确认",
+    "areYouSure": "确定要执行此操作吗？",
+    "required": "此字段为必填项。"
+  },
+
+  "tray": {
+    "showLauncher": "显示启动器",
+    "quit": "退出"
+  },
+
+  "actions": {
+    "launch": "启动",
+    "openDirectory": "打开目录",
+    "checkForUpdate": "检查更新",
+    "featureNotImplemented": "此功能尚未实现。",
+    "updateAvailable": "有可用更新",
+    "delete": "删除安装",
+    "deleteConfirmTitle": "删除安装",
+    "deleteConfirmMessage": "这将永久删除该安装及其所有文件。此操作无法撤销。",
+    "untrack": "取消跟踪",
+    "untrackConfirmTitle": "取消跟踪安装",
+    "untrackConfirmMessage": "这将从启动器中移除该安装。文件不会被删除。"
+  },
+
+  "standalone": {
+    "label": "Standalone",
+    "comfyui": "ComfyUI",
+    "variant": "环境变体",
+    "python": "Python",
+    "pythonEnvs": "Python 环境",
+    "activeEnv": "当前：{env}",
+    "noEnvs": "尚未创建虚拟环境。",
+    "newEnv": "新建环境",
+    "newEnvTitle": "新建环境",
+    "newEnvMessage": "输入新环境的名称。",
+    "newEnvPlaceholder": "my-env",
+    "newEnvCreate": "创建",
+    "newEnvRequired": "请输入环境名称。",
+    "creatingEnv": "正在创建环境 \"{env}\"…",
+    "deletingEnv": "正在删除环境 \"{env}\"…",
+    "setActive": "设为当前",
+    "deleteEnv": "删除",
+    "cannotDeleteActive": "无法删除当前活动环境。请先将其他环境设为活动环境。",
+    "deleteEnvConfirmTitle": "删除环境",
+    "deleteEnvConfirmMessage": "删除环境 \"{env}\"？此操作无法撤销。",
+    "setupEnv": "配置环境"
+  },
+
+  "portable": {
+    "label": "Portable",
+    "package": "Portable Package",
+    "version": "版本",
+    "packageLabel": "包",
+    "updates": "更新",
+    "updateTrack": "更新通道",
+    "trackStable": "稳定版",
+    "trackLatest": "GitHub 最新版",
+    "installedVersion": "已安装版本",
+    "latestVersion": "最新版本",
+    "lastChecked": "上次检查",
+    "updateStatus": "状态",
+    "updateAvailableTag": "更新：{version}",
+    "updateAvailable": "有可用更新",
+    "upToDate": "已是最新",
+    "updateNow": "立即更新",
+    "updateConfirmTitle": "更新 ComfyUI",
+    "updateConfirmMessage": "从 {installed} 更新到 {latest}？\n\n本地更改将被暂存，并创建备份分支。\n\n发布说明：\n{notes}",
+    "updateConfirmMessageLatest": "从 {installed} 更新到 master 最新版（{latest}）？\n\n这将拉取 master 分支的最新提交。本地更改将被暂存，并创建备份分支。\n\n最新提交：{commit}",
+    "updatingTitle": "正在更新到 {version}…",
+    "updatePrepare": "准备",
+    "updateRun": "更新",
+    "updateDeps": "依赖",
+    "updateFailed": "更新过程失败，退出代码 {code}。",
+    "checkingForUpdate": "正在检查更新…",
+    "noUpdateDir": "在此便携安装中未找到更新目录。"
+  },
+
+  "installer": {
+    "cachedDownload": "使用已缓存的下载",
+    "startingDownload": "正在开始下载…",
+    "downloading": "正在下载… {progress}",
+    "extracting": "正在解压… {progress}"
+  },
+
+  "launch": {
+    "connecting": "正在连接 {url}…",
+    "connectingTime": "正在连接 {url}…（{secs}秒）",
+    "starting": "正在启动 ComfyUI 进程…",
+    "waiting": "等待 ComfyUI 就绪…",
+    "waitingTime": "等待 ComfyUI 就绪…（{secs}秒）",
+    "portBusyUsing": "端口 {old} 被占用——改用端口 {new}…"
+  },
+
+  "errors": {
+    "noLaunchSupport": "此来源尚不支持启动。",
+    "noEnvFound": "无法启动：未找到 Python 环境。请先创建一个。",
+    "alreadyRunning": "ComfyUI 已在运行。请先停止再重新启动。",
+    "cannotAdd": "无法添加",
+    "dirNotExist": "目录不存在：{path}",
+    "cannotOpenDir": "无法打开目录：{error}",
+    "launchCancelled": "启动已取消。",
+    "cannotConnect": "无法连接到 {url}。请确保 ComfyUI 正在该地址运行。",
+    "portConflictLauncher": "端口 {port} 已被 \"{name}\" 占用，该实例由另一个 ComfyUI Launcher 启动。请先停止它或在启动参数中更改端口。",
+    "portConflictComfy": "端口 {port} 已被 {process} 占用，看起来是一个 ComfyUI 实例。请先停止它或在启动参数中更改端口。",
+    "portConflictOther": "端口 {port} 已被 {process} 占用。请在启动参数中更改端口以避免冲突。",
+    "portConflictUsePort": "改用端口 {port}",
+    "portConflictKill": "停止进程并重试",
+    "portConflictKillConfirmTitle": "停止现有进程",
+    "portConflictKillConfirmMessage": "这将强制停止当前使用此端口的进程。该 ComfyUI 实例中未保存的工作将丢失。",
+    "portConflictKilling": "正在停止…",
+    "portConflictKillFailed": "无法释放端口 {port}。该进程可能需要手动终止。"
+  }
+}

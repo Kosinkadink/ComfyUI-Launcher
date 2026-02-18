@@ -184,6 +184,7 @@
   },
 
   "standalone": {
+    "_note": "standalone.label and portable.label are product names — keep in English across all translations.",
     "label": "Standalone",
     "comfyui": "ComfyUI",
     "variant": "Environment Variant",

@@ -1,29 +1,49 @@
 window.Launcher = window.Launcher || {};
 
 window.Launcher.updateBanner = {
+  _state: null, // { type: "available"|"downloading"|"ready"|"error", data: ... }
+
   init() {
     const banner = document.getElementById("update-banner");
 
     window.api.onUpdateAvailable((info) => {
+      this._state = { type: "available", data: info };
       this._showAvailable(banner, info);
     });
 
     window.api.onUpdateDownloadProgress((progress) => {
+      this._state = { type: "downloading", data: progress };
       this._showDownloading(banner, progress);
     });
 
     window.api.onUpdateDownloaded((info) => {
+      this._state = { type: "ready", data: info };
       this._showReady(banner, info);
     });
 
     window.api.onUpdateError((err) => {
+      this._state = { type: "error", data: err };
       this._showError(banner, err);
     });
 
     // Check if an update was already detected before this view loaded
     window.api.getPendingUpdate().then((info) => {
-      if (info) this._showAvailable(banner, info);
+      if (info) {
+        this._state = { type: "available", data: info };
+        this._showAvailable(banner, info);
+      }
     });
+  },
+
+  refresh() {
+    if (!this._state) return;
+    const banner = document.getElementById("update-banner");
+    if (!banner || banner.style.display === "none") return;
+    const { type, data } = this._state;
+    if (type === "available") this._showAvailable(banner, data);
+    else if (type === "downloading") this._showDownloading(banner, data);
+    else if (type === "ready") this._showReady(banner, data);
+    else if (type === "error") this._showError(banner, data);
   },
 
   _showAvailable(banner, info) {

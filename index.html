@@ -253,6 +253,19 @@
   <script>
     window.api.getResolvedTheme().then((t) => window.Launcher.applyTheme(t));
     window.api.onThemeChanged((t) => window.Launcher.applyTheme(t));
+    window.api.onLocaleChanged((msgs) => {
+      window.Launcher.i18n.init(msgs);
+      // Re-render whichever tab view is currently active
+      const activeView = document.querySelector(".view.active");
+      if (activeView) {
+        const id = activeView.id.replace("view-", "");
+        if (id === "list") window.Launcher.list.render();
+        else if (id === "settings") window.Launcher.settings.show();
+        else if (id === "models") window.Launcher.models.show();
+        else if (id === "running") window.Launcher.running.show();
+      }
+      window.Launcher.updateBanner.refresh();
+    });
     window.Launcher.detail.init();
     window.Launcher.newInstall.init();
     window.Launcher.settings.init();

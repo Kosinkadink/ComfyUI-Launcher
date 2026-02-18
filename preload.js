@@ -69,6 +69,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("theme-changed", handler);
     return () => ipcRenderer.removeListener("theme-changed", handler);
   },
+  onLocaleChanged: (callback) => {
+    const handler = (_event, msgs) => callback(msgs);
+    ipcRenderer.on("locale-changed", handler);
+    return () => ipcRenderer.removeListener("locale-changed", handler);
+  },
   quitApp: () => ipcRenderer.invoke("quit-app"),
   onConfirmQuit: (callback) => {
     const handler = () => callback();
