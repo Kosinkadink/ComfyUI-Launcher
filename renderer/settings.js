@@ -113,7 +113,7 @@ window.Launcher.settings = {
               const removeBtn = document.createElement("button");
               removeBtn.type = "button";
               removeBtn.className = "danger";
-              removeBtn.textContent = window.t("settings.modelsDirsRemove");
+              removeBtn.textContent = window.t("models.removeDir");
               removeBtn.onclick = async () => {
                 paths.splice(i, 1);
                 await window.api.setSetting(f.id, [...paths]);
@@ -123,14 +123,14 @@ window.Launcher.settings = {
               if (i === 0) {
                 const tag = document.createElement("span");
                 tag.className = "path-primary-tag";
-                tag.textContent = window.t("settings.modelsDirsPrimary");
+                tag.textContent = window.t("models.primary");
                 row.appendChild(tag);
               }
               list.appendChild(row);
             });
             const addBtn = document.createElement("button");
             addBtn.type = "button";
-            addBtn.textContent = window.t("settings.modelsDirsAdd");
+            addBtn.textContent = window.t("models.addDir");
             addBtn.onclick = async () => {
               const dir = await window.api.browseFolder();
               if (dir) {

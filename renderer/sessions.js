@@ -26,9 +26,10 @@ window.Launcher.sessions = {
       const session = this._sessions.get(data.installationId);
       if (session) {
         session.exited = true;
-        session.output += data.crashed
+        const msg = data.crashed
           ? window.t("console.processCrashed", { code: data.exitCode ?? "unknown" })
           : window.t("console.processExited");
+        session.output += `\n\n--- ${msg} ---\n`;
       }
       if (data.crashed) {
         window.Launcher._errorInstances.set(data.installationId, {

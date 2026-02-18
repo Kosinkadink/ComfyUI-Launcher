@@ -114,8 +114,8 @@
     "stop": "Stop",
     "disconnect": "Disconnect",
     "connectedTo": "Connected to {url}",
-    "processExited": "\n\n--- Process exited ---\n",
-    "processCrashed": "\n\n--- Process crashed (exit code {code}) ---\n"
+    "processExited": "Process exited",
+    "processCrashed": "Process crashed (exit code {code})"
   },
 
   "settings": {
@@ -133,10 +133,6 @@
     "closeQuitConfirm": "Quit",
     "autoUpdate": "Check for updates on startup",
     "models": "Shared Models",
-    "modelsDirs": "Model Directories",
-    "modelsDirsAdd": "Add Directory",
-    "modelsDirsRemove": "Remove",
-    "modelsDirsPrimary": "primary",
     "downloads": "Downloads",
     "cacheDir": "Cache Directory",
     "maxCachedFiles": "Max Cached Downloads",
