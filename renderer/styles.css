@@ -55,6 +55,9 @@ body {
   color: var(--text-faint);
   cursor: pointer;
   padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .icon-btn:hover { color: var(--text); background: none; }
 
@@ -95,8 +98,8 @@ button.loading::after {
 @keyframes btn-spin {
   to { transform: rotate(360deg); }
 }
-button.back-btn::before { content: "← "; }
-button.add-btn::before { content: "+ "; }
+button.back-btn,
+button.add-btn { display: inline-flex; align-items: center; gap: 4px; }
 
 /* Forms */
 label { font-size: 13px; color: var(--text-muted); }

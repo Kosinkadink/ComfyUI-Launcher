@@ -6,14 +6,30 @@
   <link rel="stylesheet" href="renderer/styles.css">
 </head>
 <body>
+  <!-- Icon Sprite (Lucide) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+      <circle cx="12" cy="12" r="3"/>
+    </symbol>
+    <symbol id="icon-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m12 19-7-7 7-7"/>
+      <path d="M19 12H5"/>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12h14"/>
+      <path d="M12 5v14"/>
+    </symbol>
+  </svg>
+
   <!-- Instance List View -->
   <div id="view-list" class="view active">
     <div class="toolbar">
       <h2 data-i18n="list.title">Installations</h2>
       <div class="toolbar-actions">
-        <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
+        <button id="btn-settings" class="icon-btn" title="Settings"><svg width="18" height="18"><use href="#icon-settings"/></svg></button>
         <button id="btn-track" data-i18n="list.trackExisting">Track Existing</button>
-        <button class="primary add-btn" id="btn-new" data-i18n="list.newInstall">New Install</button>
+        <button class="primary add-btn" id="btn-new"><svg width="14" height="14"><use href="#icon-plus"/></svg> <span data-i18n="list.newInstall">New Install</span></button>
       </div>
     </div>
     <div class="view-list-scroll">
@@ -26,7 +42,7 @@
   <div id="view-new" class="view">
     <div class="toolbar">
       <h2 data-i18n="newInstall.title">New Installation</h2>
-      <button id="btn-new-back" class="back-btn" data-i18n="common.back">Back</button>
+      <button id="btn-new-back" class="back-btn"><svg width="14" height="14"><use href="#icon-arrow-left"/></svg> <span data-i18n="common.back">Back</span></button>
     </div>
     <div class="view-scroll">
       <div id="detected-gpu" class="detected-hardware"></div>
@@ -71,7 +87,7 @@
   <div id="view-detail" class="view">
     <div class="toolbar">
       <h2 id="detail-title"></h2>
-      <button id="btn-detail-back" class="back-btn" data-i18n="common.back">Back</button>
+      <button id="btn-detail-back" class="back-btn"><svg width="14" height="14"><use href="#icon-arrow-left"/></svg> <span data-i18n="common.back">Back</span></button>
     </div>
     <div class="view-scroll" id="detail-sections"></div>
     <div id="detail-bottom-actions"></div>
@@ -81,7 +97,7 @@
   <div id="view-track" class="view">
     <div class="toolbar">
       <h2 data-i18n="track.title">Track Existing Installation</h2>
-      <button id="btn-track-back" class="back-btn" data-i18n="common.back">Back</button>
+      <button id="btn-track-back" class="back-btn"><svg width="14" height="14"><use href="#icon-arrow-left"/></svg> <span data-i18n="common.back">Back</span></button>
     </div>
     <div class="view-scroll">
       <div class="field">
@@ -125,7 +141,7 @@
   <div id="view-settings" class="view">
     <div class="toolbar">
       <h2 data-i18n="settings.title">Settings</h2>
-      <button id="btn-settings-back" class="back-btn" data-i18n="common.back">Back</button>
+      <button id="btn-settings-back" class="back-btn"><svg width="14" height="14"><use href="#icon-arrow-left"/></svg> <span data-i18n="common.back">Back</span></button>
     </div>
     <div class="view-scroll" id="settings-sections"></div>
   </div>
