@@ -57,13 +57,19 @@
     "title": "Installations",
     "trackExisting": "Track Existing",
     "newInstall": "New Install",
-    "empty": "No installations yet.\nClick **+ New Install** to get started.",
-    "view": "View",
+    "empty": "No installations yet.",
+    "emptyHint": "Install or track an existing version of ComfyUI.",
+    "emptyFilter": "No installations match this filter.",
+    "view": "Manage",
     "new": "New",
     "running": "Running",
     "console": "Console",
     "viewProgress": "View Progress",
-    "dragToReorder": "Drag to reorder"
+    "dragToReorder": "Drag to reorder",
+    "filterAll": "All",
+    "filterLocal": "Local",
+    "filterRemote": "Remote",
+    "filterCloud": "Cloud"
   },
 
   "newInstall": {
@@ -96,6 +102,7 @@
   "progress": {
     "working": "Working…",
     "starting": "Starting…",
+    "cancelling": "Cancelling…",
     "error": "Error: {message}"
   },
 

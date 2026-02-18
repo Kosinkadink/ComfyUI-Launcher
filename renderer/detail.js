@@ -4,7 +4,7 @@ window.Launcher.detail = {
   _current: null,
 
   async show(inst) {
-    const { esc, showView } = window.Launcher;
+    const { showView } = window.Launcher;
     this._current = inst;
 
     if (!inst.seen) {
@@ -12,27 +12,21 @@ window.Launcher.detail = {
       window.api.updateInstallation(inst.id, { seen: true });
     }
 
-    const titleEl = document.getElementById("detail-title");
-    const goBack = () => { window.Launcher.showView("list"); window.Launcher.list.render(); };
-    window.Launcher.renderBreadcrumb(titleEl, [
-      { label: window.t("sidebar.installations"), action: goBack },
-      { label: inst.name },
-    ]);
-    // Make the last breadcrumb segment editable for renaming
-    const nameSpan = titleEl.querySelector(".breadcrumb-current");
-    nameSpan.contentEditable = true;
-    nameSpan.spellcheck = false;
-    nameSpan.onblur = () => {
-      const newName = nameSpan.textContent.trim();
+    const titleEl = document.getElementById("detail-modal-title");
+    titleEl.textContent = inst.name;
+    titleEl.contentEditable = true;
+    titleEl.spellcheck = false;
+    titleEl.onblur = () => {
+      const newName = titleEl.textContent.trim();
       if (newName && newName !== inst.name) {
         inst.name = newName;
         window.api.updateInstallation(inst.id, { name: newName });
       } else {
-        nameSpan.textContent = inst.name;
+        titleEl.textContent = inst.name;
       }
     };
-    nameSpan.onkeydown = (e) => {
-      if (e.key === "Enter") { e.preventDefault(); nameSpan.blur(); }
+    titleEl.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); titleEl.blur(); }
     };
     const container = document.getElementById("detail-sections");
     container.innerHTML = "";
@@ -53,28 +47,7 @@ window.Launcher.detail = {
     }
 
     if (bottomSection) {
-      const bar = document.createElement("div");
-      bar.className = "detail-actions";
-      bottomSection.actions.forEach((a) => {
-        const btn = document.createElement("button");
-        btn.textContent = a.label;
-        if (a.style === "primary") btn.className = "primary";
-        if (a.style === "danger") btn.className = "danger";
-        if (a.enabled === false && !a.disabledMessage) {
-          btn.disabled = true;
-        } else if (a.enabled === false && a.disabledMessage) {
-          btn.classList.add("looks-disabled");
-        }
-        btn.onclick = () => {
-          if (a.enabled === false && a.disabledMessage) {
-            window.Launcher.modal.alert({ title: a.label, message: a.disabledMessage });
-            return;
-          }
-          this._runAction(a, btn);
-        };
-        bar.appendChild(btn);
-      });
-      bottomContainer.appendChild(bar);
+      bottomContainer.appendChild(this._renderActionsBar(bottomSection.actions, "detail-actions"));
     }
 
     mainSections.forEach((section) => {
@@ -115,27 +88,7 @@ window.Launcher.detail = {
         label.textContent = item.label + (item.active ? " (active)" : "");
         row.appendChild(label);
         if (item.actions) {
-          const bar = document.createElement("div");
-          bar.className = "detail-item-actions";
-          item.actions.forEach((a) => {
-            const btn = document.createElement("button");
-            btn.textContent = a.label;
-            if (a.style === "danger") btn.className = "danger";
-            if (a.enabled === false && !a.disabledMessage) {
-              btn.disabled = true;
-            } else if (a.enabled === false && a.disabledMessage) {
-              btn.classList.add("looks-disabled");
-            }
-            btn.onclick = () => {
-              if (a.enabled === false && a.disabledMessage) {
-                window.Launcher.modal.alert({ title: a.label, message: a.disabledMessage });
-                return;
-              }
-              this._runAction(a, btn);
-            };
-            bar.appendChild(btn);
-          });
-          row.appendChild(bar);
+          row.appendChild(this._renderActionsBar(item.actions, "detail-item-actions"));
         }
         list.appendChild(row);
       });
@@ -192,31 +145,37 @@ window.Launcher.detail = {
     }
 
     if (section.actions) {
-      const bar = document.createElement("div");
-      bar.className = "detail-actions";
-      section.actions.forEach((a) => {
-        const btn = document.createElement("button");
-        btn.textContent = a.label;
-        if (a.style === "primary") btn.className = "primary";
-        if (a.style === "danger") btn.className = "danger";
-        if (a.enabled === false && !a.disabledMessage) {
-          btn.disabled = true;
-        } else if (a.enabled === false && a.disabledMessage) {
-          btn.classList.add("looks-disabled");
-        }
-        btn.onclick = () => {
-          if (a.enabled === false && a.disabledMessage) {
-            window.Launcher.modal.alert({ title: a.label, message: a.disabledMessage });
-            return;
-          }
-          this._runAction(a, btn);
-        };
-        bar.appendChild(btn);
-      });
-      sec.appendChild(bar);
+      sec.appendChild(this._renderActionsBar(section.actions, "detail-actions"));
     }
 
     return sec;
+  },
+
+  _buildActionBtn(a) {
+    const btn = document.createElement("button");
+    btn.textContent = a.label;
+    if (a.style === "primary") btn.className = "primary";
+    if (a.style === "danger") btn.className = "danger";
+    if (a.enabled === false && !a.disabledMessage) {
+      btn.disabled = true;
+    } else if (a.enabled === false && a.disabledMessage) {
+      btn.classList.add("looks-disabled");
+    }
+    btn.onclick = () => {
+      if (a.enabled === false && a.disabledMessage) {
+        window.Launcher.modal.alert({ title: a.label, message: a.disabledMessage });
+        return;
+      }
+      this._runAction(a, btn);
+    };
+    return btn;
+  },
+
+  _renderActionsBar(actions, className) {
+    const bar = document.createElement("div");
+    bar.className = className;
+    actions.forEach((a) => bar.appendChild(this._buildActionBtn(a)));
+    return bar;
   },
 
   async _refreshSection(sectionTitle, inst) {
@@ -305,7 +264,7 @@ window.Launcher.detail = {
     }
 
     if (result.navigate === "list") {
-      showView("list");
+      window.Launcher.closeViewModal("detail");
       list.render();
     } else if (result.navigate === "detail") {
       await this._refreshAllSections(this._current);

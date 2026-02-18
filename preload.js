@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("instance-stopped", handler);
   },
   cancelLaunch: () => ipcRenderer.invoke("cancel-launch"),
+  cancelOperation: (installationId) => ipcRenderer.invoke("cancel-operation", installationId),
   killPortProcess: (port) => ipcRenderer.invoke("kill-port-process", port),
   getListActions: (installationId) =>
     ipcRenderer.invoke("get-list-actions", installationId),

@@ -63,7 +63,7 @@ body {
 }
 .sidebar-brand {
   padding: 12px 20px 24px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.2px;
@@ -84,7 +84,7 @@ body {
   border-radius: 6px;
   background: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
@@ -119,7 +119,7 @@ body {
 }
 .sidebar-count {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   background: var(--accent);
   color: var(--bg);
@@ -143,7 +143,7 @@ body {
 .icon-btn {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 19px;
   color: var(--text-faint);
   cursor: pointer;
   padding: 4px 8px;
@@ -160,7 +160,7 @@ button {
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 button:hover { background: var(--border); }
@@ -171,6 +171,8 @@ button.primary {
   font-weight: 600;
 }
 button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.accent { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+button.accent:hover { background: var(--accent); color: var(--bg); }
 button.danger { color: var(--danger); border-color: var(--danger); }
 button.danger:hover { background: var(--danger); color: var(--bg); }
 button.looks-disabled { opacity: 0.4; }
@@ -194,7 +196,7 @@ button.back-btn,
 button.add-btn { display: inline-flex; align-items: center; gap: 4px; }
 
 /* Forms */
-label { font-size: 13px; color: var(--text-muted); }
+label { font-size: 14px; color: var(--text-muted); }
 select, input[type="text"], input[type="number"] {
   width: 100%;
   padding: 8px 10px;
@@ -203,7 +205,7 @@ select, input[type="text"], input[type="number"] {
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
 }
 select:focus, input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
@@ -245,10 +247,48 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 }
 .path-input button { flex-shrink: 0; }
 .field-error {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--danger);
   margin-top: 4px;
   min-height: 0;
+}
+
+/* Filter tabs */
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.filter-tab {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+}
+.filter-tab:hover {
+  color: var(--text-muted);
+  background: none;
+}
+.filter-tab.active {
+  color: var(--text);
+  font-weight: 600;
+}
+.filter-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
 }
 
 /* Instance list */
@@ -283,8 +323,8 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   border-radius: 1px;
 }
 .instance-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.instance-name { font-size: 15px; font-weight: 600; }
-.instance-meta { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.instance-name { font-size: 16px; font-weight: 600; }
+.instance-meta { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-danger { color: var(--danger); font-weight: 600; }
 .status-running { color: var(--accent); font-weight: 600; }
 .status-new { color: var(--accent); font-weight: 600; }
@@ -295,7 +335,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   text-align: center;
   padding: 40px 20px;
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .toolbar {
@@ -305,7 +345,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   min-height: 34px;
   margin-bottom: 16px;
 }
-.toolbar h2 { font-size: 15px; font-weight: 600; color: var(--text-muted); }
+.toolbar h2 { font-size: 24px; font-weight: 600; color: var(--text-muted); }
 .toolbar-actions { display: flex; gap: 8px; }
 
 /* Breadcrumbs */
@@ -315,38 +355,17 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   gap: 8px;
   min-width: 0;
 }
-.breadcrumb-link {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-faint);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.breadcrumb-link:hover { color: var(--text); }
-.breadcrumb-sep {
-  font-size: 14px;
-  color: var(--text-faint);
-  flex-shrink: 0;
-}
 .breadcrumb-current {
-  font-size: 15px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.breadcrumb-current[contenteditable] {
-  cursor: text;
-  border-bottom: 1px dashed var(--border);
-  outline: none;
-}
-.breadcrumb-current[contenteditable]:focus {
-  border-bottom-color: var(--accent);
-}
 
 .detected-hardware {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -371,7 +390,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 /* Detail sections */
 .detail-section { margin-bottom: 18px; }
 .detail-section-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-faint);
   text-transform: uppercase;
@@ -387,16 +406,16 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   flex-direction: column;
   gap: 10px;
 }
-.detail-field-label { font-size: 12px; color: var(--text-muted); }
-.detail-field-value { font-size: 14px; margin-top: 1px; }
+.detail-field-label { font-size: 13px; color: var(--text-muted); }
+.detail-field-value { font-size: 15px; margin-top: 1px; }
 .detail-field-input {
   width: 100%;
   margin-top: 4px;
   padding: 6px 8px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .detail-section-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 8px;
 }
@@ -419,14 +438,14 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   font-weight: 600;
 }
 .detail-item-label {
-  font-size: 14px;
+  font-size: 15px;
 }
 .detail-item-actions {
   display: flex;
   gap: 6px;
 }
 .detail-item-actions button {
-  font-size: 12px;
+  font-size: 13px;
   padding: 3px 10px;
 }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -438,7 +457,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 .settings-section .field:last-child { margin-bottom: 0; }
 .path-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .path-primary-tag {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   background: var(--surface);
   padding: 2px 8px;
@@ -449,7 +468,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 
 /* Progress */
 .progress-status {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 12px;
   user-select: text;
@@ -512,7 +531,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-faint);
   flex-shrink: 0;
@@ -527,7 +546,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   color: var(--bg);
 }
 .progress-step-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-faint);
 }
@@ -542,7 +561,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   margin-top: 6px;
 }
 .progress-step-status {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 6px;
   user-select: text;
@@ -550,7 +569,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 .progress-step-summary {
   margin-left: 32px;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   user-select: text;
 }
@@ -569,7 +588,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   border-radius: 6px;
   padding: 10px 12px;
   font-family: "Cascadia Mono", "Consolas", monospace;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   white-space: pre-wrap;
   word-break: break-all;
@@ -581,6 +600,76 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   max-height: none;
   flex: 1;
   min-height: 0;
+}
+
+/* View modals (large, full-content modals for sub-views) */
+.view-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.view-modal.active {
+  display: flex;
+}
+.view-modal-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: calc(100vw - 260px);
+  height: calc(100vh - 60px);
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.view-modal-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+.view-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view-modal-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.view-modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px 8px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.view-modal-close:hover {
+  color: var(--text);
+  background: none;
+}
+.view-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow: hidden;
 }
 
 /* Modal */
@@ -602,12 +691,12 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   max-width: 400px;
 }
 .modal-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 .modal-message {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 20px;
   white-space: pre-line;
@@ -624,7 +713,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   margin-bottom: 4px;
 }
 .modal-error {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--danger);
   min-height: 12px;
   margin-bottom: 4px;
@@ -632,7 +721,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 .modal-input {
   width: 100%;
   padding: 6px 8px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .modal-actions {
   display: flex;
@@ -650,7 +739,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--surface);
-  font-size: 13px;
+  font-size: 14px;
 }
 .update-banner .update-text { flex: 1; color: var(--text); }
 .update-banner .update-text strong { color: var(--accent); }
@@ -658,5 +747,39 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 
 /* In-progress status tag on list cards */
 .status-in-progress { color: var(--accent); font-weight: 600; }
+
+/* Card progress bar (inline on cards) */
+.card-progress {
+  flex: 1;
+  min-width: 0;
+  margin-top: 4px;
+}
+.card-progress-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+.card-progress-track {
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.card-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+.card-progress-fill.indeterminate {
+  animation: indeterminate 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+}
 
 

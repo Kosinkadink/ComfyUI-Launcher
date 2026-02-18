@@ -82,107 +82,16 @@
         <button class="primary add-btn" id="btn-new"><svg width="14" height="14"><use href="#icon-plus"/></svg> <span data-i18n="list.newInstall">New Install</span></button>
       </div>
     </div>
+    <div id="list-filter-tabs" class="filter-tabs">
+      <button class="filter-tab active" data-filter="all" data-i18n="list.filterAll">All</button>
+      <button class="filter-tab" data-filter="local" data-i18n="list.filterLocal">Local</button>
+      <button class="filter-tab" data-filter="remote" data-i18n="list.filterRemote">Remote</button>
+      <button class="filter-tab" data-filter="cloud" data-i18n="list.filterCloud">Cloud</button>
+    </div>
     <div class="view-list-scroll">
       <div id="instance-list" class="instance-list"></div>
     </div>
     <div id="update-banner" class="update-banner" style="display:none"></div>
-  </div>
-
-  <!-- New Install View -->
-  <div id="view-new" class="view">
-    <div class="toolbar">
-      <div id="new-install-title" class="breadcrumb"></div>
-    </div>
-    <div class="view-scroll">
-      <div id="detected-gpu" class="detected-hardware"></div>
-
-      <div class="field">
-        <label for="inst-name" data-i18n="common.name">Name</label>
-        <input type="text" id="inst-name" placeholder="e.g. ComfyUI Main">
-      </div>
-
-      <div class="field">
-        <label for="source" data-i18n="newInstall.installMethod">Install Method</label>
-        <select id="source" disabled><option>Loading…</option></select>
-      </div>
-
-      <div id="source-fields"></div>
-
-      <div class="field">
-        <label for="inst-path" data-i18n="newInstall.installLocation">Install Location</label>
-        <div class="path-input">
-          <input type="text" id="inst-path" placeholder="Loading…" readonly>
-          <button id="btn-browse" type="button" data-i18n="common.browse">Browse…</button>
-        </div>
-      </div>
-    </div>
-    <div class="view-bottom">
-      <button class="primary" id="btn-save" disabled data-i18n="newInstall.addInstallation">Add Installation</button>
-    </div>
-  </div>
-
-  <!-- Progress View -->
-  <div id="view-progress" class="view">
-    <div class="toolbar">
-      <div id="progress-title" class="breadcrumb"></div>
-      <div class="toolbar-actions">
-        <button class="danger" id="btn-progress-cancel" style="display:none" data-i18n="common.cancel">Cancel</button>
-      </div>
-    </div>
-    <div class="view-scroll" id="progress-content"></div>
-  </div>
-
-  <!-- Instance Detail View -->
-  <div id="view-detail" class="view">
-    <div class="toolbar">
-      <div id="detail-title" class="breadcrumb"></div>
-    </div>
-    <div class="view-scroll" id="detail-sections"></div>
-    <div id="detail-bottom-actions"></div>
-  </div>
-
-  <!-- Track Existing View -->
-  <div id="view-track" class="view">
-    <div class="toolbar">
-      <div id="track-title" class="breadcrumb"></div>
-    </div>
-    <div class="view-scroll">
-      <div class="field">
-        <label for="track-path" data-i18n="track.installDir">Installation Directory</label>
-        <div class="path-input">
-          <input type="text" id="track-path" placeholder="Select a directory…" readonly>
-          <button id="btn-track-browse" type="button" data-i18n="common.browse">Browse…</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="track-source" data-i18n="track.detectedType">Detected Type</label>
-        <select id="track-source" disabled><option>Browse to a directory first</option></select>
-      </div>
-
-      <div class="field">
-        <label for="track-name" data-i18n="common.name">Name</label>
-        <input type="text" id="track-name" placeholder="e.g. ComfyUI Main">
-      </div>
-
-      <div id="track-detail"></div>
-    </div>
-    <div class="view-bottom">
-      <button class="primary" id="btn-track-save" disabled data-i18n="track.trackInstallation">Track Installation</button>
-    </div>
-  </div>
-
-  <!-- Console View -->
-  <div id="view-console" class="view">
-    <div class="toolbar">
-      <div id="console-title" class="breadcrumb"></div>
-      <div class="toolbar-actions">
-        <button id="btn-console-show-window" class="primary" style="display:none" data-i18n="running.showWindow">Show Window</button>
-        <button id="btn-console-browser" data-i18n="console.openInBrowser">Open in Browser</button>
-        <button class="danger" id="btn-console-stop" data-i18n="console.stop">Stop</button>
-      </div>
-    </div>
-    <div class="terminal-output" id="console-terminal"></div>
   </div>
 
   <!-- Models View -->
@@ -210,6 +119,121 @@
   </div>
 
   </main>
+  </div>
+
+  <!-- View Modal: Detail -->
+  <div id="modal-detail" class="view-modal">
+    <div class="view-modal-content">
+      <div class="view-modal-header">
+        <div class="view-modal-title" id="detail-modal-title"></div>
+        <button class="view-modal-close" data-modal="detail">✕</button>
+      </div>
+      <div class="view-modal-body">
+        <div class="view-scroll" id="detail-sections"></div>
+        <div id="detail-bottom-actions"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Modal: Console -->
+  <div id="modal-console" class="view-modal">
+    <div class="view-modal-content">
+      <div class="view-modal-header">
+        <div class="view-modal-title" id="console-modal-title"></div>
+        <div class="view-modal-header-actions">
+          <button id="btn-console-show-window" class="primary" style="display:none" data-i18n="running.showWindow">Show Window</button>
+          <button id="btn-console-browser" data-i18n="console.openInBrowser">Open in Browser</button>
+          <button class="danger" id="btn-console-stop" data-i18n="console.stop">Stop</button>
+        </div>
+        <button class="view-modal-close" data-modal="console">✕</button>
+      </div>
+      <div class="view-modal-body">
+        <div class="terminal-output" id="console-terminal"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Modal: Progress -->
+  <div id="modal-progress" class="view-modal">
+    <div class="view-modal-content">
+      <div class="view-modal-header">
+        <div class="view-modal-title" id="progress-modal-title"></div>
+        <div class="view-modal-header-actions">
+          <button class="danger" id="btn-progress-cancel" style="display:none" data-i18n="common.cancel">Cancel</button>
+        </div>
+        <button class="view-modal-close" data-modal="progress">✕</button>
+      </div>
+      <div class="view-modal-body">
+        <div class="view-scroll" id="progress-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Modal: New Install -->
+  <div id="modal-new" class="view-modal">
+    <div class="view-modal-content">
+      <div class="view-modal-header">
+        <div class="view-modal-title" id="new-modal-title"></div>
+        <button class="view-modal-close" data-modal="new">✕</button>
+      </div>
+      <div class="view-modal-body">
+        <div class="view-scroll">
+          <div id="detected-gpu" class="detected-hardware"></div>
+          <div class="field">
+            <label for="inst-name" data-i18n="common.name">Name</label>
+            <input type="text" id="inst-name" placeholder="e.g. ComfyUI Main">
+          </div>
+          <div class="field">
+            <label for="source" data-i18n="newInstall.installMethod">Install Method</label>
+            <select id="source" disabled><option>Loading…</option></select>
+          </div>
+          <div id="source-fields"></div>
+          <div class="field">
+            <label for="inst-path" data-i18n="newInstall.installLocation">Install Location</label>
+            <div class="path-input">
+              <input type="text" id="inst-path" placeholder="Loading…" readonly>
+              <button id="btn-browse" type="button" data-i18n="common.browse">Browse…</button>
+            </div>
+          </div>
+        </div>
+        <div class="view-bottom">
+          <button class="primary" id="btn-save" disabled data-i18n="newInstall.addInstallation">Add Installation</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Modal: Track Existing -->
+  <div id="modal-track" class="view-modal">
+    <div class="view-modal-content">
+      <div class="view-modal-header">
+        <div class="view-modal-title" id="track-modal-title"></div>
+        <button class="view-modal-close" data-modal="track">✕</button>
+      </div>
+      <div class="view-modal-body">
+        <div class="view-scroll">
+          <div class="field">
+            <label for="track-path" data-i18n="track.installDir">Installation Directory</label>
+            <div class="path-input">
+              <input type="text" id="track-path" placeholder="Select a directory…" readonly>
+              <button id="btn-track-browse" type="button" data-i18n="common.browse">Browse…</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="track-source" data-i18n="track.detectedType">Detected Type</label>
+            <select id="track-source" disabled><option>Browse to a directory first</option></select>
+          </div>
+          <div class="field">
+            <label for="track-name" data-i18n="common.name">Name</label>
+            <input type="text" id="track-name" placeholder="e.g. ComfyUI Main">
+          </div>
+          <div id="track-detail"></div>
+        </div>
+        <div class="view-bottom">
+          <button class="primary" id="btn-track-save" disabled data-i18n="track.trackInstallation">Track Installation</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="renderer/i18n.js"></script>
@@ -265,6 +289,16 @@
         confirmStyle: "danger",
       });
       if (confirmed) window.api.quitApp();
+    });
+
+    // View modal close buttons
+    document.querySelectorAll(".view-modal-close").forEach((btn) => {
+      btn.onclick = () => window.Launcher.closeViewModal(btn.dataset.modal);
+    });
+
+    // Filter tabs
+    document.querySelectorAll("#list-filter-tabs .filter-tab").forEach((btn) => {
+      btn.onclick = () => window.Launcher.list.setFilter(btn.dataset.filter);
     });
 
     // Wait for i18n before first render to avoid showing raw keys

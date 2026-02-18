@@ -2,25 +2,19 @@ window.Launcher = window.Launcher || {};
 
 window.Launcher.console = {
   _installationId: null,
-  _from: null,
 
   /** Show console for any running (or recently exited) installation. */
-  show(installationId, { from } = {}) {
+  show(installationId) {
     this._installationId = installationId;
-    this._from = from || null;
 
     const session = window.Launcher.sessions.get(installationId);
     const runningInfo = window.Launcher._runningInstances.get(installationId);
     const errorInfo = window.Launcher._errorInstances.get(installationId);
     const isExited = session ? session.exited : true;
 
-    // Breadcrumb: [Parent] › Console — InstallName
     const instName = runningInfo?.installationName || errorInfo?.installationName;
-    const titleEl = document.getElementById("console-title");
-    const segments = [];
-    segments.push(this._parentSegment());
-    segments.push({ label: instName ? `${window.t("console.title")} — ${instName}` : window.t("console.title") });
-    window.Launcher.renderBreadcrumb(titleEl, segments);
+    document.getElementById("console-modal-title").textContent =
+      instName ? `${window.t("console.title")} — ${instName}` : window.t("console.title");
 
     const terminal = document.getElementById("console-terminal");
     terminal.textContent = session ? session.output : "";
@@ -44,7 +38,6 @@ window.Launcher.console = {
     browserBtn.style.display = comfyUrl ? "" : "none";
     browserBtn.onclick = comfyUrl ? () => window.api.openPath(comfyUrl) : null;
 
-    // Stop button (hidden when exited — breadcrumb handles navigation)
     const stopBtn = document.getElementById("btn-console-stop");
     if (isExited) {
       stopBtn.style.display = "none";
@@ -74,12 +67,5 @@ window.Launcher.console = {
     document.getElementById("btn-console-show-window").style.display = "none";
     document.getElementById("btn-console-browser").style.display = "none";
     document.getElementById("btn-console-stop").style.display = "none";
-  },
-
-  _parentSegment() {
-    if (this._from === "running") {
-      return { label: window.t("sidebar.running"), action: () => window.Launcher.running.show() };
-    }
-    return { label: window.t("sidebar.installations"), action: () => { window.Launcher.showView("list"); window.Launcher.list.render(); } };
   },
 };

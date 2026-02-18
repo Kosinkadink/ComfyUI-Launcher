@@ -49,58 +49,22 @@ window.Launcher.running = {
       cards.className = "instance-list";
       currentInstances.forEach((info, installationId) => {
         const inst = instMap[installationId];
-        const card = document.createElement("div");
-        card.className = "instance-card";
+        const metaParts = [];
+        if (inst) metaParts.push(esc(inst.sourceLabel));
+        if (inst && inst.version) metaParts.push(esc(inst.version));
+        metaParts.push(`<span class="status-running">${esc(window.t("list.running"))}</span>`);
+        metaParts.push(esc(info.url || `http://127.0.0.1:${info.port || 8188}`));
 
-        const infoEl = document.createElement("div");
-        infoEl.className = "instance-info";
-        const name = document.createElement("div");
-        name.className = "instance-name";
-        name.textContent = info.installationName;
-        infoEl.appendChild(name);
-        const meta = document.createElement("div");
-        meta.className = "instance-meta";
-        const parts = [];
-        if (inst) parts.push(inst.sourceLabel);
-        if (inst && inst.version) parts.push(inst.version);
-        parts.push(info.url || `http://127.0.0.1:${info.port || 8188}`);
-        meta.textContent = parts.join(" · ");
-        infoEl.appendChild(meta);
-        card.appendChild(infoEl);
+        const { card, actionsEl } = window.Launcher.buildCard({
+          name: info.installationName,
+          metaHtml: metaParts.join(" · "),
+        });
 
-        const actions = document.createElement("div");
-        actions.className = "instance-actions";
+        if (info.mode !== "console") actionsEl.appendChild(window.Launcher.buildFocusBtn(installationId));
+        actionsEl.appendChild(window.Launcher.buildConsoleBtn(installationId));
+        actionsEl.appendChild(window.Launcher.buildStopBtn(installationId));
+        if (inst) actionsEl.appendChild(window.Launcher.buildManageBtn(inst));
 
-        if (info.mode !== "console") {
-          const focusBtn = document.createElement("button");
-          focusBtn.className = "primary";
-          focusBtn.textContent = window.t("running.showWindow");
-          focusBtn.onclick = () => window.api.focusComfyWindow(installationId);
-          actions.appendChild(focusBtn);
-        }
-
-        const consoleBtn = document.createElement("button");
-        consoleBtn.textContent = window.t("list.console");
-        consoleBtn.onclick = () => window.Launcher.console.show(installationId, { from: "running" });
-        actions.appendChild(consoleBtn);
-
-        const stopBtn = document.createElement("button");
-        stopBtn.className = "danger";
-        stopBtn.textContent = window.t("console.stop");
-        stopBtn.onclick = async () => {
-          await window.api.stopComfyUI(installationId);
-        };
-        actions.appendChild(stopBtn);
-
-        if (inst) {
-          const viewBtn = document.createElement("button");
-          viewBtn.className = "view-btn";
-          viewBtn.textContent = window.t("list.view");
-          viewBtn.onclick = () => window.Launcher.detail.show(inst);
-          actions.appendChild(viewBtn);
-        }
-
-        card.appendChild(actions);
         cards.appendChild(card);
       });
       container.appendChild(cards);
@@ -119,46 +83,23 @@ window.Launcher.running = {
       cards.className = "instance-list";
       currentErrors.forEach((errorInfo, installationId) => {
         const inst = instMap[installationId];
-        const card = document.createElement("div");
-        card.className = "instance-card";
+        const metaParts = [];
+        if (inst) metaParts.push(esc(inst.sourceLabel));
+        metaParts.push(esc(window.t("running.exitCode", { code: errorInfo.exitCode ?? "unknown" })));
+        const metaHtml = `<span class="status-danger">${esc(window.t("running.crashed"))}</span> · ${metaParts.join(" · ")}`;
 
-        const infoEl = document.createElement("div");
-        infoEl.className = "instance-info";
-        const name = document.createElement("div");
-        name.className = "instance-name";
-        name.textContent = errorInfo.installationName;
-        infoEl.appendChild(name);
-        const meta = document.createElement("div");
-        meta.className = "instance-meta";
-        const parts = [];
-        if (inst) parts.push(inst.sourceLabel);
-        parts.push(window.t("running.exitCode", { code: errorInfo.exitCode ?? "unknown" }));
-        meta.innerHTML = `<span class="status-danger">${esc(window.t("running.crashed"))}</span> · ${parts.map((p) => esc(p)).join(" · ")}`;
-        infoEl.appendChild(meta);
-        card.appendChild(infoEl);
+        const { card, actionsEl } = window.Launcher.buildCard({
+          name: errorInfo.installationName,
+          metaHtml,
+        });
 
-        const actions = document.createElement("div");
-        actions.className = "instance-actions";
-
-        const consoleBtn = document.createElement("button");
-        consoleBtn.textContent = window.t("list.console");
-        consoleBtn.onclick = () => window.Launcher.console.show(installationId, { from: "running" });
-        actions.appendChild(consoleBtn);
-
+        actionsEl.appendChild(window.Launcher.buildConsoleBtn(installationId));
         const dismissBtn = document.createElement("button");
         dismissBtn.textContent = window.t("running.dismiss");
         dismissBtn.onclick = () => window.Launcher.clearErrorInstance(installationId);
-        actions.appendChild(dismissBtn);
+        actionsEl.appendChild(dismissBtn);
+        if (inst) actionsEl.appendChild(window.Launcher.buildManageBtn(inst));
 
-        if (inst) {
-          const viewBtn = document.createElement("button");
-          viewBtn.className = "view-btn";
-          viewBtn.textContent = window.t("list.view");
-          viewBtn.onclick = () => window.Launcher.detail.show(inst);
-          actions.appendChild(viewBtn);
-        }
-
-        card.appendChild(actions);
         cards.appendChild(card);
       });
       container.appendChild(cards);
@@ -177,43 +118,20 @@ window.Launcher.running = {
       inProgressIds.forEach((installationId) => {
         const session = window.Launcher._activeSessions.get(installationId);
         const inst = instMap[installationId];
-        const card = document.createElement("div");
-        card.className = "instance-card";
+        const metaParts = [];
+        if (inst) metaParts.push(esc(inst.sourceLabel));
+        if (inst && inst.version) metaParts.push(esc(inst.version));
+        if (session) metaParts.push(`<span class="status-in-progress">${esc(session.label)}</span>`);
 
-        const infoEl = document.createElement("div");
-        infoEl.className = "instance-info";
-        const name = document.createElement("div");
-        name.className = "instance-name";
-        name.textContent = inst ? inst.name : (session ? session.label : "");
-        infoEl.appendChild(name);
-        const meta = document.createElement("div");
-        meta.className = "instance-meta";
-        const parts = [];
-        if (inst) parts.push(inst.sourceLabel);
-        if (inst && inst.version) parts.push(inst.version);
-        if (session) parts.push(session.label);
-        meta.innerHTML = parts.map((p) => esc(p)).join(" · ");
-        infoEl.appendChild(meta);
-        card.appendChild(infoEl);
+        const { card, infoEl, actionsEl } = window.Launcher.buildCard({
+          name: inst ? inst.name : (session ? session.label : ""),
+          metaHtml: metaParts.join(" · "),
+        });
+        infoEl.appendChild(window.Launcher.buildCardProgress(installationId));
 
-        const actions = document.createElement("div");
-        actions.className = "instance-actions";
+        actionsEl.appendChild(window.Launcher.buildProgressBtn(installationId));
+        if (inst) actionsEl.appendChild(window.Launcher.buildManageBtn(inst));
 
-        const progressBtn = document.createElement("button");
-        progressBtn.className = "primary";
-        progressBtn.textContent = window.t("list.viewProgress");
-        progressBtn.onclick = () => window.Launcher.progress.showOperation(installationId, { from: "running" });
-        actions.appendChild(progressBtn);
-
-        if (inst) {
-          const viewBtn = document.createElement("button");
-          viewBtn.className = "view-btn";
-          viewBtn.textContent = window.t("list.view");
-          viewBtn.onclick = () => window.Launcher.detail.show(inst);
-          actions.appendChild(viewBtn);
-        }
-
-        card.appendChild(actions);
         cards.appendChild(card);
       });
       container.appendChild(cards);
