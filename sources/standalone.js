@@ -257,7 +257,7 @@ module.exports = {
     if (!pythonPath || !fs.existsSync(pythonPath)) return null;
     const mainPy = path.join(installation.installPath, "ComfyUI", "main.py");
     if (!fs.existsSync(mainPy)) return null;
-    const userArgs = (installation.launchArgs || this.defaultLaunchArgs).trim();
+    const userArgs = (installation.launchArgs ?? this.defaultLaunchArgs).trim();
     const parsed = userArgs.length > 0 ? parseArgs(userArgs) : [];
     const portIdx = parsed.indexOf("--port");
     const port = portIdx >= 0 && parsed[portIdx + 1] ? parseInt(parsed[portIdx + 1], 10) || 8188 : 8188;
