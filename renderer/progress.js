@@ -420,7 +420,7 @@ window.Launcher.progress = {
       if (result.ok) {
         const wasShowing = this._isShowing(installationId);
         window.Launcher.clearActiveSession(installationId);
-        window.Launcher.closeViewModal("progress");
+        if (wasShowing) window.Launcher.closeViewModal("progress");
         if (result.navigate === "detail" && window.Launcher.detail._current && wasShowing) {
           window.Launcher.detail.show(window.Launcher.detail._current);
         } else if (result.mode === "console" && wasShowing) {
