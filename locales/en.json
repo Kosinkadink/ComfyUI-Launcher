@@ -295,7 +295,8 @@
     "compareWith": "Compare With",
     "updateEnvRetry": "Environment setup failed, retrying…",
     "updateEnvFailed": "Update applied but environment setup failed.",
-    "updateEnvPartial": "Update completed but environment was recreated without full package copy. Some packages may need to be reinstalled."
+    "updateEnvPartial": "Update completed but environment was recreated without full package copy. Some packages may need to be reinstalled.",
+    "installingNodeDeps": "Installing custom node dependencies…"
   },
 
   "portable": {

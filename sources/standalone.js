@@ -6,7 +6,7 @@ const { downloadAndExtract, downloadAndExtractMulti } = require("../lib/installe
 const { deleteDir } = require("../lib/delete");
 const { parseArgs, formatTime } = require("../lib/util");
 const { t } = require("../lib/i18n");
-const { scanCustomNodes } = require("../lib/nodes");
+const { scanCustomNodes, installCustomNodeDeps } = require("../lib/nodes");
 const { saveSnapshot, loadSnapshot, listSnapshots, deleteSnapshot, diffCustomNodes, diffSnapshots } = require("../lib/snapshots");
 const { pipInstallFromList } = require("../lib/pip");
 
@@ -709,6 +709,12 @@ const standaloneSource = {
       const eta = etaSecs >= 0 ? formatTime(etaSecs) : "—";
       sendProgress("setup", { percent, status: `Copying packages… ${copied} / ${total} files  ·  ${elapsed} elapsed  ·  ${eta} remaining` });
     });
+    // Install custom node dependencies (no-op on fresh installs, needed for Strategy B forks)
+    const uvPath = getUvPath(installation.installPath);
+    const pythonPath = getEnvPythonPath(installation.installPath, DEFAULT_ENV);
+    await installCustomNodeDeps(installation.installPath, uvPath, pythonPath).catch((err) => {
+      console.error("Custom node dep install failed during postInstall:", err.message);
+    });
     const envMethods = { ...installation.envMethods, [DEFAULT_ENV]: ENV_METHOD };
     await update({ envMethods });
   },
@@ -1017,6 +1023,28 @@ const standaloneSource = {
           }
         }
 
+        // Step 6: Reinstall custom node dependencies into the new env
+        if (!envCreateFailed) {
+          sendProgress("setup", { percent: -1, status: t("standalone.installingNodeDeps") });
+          const uvPath = getUvPath(installPath);
+          const pythonPath = getEnvPythonPath(installPath, envName);
+          const depResult = await installCustomNodeDeps(installPath, uvPath, pythonPath, {
+            onProgress: (nodeId, i, total) => {
+              sendProgress("setup", { percent: Math.round((i / total) * 100), status: `${nodeId} (${i + 1}/${total})` });
+            },
+          }).catch((err) => {
+            console.error("Custom node dep install failed during update:", err.message);
+            if (sendOutput) sendOutput(`\n⚠ Custom node dependency installation failed: ${err.message}\n`);
+            return { installed: [], failed: [], skipped: [] };
+          });
+          if (depResult.failed.length > 0) {
+            if (sendOutput) {
+              sendOutput(`\n⚠ ${depResult.failed.length} node(s) failed to install deps:\n`);
+              for (const f of depResult.failed) sendOutput(`  • ${f.id}: ${f.error}\n`);
+            }
+          }
+        }
+
         // Update installation metadata
         const newManifestData = JSON.parse(await fs.promises.readFile(path.join(installPath, MANIFEST_FILE), "utf-8").catch(() => "{}"));
         await update({
@@ -1125,6 +1153,14 @@ const standaloneSource = {
 
         // Install snapshot packages + compare nodes (reuses performSoftRestore)
         await performSoftRestore(installPath, newEnvName, snapshot, { sendProgress, sendOutput });
+
+        // Install custom node dependencies not covered by the snapshot
+        const uvPath = getUvPath(installPath);
+        const pythonPath = getEnvPythonPath(installPath, newEnvName);
+        await installCustomNodeDeps(installPath, uvPath, pythonPath).catch((err) => {
+          console.error("Custom node dep install failed during clean restore:", err.message);
+          if (sendOutput) sendOutput(`\n⚠ Custom node dependency installation failed: ${err.message}\n`);
+        });
 
         // Activate the new env
         const envMethods = { ...(installation.envMethods || {}), [newEnvName]: ENV_METHOD };

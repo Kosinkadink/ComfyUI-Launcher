@@ -294,7 +294,8 @@
     "compareWith": "比较对象",
     "updateEnvRetry": "环境设置失败，正在重试…",
     "updateEnvFailed": "更新已应用，但环境设置失败。",
-    "updateEnvPartial": "更新完成，但环境重建时未完整复制包。某些包可能需要重新安装。"
+    "updateEnvPartial": "更新完成，但环境重建时未完整复制包。某些包可能需要重新安装。",
+    "installingNodeDeps": "正在安装自定义节点依赖…"
   },
 
   "portable": {
