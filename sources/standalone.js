@@ -10,10 +10,12 @@ const { scanCustomNodes } = require("../lib/nodes");
 const { saveSnapshot, listSnapshots, deleteSnapshot } = require("../lib/snapshots");
 
 const RELEASE_REPO = "Kosinkadink/ComfyUI-Launcher-Environments";
+const COMFYUI_REPO = "Comfy-Org/ComfyUI";
 const ENVS_DIR = "envs";
 const DEFAULT_ENV = "default";
 const ENV_METHOD = "copy";
 const MANIFEST_FILE = "manifest.json";
+const PRESERVED_DIRS = ["custom_nodes", "models", "user", "output", "input"];
 
 const VARIANT_LABELS = {
   "nvidia": "NVIDIA",
@@ -213,6 +215,72 @@ function recommendVariant(variantId, gpu) {
   return false;
 }
 
+async function fetchLatestStandaloneRelease(track, currentVariant) {
+  if (track === "latest") {
+    // Track latest commits on ComfyUI main branch
+    const [commit, releases] = await Promise.all([
+      fetchJSON(`https://api.github.com/repos/${COMFYUI_REPO}/commits/master`),
+      fetchJSON(`https://api.github.com/repos/${COMFYUI_REPO}/releases?per_page=10`).catch(() => []),
+    ]);
+    if (!commit) return null;
+    const sha = commit.sha.slice(0, 7);
+    const date = commit.commit?.committer?.date;
+    const msg = commit.commit?.message?.split("\n")[0] || "";
+    const stable = releases.find((r) => !r.draft && !r.prerelease);
+    let label = sha;
+    if (stable) {
+      try {
+        const cmp = await fetchJSON(`https://api.github.com/repos/${COMFYUI_REPO}/compare/${stable.tag_name}...master`);
+        const ahead = cmp.ahead_by;
+        label = ahead > 0
+          ? `${stable.tag_name} + ${ahead} commit${ahead !== 1 ? "s" : ""} (${sha})`
+          : stable.tag_name;
+      } catch {
+        label = `${stable.tag_name}+ (${sha})`;
+      }
+    }
+    return { tag_name: sha, name: label, body: msg, published_at: date, _commit: true };
+  }
+
+  // Stable: fetch from environments repo, find a release matching the current variant
+  const [releases, latest] = await Promise.all([
+    fetchJSON(`https://api.github.com/repos/${RELEASE_REPO}/releases?per_page=30`),
+    fetchJSON(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`).catch(() => null),
+  ]);
+  if (latest && !releases.some((r) => r.id === latest.id)) {
+    releases.unshift(latest);
+  }
+  const valid = releases.filter((r) => r.assets.some((a) => a.name === "manifests.json"));
+  if (valid.length === 0) return null;
+  const release = valid[0];
+  // Fetch manifests to check variant availability and get comfyui_ref
+  let comfyuiRef = null;
+  if (currentVariant) {
+    try {
+      const manifestAsset = release.assets.find((a) => a.name === "manifests.json");
+      if (manifestAsset) {
+        const manifests = await fetchJSON(manifestAsset.browser_download_url);
+        const match = manifests.find((m) => m.id === currentVariant);
+        if (match) comfyuiRef = match.comfyui_ref;
+      }
+    } catch {}
+  }
+  return {
+    tag_name: release.tag_name,
+    name: release.name || release.tag_name,
+    body: release.body || "",
+    published_at: release.published_at,
+    comfyui_ref: comfyuiRef,
+    _release: release,
+  };
+}
+
+function truncateNotes(text, maxLen) {
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + "\n\n… (truncated)";
+}
+
 const standaloneSource = {
   id: "standalone",
   get label() { return t("standalone.label"); },
@@ -278,6 +346,15 @@ const standaloneSource = {
         ...(!installed && { disabledMessage: t("errors.installNotReady") }),
         showProgress: true, progressTitle: t("common.startingComfyUI"), cancellable: true },
     ];
+  },
+
+  getStatusTag(installation) {
+    const track = installation.updateTrack || "stable";
+    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+    if (info && info.available) {
+      return { label: t("standalone.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
+    }
+    return undefined;
   },
 
   async getDetailSections(installation) {
@@ -375,6 +452,45 @@ const standaloneSource = {
             prompt: { title: t("standalone.saveSnapshotTitle"), message: t("standalone.saveSnapshotMessage"), placeholder: t("standalone.saveSnapshotPlaceholder"), field: "label", confirmLabel: t("standalone.saveSnapshotCreate"), required: t("standalone.saveSnapshotRequired") } },
         ],
       },
+      // Updates section
+      (() => {
+        const track = installation.updateTrack || "stable";
+        const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+        const updateFields = [
+          { id: "updateTrack", label: t("standalone.updateTrack"), value: track, editable: true,
+            refreshSection: true, editType: "select", options: [
+              { value: "stable", label: t("standalone.trackStable") },
+              { value: "latest", label: t("standalone.trackLatest") },
+            ] },
+        ];
+        if (info) {
+          updateFields.push(
+            { label: t("standalone.installedVersion"), value: info.installedTag || installation.releaseTag || installation.version },
+            { label: t("standalone.latestVersion"), value: info.releaseName || info.latestTag || "—" },
+            { label: t("standalone.lastChecked"), value: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : "—" },
+            { label: t("standalone.updateStatus"), value: info.available ? t("standalone.updateAvailable") : t("standalone.upToDate") },
+          );
+        }
+        const updateActions = [];
+        if (info && info.available && track === "stable") {
+          updateActions.push({
+            id: "update-standalone", label: t("standalone.updateNow"), style: "primary", enabled: installed,
+            showProgress: true, progressTitle: t("standalone.updatingTitle", { version: info.latestTag }),
+            confirm: {
+              title: t("standalone.updateConfirmTitle"),
+              message: t("standalone.updateConfirmMessage", {
+                installed: info.installedTag || installation.releaseTag || installation.version,
+                latest: info.releaseName || info.latestTag,
+              }),
+            },
+          });
+        }
+        updateActions.push(
+          { id: "check-update", label: t("actions.checkForUpdate"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("standalone.checkingForUpdate") },
+        );
+        return { title: t("standalone.updates"), fields: updateFields, actions: updateActions };
+      })(),
       {
         title: t("common.launchSettings"),
         fields: [
@@ -405,7 +521,6 @@ const standaloneSource = {
             ...(!installed && { disabledMessage: t("errors.installNotReady") }),
             showProgress: true, progressTitle: t("common.startingComfyUI"), cancellable: true },
           { id: "open-folder", label: t("actions.openDirectory"), style: "default", enabled: !!installation.installPath },
-          { id: "check-update", label: t("actions.checkForUpdate"), style: "default", enabled: false, disabledMessage: t("actions.featureNotImplemented") },
           deleteAction(installation),
           untrackAction(),
         ],
@@ -477,7 +592,7 @@ const standaloneSource = {
     };
   },
 
-  async handleAction(actionId, installation, actionData, { update, sendProgress }) {
+  async handleAction(actionId, installation, actionData, { update, sendProgress, download, cache, extract }) {
     if (actionId === "env-create") {
       const envName = actionData?.env;
       if (!envName) return { ok: false, message: "No environment name provided." };
@@ -520,6 +635,245 @@ const standaloneSource = {
       const envMethods = { ...installation.envMethods };
       delete envMethods[envName];
       await update({ envMethods });
+      return { ok: true, navigate: "detail" };
+    }
+    if (actionId === "check-update") {
+      const track = installation.updateTrack || "stable";
+      sendProgress("check", { percent: -1, status: t("standalone.checkingForUpdate") });
+      const release = await fetchLatestStandaloneRelease(track, installation.variant);
+      if (!release) {
+        return { ok: false, message: "Could not fetch releases." };
+      }
+      const installedTag = installation.releaseTag || installation.version || "unknown";
+      const latestTag = release.tag_name;
+      const available = installedTag !== latestTag;
+      const existing = installation.updateInfoByTrack || {};
+      await update({
+        updateInfoByTrack: {
+          ...existing,
+          [track]: {
+            checkedAt: Date.now(),
+            installedTag,
+            latestTag,
+            available,
+            releaseName: release.name || latestTag,
+            releaseNotes: truncateNotes(release.body, 4000),
+            publishedAt: release.published_at,
+            comfyuiRef: release.comfyui_ref || null,
+            ...(release._release ? { releaseData: { tag_name: release._release.tag_name } } : {}),
+          },
+        },
+      });
+      return { ok: true, navigate: "detail" };
+    }
+    if (actionId === "update-standalone") {
+      const track = installation.updateTrack || "stable";
+      if (track !== "stable") {
+        return { ok: false, message: "Only stable track updates are supported for now." };
+      }
+      const existing = installation.updateInfoByTrack || {};
+      const trackInfo = existing[track] || {};
+      if (!trackInfo.available) {
+        return { ok: false, message: "No update available." };
+      }
+
+      sendProgress("steps", { steps: [
+        { phase: "snapshot", label: t("standalone.snapshots") },
+        { phase: "download", label: t("standalone.updateDownload") },
+        { phase: "extract", label: t("standalone.updateExtract") },
+        { phase: "apply", label: t("standalone.updateApply") },
+        { phase: "setup", label: t("standalone.updateEnv") },
+      ] });
+
+      // Step 1: Auto-snapshot before update
+      const envName = resolveActiveEnv(installation) || DEFAULT_ENV;
+      sendProgress("snapshot", { percent: -1, status: t("standalone.snapshotSaving") });
+      let snapshotOk = false;
+      try {
+        const snapshotFile = await saveSnapshot(installation.installPath, envName, "auto-pre-update", { getUvPath, getEnvPythonPath });
+        await update({ envSnapshots: { ...installation.envSnapshots, [envName]: snapshotFile } });
+        snapshotOk = true;
+      } catch (err) {
+        console.error("Pre-update snapshot failed:", err.message);
+      }
+      if (!snapshotOk) {
+        await update({
+          updateInfoByTrack: {
+            ...existing,
+            [track]: { ...trackInfo, snapshotFailed: true },
+          },
+        });
+      }
+
+      // Step 2: Fetch the specific release recorded at check-update time
+      sendProgress("download", { percent: 0, status: t("standalone.updateFetchingRelease") });
+      const targetTag = trackInfo.releaseData?.tag_name || trackInfo.latestTag;
+      let ghRelease;
+      if (targetTag) {
+        try {
+          ghRelease = await fetchJSON(`https://api.github.com/repos/${RELEASE_REPO}/releases/tags/${targetTag}`);
+        } catch {
+          ghRelease = null;
+        }
+      }
+      if (!ghRelease) {
+        // Fall back to fetching latest if the specific tag fetch fails
+        const release = await fetchLatestStandaloneRelease("stable", installation.variant);
+        ghRelease = release?._release;
+      }
+      if (!ghRelease) {
+        return { ok: false, message: "Could not fetch release data for update." };
+      }
+      const manifestAsset = ghRelease.assets.find((a) => a.name === "manifests.json");
+      if (!manifestAsset) {
+        return { ok: false, message: "Release has no manifests.json." };
+      }
+      const manifests = await fetchJSON(manifestAsset.browser_download_url);
+      const variantManifest = manifests.find((m) => m.id === installation.variant);
+      if (!variantManifest) {
+        return { ok: false, message: `Variant "${installation.variant}" not found in this release.` };
+      }
+      const files = (variantManifest.files || [])
+        .map((f) => ghRelease.assets.find((a) => a.name === f))
+        .filter(Boolean)
+        .map((a) => ({ url: a.browser_download_url, filename: a.name, size: a.size }));
+      if (files.length === 0) {
+        return { ok: false, message: "No download files found for this variant." };
+      }
+
+      // Step 3: Download and extract to a temp directory
+      const tmpDir = path.join(installation.installPath, ".launcher", "update-tmp");
+      await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      await fs.promises.mkdir(tmpDir, { recursive: true });
+      try {
+        const updateCacheDir = `${ghRelease.tag_name}_${installation.variant}`;
+        await downloadAndExtractMulti(files, tmpDir, updateCacheDir, {
+          sendProgress, download, cache, extract,
+        });
+
+        // Step 4: Apply — replace standalone-env/ and ComfyUI/ while preserving user data
+        sendProgress("apply", { percent: 0, status: t("standalone.updateApplying") });
+        const installPath = installation.installPath;
+
+        // Replace standalone-env/ using backup-and-swap for rollback safety
+        const oldStandaloneEnv = path.join(installPath, "standalone-env");
+        const bakStandaloneEnv = path.join(installPath, "standalone-env.bak");
+        const newStandaloneEnv = path.join(tmpDir, "standalone-env");
+        if (fs.existsSync(newStandaloneEnv)) {
+          await fs.promises.rm(bakStandaloneEnv, { recursive: true, force: true }).catch(() => {});
+          await fs.promises.rename(oldStandaloneEnv, bakStandaloneEnv);
+          try {
+            await fs.promises.rename(newStandaloneEnv, oldStandaloneEnv);
+          } catch (swapErr) {
+            // Restore backup if swap fails (e.g. file locks on Windows)
+            await fs.promises.rename(bakStandaloneEnv, oldStandaloneEnv).catch(() => {});
+            throw new Error(`Failed to apply standalone-env update: ${swapErr.message}`);
+          }
+          await fs.promises.rm(bakStandaloneEnv, { recursive: true, force: true }).catch(() => {});
+        }
+        sendProgress("apply", { percent: 30, status: t("standalone.updateApplyingCode") });
+
+        // Replace ComfyUI/ — preserve user directories, using backup-and-swap
+        const oldComfyUI = path.join(installPath, "ComfyUI");
+        const bakComfyUI = path.join(installPath, "ComfyUI.bak");
+        const newComfyUI = path.join(tmpDir, "ComfyUI");
+        if (fs.existsSync(newComfyUI)) {
+          // Move preserved dirs out temporarily
+          const preservedTmp = path.join(installPath, ".launcher", "preserved-tmp");
+          await fs.promises.mkdir(preservedTmp, { recursive: true });
+          for (const dir of PRESERVED_DIRS) {
+            const src = path.join(oldComfyUI, dir);
+            if (fs.existsSync(src)) {
+              await fs.promises.rename(src, path.join(preservedTmp, dir));
+            }
+          }
+          // Backup-and-swap ComfyUI/
+          await fs.promises.rm(bakComfyUI, { recursive: true, force: true }).catch(() => {});
+          await fs.promises.rename(oldComfyUI, bakComfyUI);
+          try {
+            await fs.promises.rename(newComfyUI, oldComfyUI);
+          } catch (swapErr) {
+            // Restore backup
+            await fs.promises.rename(bakComfyUI, oldComfyUI).catch(() => {});
+            // Restore preserved dirs back into the restored ComfyUI/
+            for (const dir of PRESERVED_DIRS) {
+              const src = path.join(preservedTmp, dir);
+              if (fs.existsSync(src)) {
+                const dest = path.join(oldComfyUI, dir);
+                await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {});
+                await fs.promises.rename(src, dest).catch(() => {});
+              }
+            }
+            await fs.promises.rm(preservedTmp, { recursive: true, force: true }).catch(() => {});
+            throw new Error(`Failed to apply ComfyUI update: ${swapErr.message}`);
+          }
+          // Restore preserved dirs into the new ComfyUI/
+          for (const dir of PRESERVED_DIRS) {
+            const src = path.join(preservedTmp, dir);
+            if (fs.existsSync(src)) {
+              const dest = path.join(oldComfyUI, dir);
+              await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {});
+              await fs.promises.rename(src, dest);
+            }
+          }
+          await fs.promises.rm(preservedTmp, { recursive: true, force: true }).catch(() => {});
+          await fs.promises.rm(bakComfyUI, { recursive: true, force: true }).catch(() => {});
+        }
+        sendProgress("apply", { percent: 60, status: t("standalone.updateApplyingManifest") });
+
+        // Update manifest.json
+        const newManifest = path.join(tmpDir, MANIFEST_FILE);
+        if (fs.existsSync(newManifest)) {
+          await fs.promises.copyFile(newManifest, path.join(installPath, MANIFEST_FILE));
+        }
+        sendProgress("apply", { percent: 100 });
+
+        // Step 5: Recreate the active env from new master
+        sendProgress("setup", { percent: 0, status: t("standalone.updateRecreatingEnv") });
+        const envPath = path.join(installPath, ENVS_DIR, envName);
+        await fs.promises.rm(envPath, { recursive: true, force: true }).catch(() => {});
+        await createEnv(installPath, envName, (copied, total, elapsedSecs, etaSecs) => {
+          const percent = Math.round((copied / total) * 100);
+          const elapsed = formatTime(elapsedSecs);
+          const eta = etaSecs >= 0 ? formatTime(etaSecs) : "—";
+          sendProgress("setup", { percent, status: `${t("standalone.updateCopyingPackages")} ${copied} / ${total}  ·  ${elapsed} elapsed  ·  ${eta} remaining` });
+        });
+
+        // Update installation metadata
+        const newManifestData = JSON.parse(await fs.promises.readFile(path.join(installPath, MANIFEST_FILE), "utf-8").catch(() => "{}"));
+        await update({
+          version: newManifestData.comfyui_ref || trackInfo.latestTag,
+          releaseTag: ghRelease.tag_name,
+          pythonVersion: newManifestData.python_version || installation.pythonVersion,
+          updateInfoByTrack: {
+            ...existing,
+            [track]: {
+              ...trackInfo,
+              available: false,
+              installedTag: ghRelease.tag_name,
+              checkedAt: Date.now(),
+              snapshotFailed: undefined,
+            },
+          },
+        });
+      } catch (err) {
+        // Record failure state so UI reflects the partial update
+        await update({
+          updateInfoByTrack: {
+            ...existing,
+            [track]: {
+              ...trackInfo,
+              lastError: err.message,
+              lastErrorAt: Date.now(),
+            },
+          },
+        }).catch(() => {});
+        throw err;
+      } finally {
+        // Clean up temp directory and any leftover backups
+        await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      }
+
       return { ok: true, navigate: "detail" };
     }
     if (actionId === "snapshot-save") {
