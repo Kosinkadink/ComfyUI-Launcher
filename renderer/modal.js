@@ -28,7 +28,9 @@ window.Launcher.modal = {
       const close = () => { overlay.remove(); resolve(); };
 
       box.querySelector(".modal-ok").onclick = close;
-      overlay.onclick = (e) => { if (e.target === overlay) close(); };
+      let downOnOverlay = false;
+      overlay.onmousedown = (e) => { downOnOverlay = e.target === overlay; };
+      overlay.onclick = (e) => { if (e.target === overlay && downOnOverlay) close(); };
 
       overlay.appendChild(box);
       document.body.appendChild(overlay);
@@ -59,7 +61,9 @@ window.Launcher.modal = {
 
       box.querySelector(".modal-cancel").onclick = () => close(false);
       box.querySelector(".modal-confirm").onclick = () => close(true);
-      overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+      let downOnOverlay = false;
+      overlay.onmousedown = (e) => { downOnOverlay = e.target === overlay; };
+      overlay.onclick = (e) => { if (e.target === overlay && downOnOverlay) close(false); };
 
       overlay.appendChild(box);
       document.body.appendChild(overlay);
@@ -103,7 +107,9 @@ window.Launcher.modal = {
       box.querySelector(".modal-cancel").onclick = () => close(null);
       box.querySelector(".modal-confirm").onclick = trySubmit;
       input.onkeydown = (e) => { if (e.key === "Enter") trySubmit(); };
-      overlay.onclick = (e) => { if (e.target === overlay) close(null); };
+      let downOnOverlay = false;
+      overlay.onmousedown = (e) => { downOnOverlay = e.target === overlay; };
+      overlay.onclick = (e) => { if (e.target === overlay && downOnOverlay) close(null); };
 
       overlay.appendChild(box);
       document.body.appendChild(overlay);

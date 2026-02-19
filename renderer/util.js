@@ -262,8 +262,10 @@ window.Launcher.showViewModal = function showViewModal(name) {
     if (m !== modal) m.classList.remove("active");
   });
   modal.classList.add("active");
+  let downOnModal = false;
+  modal.onmousedown = (e) => { downOnModal = e.target === modal; };
   modal.onclick = (e) => {
-    if (e.target === modal) window.Launcher.closeViewModal(name);
+    if (e.target === modal && downOnModal) window.Launcher.closeViewModal(name);
   };
 };
 
