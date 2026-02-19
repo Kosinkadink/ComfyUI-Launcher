@@ -7,6 +7,7 @@ const DEFAULT_URL = "https://cloud.comfy.org/";
 module.exports = {
   id: "cloud",
   get label() { return t("cloud.label"); },
+  category: "cloud",
 
   skipInstall: true,
 
@@ -75,6 +76,7 @@ module.exports = {
       },
       {
         title: "Actions",
+        pinBottom: true,
         actions: [
           { id: "launch", label: t("actions.connect"), style: "primary", enabled: installation.status === "installed",
             showProgress: true, progressTitle: t("actions.connecting"), cancellable: true },

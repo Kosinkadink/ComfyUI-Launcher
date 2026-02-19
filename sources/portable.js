@@ -73,6 +73,7 @@ function truncateNotes(text, maxLen) {
 module.exports = {
   id: "portable",
   get label() { return t("portable.label"); },
+  category: "local",
 
   get fields() {
     return [
@@ -159,7 +160,7 @@ module.exports = {
     const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
     const updateFields = [
       { id: "updateTrack", label: t("portable.updateTrack"), value: track, editable: true,
-        editType: "select", options: [
+        refreshSection: true, editType: "select", options: [
           { value: "stable", label: t("portable.trackStable") },
           { value: "latest", label: t("portable.trackLatest") },
         ] },
@@ -223,6 +224,7 @@ module.exports = {
       },
       {
         title: "Actions",
+        pinBottom: true,
         actions: [
           { id: "launch", label: t("actions.launch"), style: "primary", enabled: installed,
             ...(!installed && { disabledMessage: t("errors.installNotReady") }),

@@ -80,9 +80,9 @@ window.Launcher.track = {
 
     const p = this._selectedProbe;
     const fields = [];
-    if (p.version && p.version !== "unknown") fields.push(["Version", p.version]);
-    if (p.repo) fields.push(["Repository", p.repo]);
-    if (p.branch) fields.push(["Branch", p.branch]);
+    if (p.version && p.version !== "unknown") fields.push([window.t("track.version"), p.version]);
+    if (p.repo) fields.push([window.t("track.repository"), p.repo]);
+    if (p.branch) fields.push([window.t("track.branch"), p.branch]);
 
     if (fields.length === 0) return;
 

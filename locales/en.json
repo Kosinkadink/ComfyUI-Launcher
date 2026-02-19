@@ -98,7 +98,10 @@
     "detecting": "Detecting…",
     "noDetected": "No known installation detected",
     "trackInstallation": "Track Installation",
-    "cannotTrack": "Cannot Track"
+    "cannotTrack": "Cannot Track",
+    "version": "Version",
+    "repository": "Repository",
+    "branch": "Branch"
   },
 
   "progress": {

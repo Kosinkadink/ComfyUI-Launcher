@@ -39,7 +39,7 @@ window.Launcher.detail = {
     let bottomSection = null;
     const mainSections = [];
     for (const section of sections) {
-      if (section.title === "Actions" && section.actions && !section.fields && !section.items) {
+      if (section.pinBottom) {
         bottomSection = section;
       } else {
         mainSections.push(section);
@@ -118,7 +118,7 @@ window.Launcher.detail = {
           select.onchange = async () => {
             await window.api.updateInstallation(inst.id, { [f.id]: select.value });
             inst[f.id] = select.value;
-            if (f.id === "updateTrack") {
+            if (f.refreshSection) {
               this._refreshSection(section.title, inst);
             }
           };

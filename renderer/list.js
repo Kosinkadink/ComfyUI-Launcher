@@ -5,17 +5,9 @@ window.Launcher.list = {
   _renderGen: 0,
   _filter: "all",
 
-  _sourceCategory: {
-    standalone: "local",
-    portable: "local",
-    git: "local",
-    remote: "remote",
-    cloud: "cloud",
-  },
-
   _matchesFilter(inst) {
     if (this._filter === "all") return true;
-    return this._sourceCategory[inst.sourceId] === this._filter;
+    return inst.sourceCategory === this._filter;
   },
 
   _buildInstallPrompt() {

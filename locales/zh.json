@@ -98,7 +98,10 @@
     "detecting": "正在检测…",
     "noDetected": "未检测到已知安装",
     "trackInstallation": "跟踪安装",
-    "cannotTrack": "无法跟踪"
+    "cannotTrack": "无法跟踪",
+    "version": "版本",
+    "repository": "仓库",
+    "branch": "分支"
   },
 
   "progress": {

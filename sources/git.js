@@ -29,6 +29,7 @@ function parseGitHubRepo(url) {
 module.exports = {
   id: "git",
   label: "Git Source",
+  category: "local",
 
   fields: [
     { id: "repo", label: "Git Repository", type: "text",
@@ -83,6 +84,7 @@ module.exports = {
       },
       {
         title: "Actions",
+        pinBottom: true,
         actions: [
           { id: "launch", label: "Launch", style: "primary", enabled: false },
           { id: "open-folder", label: "Open Directory", style: "default", enabled: !!installation.installPath },

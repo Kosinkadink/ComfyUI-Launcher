@@ -214,6 +214,7 @@ function recommendVariant(variantId, gpu) {
 module.exports = {
   id: "standalone",
   get label() { return t("standalone.label"); },
+  category: "local",
 
   get fields() {
     return [
@@ -343,6 +344,7 @@ module.exports = {
       },
       {
         title: "Actions",
+        pinBottom: true,
         actions: [
           { id: "launch", label: t("actions.launch"), style: "primary", enabled: installed,
             ...(!installed && { disabledMessage: t("errors.installNotReady") }),

@@ -5,6 +5,7 @@ const { t } = require("../lib/i18n");
 module.exports = {
   id: "remote",
   get label() { return t("remote.label"); },
+  category: "remote",
 
   skipInstall: true,
 
@@ -73,6 +74,7 @@ module.exports = {
       },
       {
         title: "Actions",
+        pinBottom: true,
         actions: [
           { id: "launch", label: t("actions.connect"), style: "primary", enabled: installation.status === "installed",
             showProgress: true, progressTitle: t("actions.connecting"), cancellable: true },
