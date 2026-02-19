@@ -171,6 +171,8 @@
 
   "actions": {
     "launch": "Uruchom",
+    "connect": "Połącz",
+    "connecting": "Łączenie…",
     "openDirectory": "Otwórz katalog",
     "checkForUpdate": "Sprawdź aktualizacje",
     "featureNotImplemented": "Ta funkcja nie jest jeszcze zaimplementowana.",
@@ -181,6 +183,18 @@
     "untrack": "Przestań śledzić",
     "untrackConfirmTitle": "Przestań śledzić instalację",
     "untrackConfirmMessage": "Instalacja zostanie usunięta z launchera. Pliki nie zostaną usunięte."
+  },
+
+  "remote": {
+    "label": "Połączenie zdalne",
+    "connectionInfo": "Informacje o połączeniu",
+    "comfyuiUrl": "Adres URL ComfyUI",
+    "url": "URL",
+    "added": "Dodano"
+  },
+
+  "cloud": {
+    "label": "Chmura"
   },
 
   "standalone": {

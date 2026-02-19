@@ -171,6 +171,8 @@
 
   "actions": {
     "launch": "Iniciar",
+    "connect": "Conectar",
+    "connecting": "Conectando…",
     "openDirectory": "Abrir directorio",
     "checkForUpdate": "Buscar actualizaciones",
     "featureNotImplemented": "Esta función aún no está implementada.",
@@ -181,6 +183,18 @@
     "untrack": "Dejar de rastrear",
     "untrackConfirmTitle": "Dejar de rastrear instalación",
     "untrackConfirmMessage": "Esto eliminará la instalación del lanzador. Los archivos no serán eliminados."
+  },
+
+  "remote": {
+    "label": "Conexión remota",
+    "connectionInfo": "Información de conexión",
+    "comfyuiUrl": "URL de ComfyUI",
+    "url": "URL",
+    "added": "Añadido"
+  },
+
+  "cloud": {
+    "label": "Nube"
   },
 
   "standalone": {

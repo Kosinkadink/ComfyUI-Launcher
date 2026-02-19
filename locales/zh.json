@@ -171,6 +171,8 @@
 
   "actions": {
     "launch": "启动",
+    "connect": "连接",
+    "connecting": "连接中…",
     "openDirectory": "打开目录",
     "checkForUpdate": "检查更新",
     "featureNotImplemented": "此功能尚未实现。",
@@ -181,6 +183,18 @@
     "untrack": "取消跟踪",
     "untrackConfirmTitle": "取消跟踪安装",
     "untrackConfirmMessage": "这将从启动器中移除该安装。文件不会被删除。"
+  },
+
+  "remote": {
+    "label": "远程连接",
+    "connectionInfo": "连接信息",
+    "comfyuiUrl": "ComfyUI 网址",
+    "url": "网址",
+    "added": "添加日期"
+  },
+
+  "cloud": {
+    "label": "云端"
   },
 
   "standalone": {

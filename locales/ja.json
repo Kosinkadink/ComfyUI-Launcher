@@ -171,6 +171,8 @@
 
   "actions": {
     "launch": "起動",
+    "connect": "接続",
+    "connecting": "接続中…",
     "openDirectory": "ディレクトリを開く",
     "checkForUpdate": "アップデートを確認",
     "featureNotImplemented": "この機能はまだ実装されていません。",
@@ -181,6 +183,18 @@
     "untrack": "追跡を解除",
     "untrackConfirmTitle": "インストールの追跡を解除",
     "untrackConfirmMessage": "ランチャーからインストールを削除します。ファイルは削除されません。"
+  },
+
+  "remote": {
+    "label": "リモート接続",
+    "connectionInfo": "接続情報",
+    "comfyuiUrl": "ComfyUI URL",
+    "url": "URL",
+    "added": "追加日"
+  },
+
+  "cloud": {
+    "label": "クラウド"
   },
 
   "standalone": {

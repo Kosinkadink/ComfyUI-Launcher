@@ -171,6 +171,8 @@
 
   "actions": {
     "launch": "Launch",
+    "connect": "Connect",
+    "connecting": "Connecting…",
     "openDirectory": "Open Directory",
     "checkForUpdate": "Check for Update",
     "featureNotImplemented": "This feature is not yet implemented.",
@@ -181,6 +183,18 @@
     "untrack": "Untrack",
     "untrackConfirmTitle": "Untrack Installation",
     "untrackConfirmMessage": "This will remove the installation from the launcher. The files will not be deleted."
+  },
+
+  "remote": {
+    "label": "Remote Connection",
+    "connectionInfo": "Connection Info",
+    "comfyuiUrl": "ComfyUI URL",
+    "url": "URL",
+    "added": "Added"
+  },
+
+  "cloud": {
+    "label": "Cloud"
   },
 
   "standalone": {

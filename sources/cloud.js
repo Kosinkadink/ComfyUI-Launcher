@@ -1,17 +1,20 @@
 const { untrackAction } = require("../lib/actions");
 const { parseUrl } = require("../lib/util");
+const { t } = require("../lib/i18n");
 
 const DEFAULT_URL = "https://cloud.comfy.org/";
 
 module.exports = {
   id: "cloud",
-  label: "Cloud",
+  get label() { return t("cloud.label"); },
 
   skipInstall: true,
 
-  fields: [
-    { id: "url", label: "ComfyUI URL", type: "text", defaultValue: DEFAULT_URL },
-  ],
+  get fields() {
+    return [
+      { id: "url", label: t("remote.comfyuiUrl"), type: "text", defaultValue: DEFAULT_URL },
+    ];
+  },
 
   getDefaults() {
     return { launchMode: "window", browserPartition: "shared" };
@@ -45,36 +48,36 @@ module.exports = {
 
   getListActions(installation) {
     return [
-      { id: "launch", label: "Connect", style: "primary", enabled: installation.status === "installed",
-        showProgress: true, progressTitle: "Connecting…", cancellable: true },
+      { id: "launch", label: t("actions.connect"), style: "primary", enabled: installation.status === "installed",
+        showProgress: true, progressTitle: t("actions.connecting"), cancellable: true },
     ];
   },
 
   getDetailSections(installation) {
     return [
       {
-        title: "Connection Info",
+        title: t("remote.connectionInfo"),
         fields: [
-          { label: "Install Method", value: installation.sourceLabel },
-          { id: "remoteUrl", label: "URL", value: installation.remoteUrl || "—", editable: true },
-          { label: "Added", value: new Date(installation.createdAt).toLocaleDateString() },
+          { label: t("common.installMethod"), value: installation.sourceLabel },
+          { id: "remoteUrl", label: t("remote.url"), value: installation.remoteUrl || "—", editable: true },
+          { label: t("remote.added"), value: new Date(installation.createdAt).toLocaleDateString() },
         ],
       },
       {
-        title: "Launch Settings",
+        title: t("common.launchSettings"),
         fields: [
-          { id: "browserPartition", label: "Browser Cache", value: installation.browserPartition || "shared", editable: true,
+          { id: "browserPartition", label: t("common.browserPartition"), value: installation.browserPartition || "shared", editable: true,
             editType: "select", options: [
-              { value: "shared", label: "Shared" },
-              { value: "unique", label: "Unique to this install" },
+              { value: "shared", label: t("common.partitionShared") },
+              { value: "unique", label: t("common.partitionUnique") },
             ] },
         ],
       },
       {
         title: "Actions",
         actions: [
-          { id: "launch", label: "Connect", style: "primary", enabled: installation.status === "installed",
-            showProgress: true, progressTitle: "Connecting…", cancellable: true },
+          { id: "launch", label: t("actions.connect"), style: "primary", enabled: installation.status === "installed",
+            showProgress: true, progressTitle: t("actions.connecting"), cancellable: true },
           untrackAction(),
         ],
       },
