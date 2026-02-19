@@ -334,8 +334,8 @@ function sendRestoreSummary(sendOutput, snapshot, nodeDiff, packageCount) {
  * then compare custom nodes and send a summary.
  */
 async function performSoftRestore(installPath, envName, snapshot, { sendProgress, sendOutput }) {
-  sendProgress("pip", { percent: -1, status: t("standalone.restoreInstallingPackages") });
   const packages = buildRestorePackageList(snapshot.pipPackages, sendOutput);
+  sendProgress("pip", { percent: -1, status: t("standalone.restoreInstallingPackages") + ` (${packages.length})` });
   if (packages.length > 0) {
     const uvPath = getUvPath(installPath);
     const pythonPath = getEnvPythonPath(installPath, envName);
@@ -492,18 +492,6 @@ const standaloneSource = {
     const activeEnv = resolveActiveEnv(installation) || DEFAULT_ENV;
     const hasEnvs = envs.length > 0;
 
-    const envItems = envs.map((name) => ({
-      label: name,
-      active: name === activeEnv,
-      actions: [
-        ...(name !== activeEnv ? [{ id: "env-activate", label: t("standalone.setActive"), style: "default", data: { env: name } }] : []),
-        { id: "env-delete", label: t("standalone.deleteEnv"), style: "danger", enabled: name !== activeEnv, data: { env: name },
-          showProgress: true, progressTitle: t("standalone.deletingEnv", { env: name }),
-          disabledMessage: t("standalone.cannotDeleteActive"),
-          confirm: { title: t("standalone.deleteEnvConfirmTitle"), message: t("standalone.deleteEnvConfirmMessage", { env: name }) } },
-      ],
-    }));
-
     // Scan custom nodes and snapshots (only when installed)
     let nodes = [];
     let snapshots = [];
@@ -575,18 +563,6 @@ const standaloneSource = {
           { label: t("standalone.python"), value: installation.pythonVersion || "—" },
           { label: t("common.location"), value: installation.installPath || "—" },
           { label: t("common.installed"), value: new Date(installation.createdAt).toLocaleDateString() },
-        ],
-      },
-      {
-        title: t("standalone.pythonEnvs"),
-        description: hasEnvs
-          ? t("standalone.activeEnv", { env: activeEnv })
-          : t("standalone.noEnvs"),
-        items: envItems,
-        actions: [
-          { id: "env-create", label: t("standalone.newEnv"), style: "default", enabled: installed,
-            showProgress: true, progressTitle: t("standalone.creatingEnv"),
-            prompt: { title: t("standalone.newEnvTitle"), message: t("standalone.newEnvMessage"), placeholder: t("standalone.newEnvPlaceholder"), field: "env", confirmLabel: t("standalone.newEnvCreate"), required: t("standalone.newEnvRequired") } },
         ],
       },
       {
@@ -766,7 +742,7 @@ const standaloneSource = {
     };
   },
 
-  async handleAction(actionId, installation, actionData, { update, sendProgress, download, cache, extract }) {
+  async handleAction(actionId, installation, actionData, { update, sendProgress, sendOutput, download, cache, extract }) {
     if (actionId === "env-create") {
       const envName = actionData?.env;
       if (!envName) return { ok: false, message: "No environment name provided." };
