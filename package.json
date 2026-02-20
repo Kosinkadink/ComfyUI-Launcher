@@ -7,18 +7,21 @@
     "email": "kosinkadink@users.noreply.github.com"
   },
   "repository": "github:Kosinkadink/ComfyUI-Launcher",
-  "main": "main.js",
+  "main": "./out/main/index.js",
   "scripts": {
     "postinstall": "node -e \"if(process.platform!=='win32'){try{require('fs').chmodSync(require('7zip-bin').path7za,0o755)}catch{}}\"",
-    "start": "electron .",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:linux": "electron-vite build && electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^40.4.1",
     "electron-builder": "^26.7.0",
+    "electron-vite": "^5.0.0",
     "tar": "^7.5.9"
   },
   "dependencies": {
@@ -34,14 +37,7 @@
       "repo": "ComfyUI-Launcher"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "installations.js",
-      "settings.js",
-      "lib/**/*",
-      "sources/**/*",
-      "renderer/**/*",
+      "out/**/*",
       "assets/**/*",
       "locales/**/*"
     ],
