@@ -935,7 +935,7 @@ const standaloneSource = {
         const newComfyUI = path.join(tmpDir, "ComfyUI");
         if (fs.existsSync(newComfyUI)) {
           // Move preserved dirs out temporarily
-          const preservedTmp = path.join(installPath, ".launcher", "preserved-tmp");
+          const preservedTmp = path.join(installPath, `_recovery_${new Date().toISOString().replace(/[:.]/g, "-")}`);
           await fs.promises.mkdir(preservedTmp, { recursive: true });
           for (const dir of PRESERVED_DIRS) {
             const src = path.join(oldComfyUI, dir);
