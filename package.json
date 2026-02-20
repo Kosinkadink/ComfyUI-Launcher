@@ -28,6 +28,7 @@
   "build": {
     "appId": "com.kosinkadink.comfyui-launcher",
     "productName": "ComfyUI Launcher",
+    "generateUpdatesFilesForAllChannels": true,
     "publish": {
       "provider": "github",
       "owner": "Kosinkadink",
