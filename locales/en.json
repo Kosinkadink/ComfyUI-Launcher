@@ -136,6 +136,7 @@
     "closeQuitMessage": "ComfyUI instances are still running. Quitting will stop all of them.",
     "closeQuitConfirm": "Quit",
     "autoUpdate": "Check for updates on startup",
+    "errorReporting": "Send anonymous error reports (requires restart)",
     "models": "Shared Models",
     "downloads": "Downloads",
     "cacheDir": "Cache Directory",

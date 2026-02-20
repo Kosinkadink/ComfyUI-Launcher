@@ -1,3 +1,4 @@
+require("./lib/sentry");
 const { app, BrowserWindow, Tray, Menu, ipcMain } = require("electron");
 const path = require("path");
 const ipc = require("./lib/ipc");
