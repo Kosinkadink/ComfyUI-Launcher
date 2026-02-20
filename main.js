@@ -22,12 +22,16 @@ function createLauncherWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "../preload/index.js"),
     },
   });
 
   launcherWindow.setMenuBarVisibility(false);
-  launcherWindow.loadFile("index.html");
+  if (!app.isPackaged && process.env["ELECTRON_RENDERER_URL"]) {
+    launcherWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+  } else {
+    launcherWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+  }
 
   launcherWindow.on("close", (e) => {
     const onClose = settings.get("onLauncherClose") || "tray";
