@@ -16,11 +16,16 @@ window.Launcher.detail = {
     titleEl.textContent = inst.name;
     titleEl.contentEditable = true;
     titleEl.spellcheck = false;
-    titleEl.onblur = () => {
+    titleEl.onblur = async () => {
       const newName = titleEl.textContent.trim();
       if (newName && newName !== inst.name) {
-        inst.name = newName;
-        window.api.updateInstallation(inst.id, { name: newName });
+        const result = await window.api.updateInstallation(inst.id, { name: newName });
+        if (result && !result.ok) {
+          titleEl.textContent = inst.name;
+          await window.Launcher.modal.alert({ title: inst.name, message: result.message });
+        } else {
+          inst.name = newName;
+        }
       } else {
         titleEl.textContent = inst.name;
       }
@@ -66,15 +71,30 @@ window.Launcher.detail = {
     if (section.title) {
       const title = document.createElement("div");
       title.className = "detail-section-title";
+      if (section.collapsed != null) {
+        title.classList.add("collapsible");
+        title.dataset.collapsed = section.collapsed ? "true" : "false";
+        title.onclick = () => {
+          const isCollapsed = title.dataset.collapsed === "true";
+          title.dataset.collapsed = isCollapsed ? "false" : "true";
+          body.hidden = !isCollapsed;
+          if (isCollapsed) {
+            requestAnimationFrame(() => body.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+          }
+        };
+      }
       title.textContent = section.title;
       sec.appendChild(title);
     }
+    const body = document.createElement("div");
+    body.className = "detail-section-body";
+    if (section.collapsed) body.hidden = true;
 
     if (section.description) {
       const desc = document.createElement("div");
       desc.className = "detail-section-desc";
       desc.textContent = section.description;
-      sec.appendChild(desc);
+      body.appendChild(desc);
     }
 
     if (section.items) {
@@ -92,7 +112,7 @@ window.Launcher.detail = {
         }
         list.appendChild(row);
       });
-      sec.appendChild(list);
+      body.appendChild(list);
     }
 
     if (section.fields) {
@@ -162,13 +182,14 @@ window.Launcher.detail = {
 
         fields.appendChild(row);
       });
-      sec.appendChild(fields);
+      body.appendChild(fields);
     }
 
     if (section.actions) {
-      sec.appendChild(this._renderActionsBar(section.actions, "detail-actions"));
+      body.appendChild(this._renderActionsBar(section.actions, "detail-actions"));
     }
 
+    sec.appendChild(body);
     return sec;
   },
 
@@ -231,6 +252,33 @@ window.Launcher.detail = {
     if (!this._current) return;
     const { showView, list, modal } = window.Launcher;
 
+    if (action.select) {
+      let items;
+      if (action.select.source === "installations") {
+        let all = await window.api.getInstallations();
+        if (action.select.excludeSelf && this._current) {
+          all = all.filter((i) => i.id !== this._current.id);
+        }
+        if (action.select.filters) {
+          for (const [key, value] of Object.entries(action.select.filters)) {
+            all = all.filter((i) => i[key] === value);
+          }
+        }
+        items = all.map((i) => ({ value: i.id, label: i.name, description: i.sourceLabel }));
+      }
+      if (!items || items.length === 0) {
+        await modal.alert({ title: action.label, message: action.select.emptyMessage || window.t("common.noItems") });
+        return;
+      }
+      const selected = await modal.select({
+        title: action.select.title || action.label,
+        message: action.select.message || "",
+        items,
+      });
+      if (!selected) return;
+      action = { ...action, data: { ...action.data, [action.select.field]: selected } };
+    }
+
     if (action.prompt) {
       const value = await modal.prompt({
         title: action.prompt.title || action.label,
@@ -245,13 +293,25 @@ window.Launcher.detail = {
     }
 
     if (action.confirm) {
-      const confirmed = await modal.confirm({
-        title: action.confirm.title || "Confirm",
-        message: action.confirm.message || "Are you sure?",
-        confirmLabel: action.label,
-        confirmStyle: action.style || "danger",
-      });
-      if (!confirmed) return;
+      if (action.confirm.options) {
+        const result = await modal.confirmWithOptions({
+          title: action.confirm.title || "Confirm",
+          message: action.confirm.message || "Are you sure?",
+          options: action.confirm.options,
+          confirmLabel: action.confirm.confirmLabel || action.label,
+          confirmStyle: action.style || "danger",
+        });
+        if (!result) return;
+        action = { ...action, data: { ...action.data, ...result } };
+      } else {
+        const confirmed = await modal.confirm({
+          title: action.confirm.title || "Confirm",
+          message: action.confirm.message || "Are you sure?",
+          confirmLabel: action.label,
+          confirmStyle: action.style || "danger",
+        });
+        if (!confirmed) return;
+      }
     }
 
     if (action.showProgress) {

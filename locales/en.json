@@ -54,7 +54,9 @@
     "download": "Download",
     "extract": "Extract",
     "useSharedPaths": "Use Shared Directories",
-    "done": "Done"
+    "done": "Done",
+    "noItems": "No items available.",
+    "advanced": "Advanced"
   },
 
   "list": {
@@ -199,6 +201,49 @@
     "untrackConfirmMessage": "This will remove the installation from the launcher. The files will not be deleted."
   },
 
+  "migrate": {
+    "migrateFrom": "Migrate From",
+    "migrating": "Migrating…",
+    "migrateConfirm": "Migrate",
+    "selectSource": "Migrate From",
+    "selectSourceMessage": "Select a source installation to migrate from.",
+    "confirmTitle": "Migrate Data",
+    "confirmMessage": "Select what to migrate from the source installation.\n\nCustom nodes are copied additively (existing nodes backed up). Models, input, and output use flat merge (existing files are skipped).",
+    "optCustomNodes": "Custom Nodes",
+    "optWorkflows": "Saved Workflows",
+    "optUserSettings": "User Settings (replaces existing)",
+    "optModels": "Models",
+    "optInput": "Input",
+    "optOutput": "Output",
+    "noInstallations": "No other installations available to migrate from.",
+    "noComfyUIDir": "Source installation has no ComfyUI directory.",
+    "filePhase": "Copy Files",
+    "depsPhase": "Install Dependencies",
+    "scanning": "Scanning source installation…",
+    "nothingToMigrate": "Nothing to migrate from source.",
+    "copyingNode": "Copying {name}… ({current}/{total})",
+    "copyingSettings": "Copying user settings…",
+    "mergingWorkflows": "Merging workflows…",
+    "mergingModels": "Merging models…",
+    "mergingInput": "Merging input files…",
+    "mergingOutput": "Merging output files…",
+    "checkingDeps": "Checking dependencies…",
+    "noDeps": "No dependencies to install.",
+    "noUvOrPython": "⚠ Cannot install dependencies: uv or Python environment not found.",
+    "depsSkipped": "Skipped (no uv/Python).",
+    "installingNodeDeps": "Installing dependencies for {name}…",
+    "depsComplete": "Dependencies installed.",
+    "complete": "Migration complete",
+    "summaryNodes": "{count} custom node(s) migrated",
+    "summaryBackedUp": "{count} backed up",
+    "summarySettings": "{count} user settings profile(s) copied",
+    "summaryWorkflows": "workflows: {copied} copied, {skipped} skipped",
+    "summaryModels": "models: {copied} copied, {skipped} skipped",
+    "summaryInput": "input: {copied} copied, {skipped} skipped",
+    "summaryOutput": "output: {copied} copied, {skipped} skipped",
+    "summaryDeps": "{count} with dependencies installed"
+  },
+
   "remote": {
     "label": "Remote Connection",
     "connectionInfo": "Connection Info",
@@ -328,6 +373,7 @@
     "portConflictKillConfirmTitle": "Stop Existing Process",
     "portConflictKillConfirmMessage": "This will forcefully stop the process currently using this port. Any unsaved work in that ComfyUI instance will be lost.",
     "portConflictKilling": "Stopping…",
-    "portConflictKillFailed": "Could not free port {port}. The process may require manual termination."
+    "portConflictKillFailed": "Could not free port {port}. The process may require manual termination.",
+    "duplicateName": "An installation named \"{name}\" already exists. Please choose a different name."
   }
 }

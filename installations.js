@@ -21,8 +21,17 @@ async function list() {
   return load();
 }
 
+function uniqueName(baseName, existing, excludeId) {
+  const names = new Set(existing.filter((i) => i.id !== excludeId).map((i) => i.name));
+  if (!names.has(baseName)) return baseName;
+  let suffix = 2;
+  while (names.has(`${baseName} (${suffix})`)) suffix++;
+  return `${baseName} (${suffix})`;
+}
+
 async function add(installation) {
   const installations = await load();
+  installation.name = uniqueName(installation.name, installations);
   const entry = {
     id: `inst-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -76,4 +85,4 @@ async function seedDefaults(defaults) {
   if (installations.length > 0) await save(installations);
 }
 
-module.exports = { list, add, remove, update, get, reorder, seedDefaults };
+module.exports = { list, add, remove, update, get, reorder, seedDefaults, uniqueName };

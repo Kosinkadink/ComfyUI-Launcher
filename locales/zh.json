@@ -54,7 +54,9 @@
     "download": "下载",
     "extract": "解压",
     "useSharedPaths": "使用共享目录",
-    "done": "完成"
+    "done": "完成",
+    "noItems": "没有可用项目。",
+    "advanced": "高级"
   },
 
   "list": {
@@ -199,6 +201,49 @@
     "untrackConfirmMessage": "这将从启动器中移除该安装。文件不会被删除。"
   },
 
+  "migrate": {
+    "migrateFrom": "从其他安装迁移",
+    "migrating": "迁移中…",
+    "migrateConfirm": "迁移",
+    "selectSource": "从…迁移",
+    "selectSourceMessage": "选择要迁移的源安装。",
+    "confirmTitle": "迁移数据",
+    "confirmMessage": "选择要从源安装迁移的内容。\n\n自定义节点以增量方式复制（现有节点将备份）。模型、输入和输出使用平面合并（跳过已存在的文件）。",
+    "optCustomNodes": "自定义节点",
+    "optWorkflows": "已保存的工作流",
+    "optUserSettings": "用户设置（替换现有）",
+    "optModels": "模型",
+    "optInput": "输入",
+    "optOutput": "输出",
+    "noInstallations": "没有其他可用的安装可供迁移。",
+    "noComfyUIDir": "源安装没有 ComfyUI 目录。",
+    "filePhase": "复制文件",
+    "depsPhase": "安装依赖",
+    "scanning": "正在扫描源安装…",
+    "nothingToMigrate": "源中没有可迁移的内容。",
+    "copyingNode": "正在复制 {name}… ({current}/{total})",
+    "copyingSettings": "正在复制用户设置…",
+    "mergingWorkflows": "正在合并工作流…",
+    "mergingModels": "正在合并模型…",
+    "mergingInput": "正在合并输入文件…",
+    "mergingOutput": "正在合并输出文件…",
+    "checkingDeps": "正在检查依赖…",
+    "noDeps": "无需安装依赖。",
+    "noUvOrPython": "⚠ 无法安装依赖：未找到 uv 或 Python 环境。",
+    "depsSkipped": "已跳过（无 uv/Python）。",
+    "installingNodeDeps": "正在为 {name} 安装依赖…",
+    "depsComplete": "依赖安装完成。",
+    "complete": "迁移完成",
+    "summaryNodes": "已迁移 {count} 个自定义节点",
+    "summaryBackedUp": "{count} 个已备份",
+    "summarySettings": "已复制 {count} 个用户设置配置文件",
+    "summaryWorkflows": "工作流：{copied} 个已复制，{skipped} 个已跳过",
+    "summaryModels": "模型：{copied} 个已复制，{skipped} 个已跳过",
+    "summaryInput": "输入：{copied} 个已复制，{skipped} 个已跳过",
+    "summaryOutput": "输出：{copied} 个已复制，{skipped} 个已跳过",
+    "summaryDeps": "{count} 个已安装依赖"
+  },
+
   "remote": {
     "label": "远程连接",
     "connectionInfo": "连接信息",
@@ -327,6 +372,7 @@
     "portConflictKillConfirmTitle": "停止现有进程",
     "portConflictKillConfirmMessage": "这将强制停止当前使用此端口的进程。该 ComfyUI 实例中未保存的工作将丢失。",
     "portConflictKilling": "正在停止…",
-    "portConflictKillFailed": "无法释放端口 {port}。该进程可能需要手动终止。"
+    "portConflictKillFailed": "无法释放端口 {port}。该进程可能需要手动终止。",
+    "duplicateName": "名为 \"{name}\" 的安装已存在。请选择其他名称。"
   }
 }

@@ -358,6 +358,36 @@ module.exports = {
           untrackAction(),
         ],
       },
+      {
+        title: t("common.advanced"),
+        collapsed: true,
+        actions: [
+          { id: "migrate-from", label: t("migrate.migrateFrom"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("migrate.migrating"), cancellable: true,
+            select: {
+              title: t("migrate.selectSource"),
+              message: t("migrate.selectSourceMessage"),
+              emptyMessage: t("migrate.noInstallations"),
+              source: "installations",
+              field: "sourceInstallationId",
+              excludeSelf: true,
+              filters: { status: "installed", sourceCategory: "local" },
+            },
+            confirm: {
+              title: t("migrate.confirmTitle"),
+              message: t("migrate.confirmMessage"),
+              confirmLabel: t("migrate.migrateConfirm"),
+              options: [
+                { id: "customNodes", label: t("migrate.optCustomNodes"), checked: true },
+                { id: "workflows", label: t("migrate.optWorkflows"), checked: false },
+                { id: "userSettings", label: t("migrate.optUserSettings"), checked: false },
+                { id: "models", label: t("migrate.optModels"), checked: false },
+                { id: "input", label: t("migrate.optInput"), checked: false },
+                { id: "output", label: t("migrate.optOutput"), checked: false },
+              ],
+            } },
+        ],
+      },
     );
 
     return sections;
@@ -515,7 +545,7 @@ module.exports = {
         if (fs.existsSync(uvPath) && activeEnvPython) {
           // Filter out PyTorch packages — they are tied to the Standalone release
           // and must never be modified by a commit-based update.
-          const PYTORCH_RE = /^(torch|torchvision|torchaudio)\b/;
+          const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;\[#]|$)/;
           const filteredReqs = postReqs.split("\n").filter((l) => !PYTORCH_RE.test(l.trim())).join("\n");
           const filteredReqPath = path.join(installPath, ".comfyui-reqs-filtered.txt");
           await fs.promises.writeFile(filteredReqPath, filteredReqs, "utf-8");
@@ -599,6 +629,253 @@ module.exports = {
       });
 
       sendProgress("done", { percent: 100, status: "Complete" });
+      return { ok: true, navigate: "detail" };
+    }
+
+    if (actionId === "migrate-from") {
+      const sourceId = actionData?.sourceInstallationId;
+      if (!sourceId) return { ok: false, message: "No source installation specified." };
+
+      const wantNodes = actionData?.customNodes === true;
+      const wantWorkflows = actionData?.workflows === true;
+      const wantSettings = actionData?.userSettings === true;
+      const wantModels = actionData?.models === true;
+      const wantInput = actionData?.input === true;
+      const wantOutput = actionData?.output === true;
+
+      const installations = require("../installations");
+      const srcInst = await installations.get(sourceId);
+      if (!srcInst) return { ok: false, message: "Source installation not found." };
+
+      const { listCustomNodes, findComfyUIDir, backupDir, mergeDirFlat } = require("../lib/migrate");
+
+      const srcComfyUI = findComfyUIDir(srcInst.installPath);
+      const dstComfyUI = path.join(installation.installPath, "ComfyUI");
+
+      if (!srcComfyUI) {
+        return { ok: false, message: t("migrate.noComfyUIDir") };
+      }
+
+      // Resolve shared vs local destinations for models/input/output
+      const settings = require("../settings");
+      const useShared = installation.useSharedPaths !== false;
+
+      const srcModels = path.join(srcComfyUI, "models");
+      const dstModels = useShared
+        ? (settings.get("modelsDirs") || settings.defaults.modelsDirs)[0]
+        : path.join(dstComfyUI, "models");
+      const srcInput = path.join(srcComfyUI, "input");
+      const dstInput = useShared
+        ? (settings.get("inputDir") || settings.defaults.inputDir)
+        : path.join(dstComfyUI, "input");
+      const srcOutput = path.join(srcComfyUI, "output");
+      const dstOutput = useShared
+        ? (settings.get("outputDir") || settings.defaults.outputDir)
+        : path.join(dstComfyUI, "output");
+
+      const srcCustomNodes = path.join(srcComfyUI, "custom_nodes");
+      const dstCustomNodes = path.join(dstComfyUI, "custom_nodes");
+      const srcWorkflows = path.join(srcComfyUI, "user", "default", "workflows");
+      const dstWorkflows = path.join(dstComfyUI, "user", "default", "workflows");
+      const srcUserDir = path.join(srcComfyUI, "user");
+
+      // Build step list based on selected categories
+      const steps = [{ phase: "migrate", label: t("migrate.filePhase") }];
+      if (wantNodes) steps.push({ phase: "deps", label: t("migrate.depsPhase") });
+      sendProgress("steps", { steps });
+
+      // Phase 1: File migration
+      sendProgress("migrate", { percent: 0, status: t("migrate.scanning") });
+
+      const srcNodes = wantNodes ? listCustomNodes(srcCustomNodes) : [];
+      const hasWorkflows = wantWorkflows && fs.existsSync(srcWorkflows);
+      const hasModels = wantModels && fs.existsSync(srcModels);
+      const hasInput = wantInput && fs.existsSync(srcInput);
+      const hasOutput = wantOutput && fs.existsSync(srcOutput);
+
+      // Collect user profile settings files (e.g. user/default/comfy.settings.json)
+      const settingsFiles = [];
+      if (wantSettings && fs.existsSync(srcUserDir)) {
+        try {
+          for (const d of fs.readdirSync(srcUserDir, { withFileTypes: true })) {
+            if (d.isDirectory() && !d.name.startsWith("_")) {
+              const src = path.join(srcUserDir, d.name, "comfy.settings.json");
+              if (fs.existsSync(src)) {
+                settingsFiles.push({ profile: d.name, src, dst: path.join(dstComfyUI, "user", d.name, "comfy.settings.json") });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Each category counts as one unit for overall progress
+      const total = srcNodes.length + (hasWorkflows ? 1 : 0) + (settingsFiles.length > 0 ? 1 : 0) + (hasModels ? 1 : 0) + (hasInput ? 1 : 0) + (hasOutput ? 1 : 0);
+
+      if (total === 0) {
+        sendProgress("migrate", { percent: 100, status: t("migrate.nothingToMigrate") });
+        if (wantNodes) sendProgress("deps", { percent: 100, status: t("migrate.noDeps") });
+        sendProgress("done", { percent: 100, status: "Complete" });
+        return { ok: true, navigate: "detail" };
+      }
+
+      let migrated = 0;
+      const migratedNodes = [];
+      const backedUp = [];
+      const summary = [];
+
+      // Custom nodes (additive with backup per-node)
+      if (srcNodes.length > 0) {
+        fs.mkdirSync(dstCustomNodes, { recursive: true });
+        for (const node of srcNodes) {
+          const dstNodeDir = path.join(dstCustomNodes, node.name);
+          if (fs.existsSync(dstNodeDir)) {
+            const bak = backupDir(dstNodeDir);
+            if (bak) backedUp.push(node.name);
+          }
+          await copyDirWithProgress(node.dir, dstNodeDir, (copied, fileTotal) => {
+            const sub = fileTotal > 0 ? copied / fileTotal : 1;
+            const percent = Math.round(((migrated + sub) / total) * 100);
+            sendProgress("migrate", { percent, status: t("migrate.copyingNode", { name: node.name, current: migrated + 1, total }) });
+          });
+          migratedNodes.push(node);
+          migrated++;
+        }
+        summary.push(t("migrate.summaryNodes", { count: migratedNodes.length }));
+        if (backedUp.length > 0) summary.push(t("migrate.summaryBackedUp", { count: backedUp.length }));
+      }
+
+      // Workflows only (flat merge, skipped when full user data is selected)
+      if (hasWorkflows) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingWorkflows") });
+        const result = await mergeDirFlat(srcWorkflows, dstWorkflows, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingWorkflows") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryWorkflows", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // User settings (copy comfy.settings.json per profile)
+      if (settingsFiles.length > 0) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.copyingSettings") });
+        let copied = 0;
+        for (const sf of settingsFiles) {
+          await fs.promises.mkdir(path.dirname(sf.dst), { recursive: true });
+          await fs.promises.copyFile(sf.src, sf.dst);
+          copied++;
+        }
+        migrated++;
+        summary.push(t("migrate.summarySettings", { count: copied }));
+      }
+
+      // Models (flat merge — skip existing files)
+      if (hasModels) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingModels") });
+        const result = await mergeDirFlat(srcModels, dstModels, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingModels") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryModels", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // Input (flat merge)
+      if (hasInput) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingInput") });
+        const result = await mergeDirFlat(srcInput, dstInput, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingInput") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryInput", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // Output (flat merge)
+      if (hasOutput) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingOutput") });
+        const result = await mergeDirFlat(srcOutput, dstOutput, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingOutput") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryOutput", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      sendProgress("migrate", { percent: 100, status: t("common.done") });
+
+      // Phase 2: Dependency reconciliation (only if custom nodes were migrated)
+      if (wantNodes) {
+        sendProgress("deps", { percent: 0, status: t("migrate.checkingDeps") });
+
+        const nodesWithReqs = migratedNodes.filter((n) => n.hasRequirements);
+        if (nodesWithReqs.length === 0) {
+          sendProgress("deps", { percent: 100, status: t("migrate.noDeps") });
+        } else {
+          const uvPath = getUvPath(installation.installPath);
+          const activePython = getActivePythonPath(installation);
+
+          if (!fs.existsSync(uvPath) || !activePython) {
+            sendOutput(t("migrate.noUvOrPython") + "\n");
+            sendProgress("deps", { percent: 100, status: t("migrate.depsSkipped") });
+          } else {
+            const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;\[#]|$)/;
+            let installed = 0;
+
+            for (const node of nodesWithReqs) {
+              const reqPath = path.join(dstCustomNodes, node.name, "requirements.txt");
+              sendProgress("deps", {
+                percent: Math.round((installed / nodesWithReqs.length) * 100),
+                status: t("migrate.installingNodeDeps", { name: node.name }),
+              });
+
+              try {
+                const reqContent = await fs.promises.readFile(reqPath, "utf-8");
+                const filtered = reqContent.split("\n").filter((l) => !PYTORCH_RE.test(l.trim())).join("\n");
+                const filteredReqPath = path.join(installation.installPath, `.migrate-reqs-${node.name}.txt`);
+                await fs.promises.writeFile(filteredReqPath, filtered, "utf-8");
+
+                try {
+                  const result = await new Promise((resolve) => {
+                    const proc = spawn(uvPath, ["pip", "install", "-r", filteredReqPath, "--python", activePython], {
+                      cwd: installation.installPath,
+                      stdio: ["ignore", "pipe", "pipe"],
+                      windowsHide: true,
+                    });
+                    proc.stdout.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+                    proc.stderr.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+                    proc.on("error", (err) => {
+                      sendOutput(`Error: ${err.message}\n`);
+                      resolve(1);
+                    });
+                    proc.on("exit", (code) => resolve(code ?? 1));
+                  });
+
+                  if (result !== 0) {
+                    sendOutput(`\n⚠ ${node.name}: dependency install exited with code ${result}\n`);
+                  }
+                } finally {
+                  try { await fs.promises.unlink(filteredReqPath); } catch {}
+                }
+              } catch (err) {
+                sendOutput(`⚠ ${node.name}: ${err.message}\n`);
+              }
+
+              installed++;
+            }
+
+            sendProgress("deps", { percent: 100, status: t("migrate.depsComplete") });
+            summary.push(t("migrate.summaryDeps", { count: nodesWithReqs.length }));
+          }
+        }
+      }
+
+      sendProgress("done", { percent: 100, status: "Complete" });
+      sendOutput(`\n✓ ${t("migrate.complete")}: ${summary.join(", ")}\n`);
+
       return { ok: true, navigate: "detail" };
     }
 
