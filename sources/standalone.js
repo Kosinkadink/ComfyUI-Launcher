@@ -215,23 +215,6 @@ function recommendVariant(variantId, gpu) {
   return false;
 }
 
-/**
- * Determine if an update is available for the given track, using local data only.
- * Handles cross-track switches (e.g. last update was on "latest" but viewing "stable").
- */
-function isUpdateAvailable(installation, track, info) {
-  if (!info || !info.latestTag) return false;
-  // Cross-track: last update was on a different track, so this track's installedTag is stale
-  const lastUpdateTrack = installation.lastRollback?.track;
-  if (lastUpdateTrack && lastUpdateTrack !== track) return true;
-  // Installed version string shows commits ahead of the stable tag (e.g. "v0.14.2 + 21 commits")
-  const version = installation.version || "";
-  if (track === "stable" && version.includes(info.latestTag + " +")) return true;
-  // Raw tag/sha mismatch
-  if (info.installedTag && info.installedTag !== info.latestTag) return true;
-  return false;
-}
-
 module.exports = {
   id: "standalone",
   get label() { return t("standalone.label"); },
@@ -261,7 +244,7 @@ module.exports = {
   getStatusTag(installation) {
     const track = installation.updateTrack || "stable";
     const info = releaseCache.getEffectiveInfo(COMFYUI_REPO, track, installation);
-    if (info && isUpdateAvailable(installation, track, info)) {
+    if (info && releaseCache.isUpdateAvailable(installation, track, info)) {
       return { label: t("standalone.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
     }
     return undefined;
@@ -340,7 +323,7 @@ module.exports = {
     if (info) {
       const installedDisplay = installation.version || info.installedTag || "unknown";
       const latestDisplay = info.releaseName || info.latestTag || "—";
-      const updateAvail = isUpdateAvailable(installation, track, info);
+      const updateAvail = releaseCache.isUpdateAvailable(installation, track, info);
       updateFields.push(
         { label: t("standalone.installedVersion"), value: installedDisplay },
         { label: t("standalone.latestVersion"), value: latestDisplay },
@@ -349,7 +332,7 @@ module.exports = {
       );
     }
     const updateActions = [];
-    if (info && isUpdateAvailable(installation, track, info) && hasGit) {
+    if (info && releaseCache.isUpdateAvailable(installation, track, info) && hasGit) {
       const installedDisplay = installation.version || info.installedTag || "unknown";
       const latestDisplay = info.releaseName || info.latestTag;
       // Detect downgrade: installed is ahead of target (e.g. "v0.14.2 + 5 commits" → "v0.14.2")

@@ -53,7 +53,7 @@ module.exports = {
   getStatusTag(installation) {
     const track = installation.updateTrack || "stable";
     const info = releaseCache.getEffectiveInfo(COMFYUI_REPO, track, installation);
-    if (info && info.installedTag !== info.latestTag) {
+    if (info && releaseCache.isUpdateAvailable(installation, track, info)) {
       return { label: t("portable.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
     }
     return undefined;
@@ -125,11 +125,11 @@ module.exports = {
         { label: t("portable.installedVersion"), value: info.installedTag || installation.version },
         { label: t("portable.latestVersion"), value: info.releaseName || info.latestTag || "—" },
         { label: t("portable.lastChecked"), value: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : "—" },
-        { label: t("portable.updateStatus"), value: info.installedTag !== info.latestTag ? t("portable.updateAvailable") : t("portable.upToDate") },
+        { label: t("portable.updateStatus"), value: releaseCache.isUpdateAvailable(installation, track, info) ? t("portable.updateAvailable") : t("portable.upToDate") },
       );
     }
     const updateActions = [];
-    if (info && info.installedTag !== info.latestTag) {
+    if (info && releaseCache.isUpdateAvailable(installation, track, info)) {
       const msgKey = track === "latest" ? "portable.updateConfirmMessageLatest" : "portable.updateConfirmMessage";
       const notes = truncateNotes(info.releaseNotes, 2000);
       updateActions.push({
