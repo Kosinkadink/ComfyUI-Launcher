@@ -469,6 +469,7 @@ module.exports = {
 
       const updateScript = path.join(__dirname, "..", "lib", "update_comfyui.py");
       const markers = {};
+      let stdoutBuf = "";
       const exitCode = await new Promise((resolve) => {
         const proc = spawn(masterPython, ["-s", updateScript, comfyuiDir, ...stableArgs], {
           stdio: ["ignore", "pipe", "pipe"],
@@ -476,8 +477,10 @@ module.exports = {
         });
         proc.stdout.on("data", (chunk) => {
           const text = chunk.toString("utf-8");
-          // Parse structured markers from the script output
-          for (const line of text.split(/\r?\n/)) {
+          stdoutBuf += text;
+          const lines = stdoutBuf.split(/\r?\n/);
+          stdoutBuf = lines.pop();
+          for (const line of lines) {
             const match = line.match(/^\[(\w+)\]\s*(.+)$/);
             if (match) markers[match[1]] = match[2].trim();
           }
@@ -490,6 +493,10 @@ module.exports = {
         });
         proc.on("exit", (code) => resolve(code ?? 1));
       });
+      if (stdoutBuf) {
+        const match = stdoutBuf.match(/^\[(\w+)\]\s*(.+)$/);
+        if (match) markers[match[1]] = match[2].trim();
+      }
 
       if (exitCode !== 0) {
         return { ok: false, message: t("standalone.updateFailed", { code: exitCode }) };
@@ -642,7 +649,7 @@ module.exports = {
     return { ok: false, message: `Action "${actionId}" not yet implemented.` };
   },
 
-  fixupCopy(srcPath, destPath) {
+  async fixupCopy(srcPath, destPath) {
     const envsDir = path.join(destPath, ENVS_DIR);
     if (!fs.existsSync(envsDir)) return;
 
@@ -652,23 +659,24 @@ module.exports = {
       // Rewrite absolute paths in pyvenv.cfg to point to the new location
       const cfgPath = path.join(envPath, "pyvenv.cfg");
       if (fs.existsSync(cfgPath)) {
-        let content = fs.readFileSync(cfgPath, "utf-8");
+        let content = await fs.promises.readFile(cfgPath, "utf-8");
         content = content.replaceAll(srcPath, destPath);
-        fs.writeFileSync(cfgPath, content, "utf-8");
+        await fs.promises.writeFile(cfgPath, content, "utf-8");
       }
 
       // Fix shebangs in bin/ scripts (Unix only)
       if (process.platform !== "win32") {
         const binDir = path.join(envPath, "bin");
         if (fs.existsSync(binDir)) {
-          for (const entry of fs.readdirSync(binDir, { withFileTypes: true })) {
+          const entries = await fs.promises.readdir(binDir, { withFileTypes: true });
+          for (const entry of entries) {
             if (!entry.isFile()) continue;
             const filePath = path.join(binDir, entry.name);
             try {
-              let content = fs.readFileSync(filePath, "utf-8");
+              let content = await fs.promises.readFile(filePath, "utf-8");
               if (content.startsWith("#!") && content.includes(srcPath)) {
                 content = content.replaceAll(srcPath, destPath);
-                fs.writeFileSync(filePath, content, "utf-8");
+                await fs.promises.writeFile(filePath, content, "utf-8");
               }
             } catch {}
           }
