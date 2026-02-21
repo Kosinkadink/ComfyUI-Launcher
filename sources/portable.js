@@ -4,9 +4,20 @@ const { spawn } = require("child_process");
 const { fetchJSON } = require("../lib/fetch");
 const { deleteAction, untrackAction } = require("../lib/actions");
 const { downloadAndExtract } = require("../lib/installer");
+const releaseCache = require("../lib/release-cache");
 const { parseArgs } = require("../lib/util");
 const { t } = require("../lib/i18n");
 const { fetchLatestRelease, truncateNotes } = require("../lib/comfyui-releases");
+
+const COMFYUI_REPO = "Comfy-Org/ComfyUI";
+
+function getEffectiveUpdateInfo(installation, track) {
+  const cached = releaseCache.get(COMFYUI_REPO, track);
+  if (!cached) return null;
+  const perInstall = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+  const installedTag = perInstall?.installedTag || installation.version || "unknown";
+  return { ...cached, installedTag };
+}
 
 function findPortableRoot(installPath) {
   // Content may be directly in installPath (tracked existing)
@@ -49,8 +60,8 @@ module.exports = {
 
   getStatusTag(installation) {
     const track = installation.updateTrack || "stable";
-    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
-    if (info && info.available) {
+    const info = getEffectiveUpdateInfo(installation, track);
+    if (info && info.installedTag !== info.latestTag) {
       return { label: t("portable.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
     }
     return undefined;
@@ -109,7 +120,7 @@ module.exports = {
 
     // Updates section
     const track = installation.updateTrack || "stable";
-    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+    const info = getEffectiveUpdateInfo(installation, track);
     const updateFields = [
       { id: "updateTrack", label: t("portable.updateTrack"), value: track, editable: true,
         refreshSection: true, editType: "select", options: [
@@ -122,11 +133,11 @@ module.exports = {
         { label: t("portable.installedVersion"), value: info.installedTag || installation.version },
         { label: t("portable.latestVersion"), value: info.releaseName || info.latestTag || "—" },
         { label: t("portable.lastChecked"), value: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : "—" },
-        { label: t("portable.updateStatus"), value: info.available ? t("portable.updateAvailable") : t("portable.upToDate") },
+        { label: t("portable.updateStatus"), value: info.installedTag !== info.latestTag ? t("portable.updateAvailable") : t("portable.upToDate") },
       );
     }
     const updateActions = [];
-    if (info && info.available) {
+    if (info && info.installedTag !== info.latestTag) {
       const msgKey = track === "latest" ? "portable.updateConfirmMessageLatest" : "portable.updateConfirmMessage";
       const notes = truncateNotes(info.releaseNotes, 2000);
       updateActions.push({
@@ -205,27 +216,28 @@ module.exports = {
   async handleAction(actionId, installation, actionData, { update, sendProgress, sendOutput }) {
     if (actionId === "check-update") {
       const track = installation.updateTrack || "stable";
-      const release = await fetchLatestRelease(track);
-      if (!release) {
+      const entry = await releaseCache.getOrFetch(COMFYUI_REPO, track, async () => {
+        const release = await fetchLatestRelease(track);
+        if (!release) return null;
+        return {
+          checkedAt: Date.now(),
+          latestTag: release.tag_name,
+          releaseName: release.name || release.tag_name,
+          releaseNotes: truncateNotes(release.body, 4000),
+          releaseUrl: release.html_url,
+          publishedAt: release.published_at,
+        };
+      }, /* force */ true);
+      if (!entry) {
         return { ok: false, message: "Could not fetch releases from GitHub." };
       }
+      // Store per-installation installedTag for this track
       const installedTag = installation.version || "unknown";
-      const latestTag = release.tag_name;
-      const available = installedTag !== latestTag;
       const existing = installation.updateInfoByTrack || {};
       await update({
         updateInfoByTrack: {
           ...existing,
-          [track]: {
-            checkedAt: Date.now(),
-            installedTag,
-            latestTag,
-            available,
-            releaseName: release.name || latestTag,
-            releaseNotes: truncateNotes(release.body, 4000),
-            releaseUrl: release.html_url,
-            publishedAt: release.published_at,
-          },
+          [track]: { installedTag },
         },
       });
       return { ok: true, navigate: "detail" };
@@ -305,19 +317,14 @@ module.exports = {
       sendProgress("deps", { percent: -1, status: "Dependencies checked." });
 
       // Update installation metadata
+      const cachedRelease = releaseCache.get(COMFYUI_REPO, track) || {};
+      const latestTag = cachedRelease.latestTag || installation.version;
       const existing = installation.updateInfoByTrack || {};
-      const trackInfo = existing[track] || {};
-      const latestTag = trackInfo.latestTag || installation.version;
       await update({
         version: latestTag,
         updateInfoByTrack: {
           ...existing,
-          [track]: {
-            ...trackInfo,
-            available: false,
-            installedTag: latestTag,
-            checkedAt: Date.now(),
-          },
+          [track]: { installedTag: latestTag },
         },
       });
 

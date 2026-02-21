@@ -3,12 +3,14 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { fetchJSON } = require("../lib/fetch");
 const { fetchLatestRelease, truncateNotes } = require("../lib/comfyui-releases");
+const releaseCache = require("../lib/release-cache");
 const { deleteAction, untrackAction } = require("../lib/actions");
 const { downloadAndExtract, downloadAndExtractMulti } = require("../lib/installer");
 const { deleteDir } = require("../lib/delete");
 const { parseArgs, formatTime } = require("../lib/util");
 const { t } = require("../lib/i18n");
 
+const COMFYUI_REPO = "Comfy-Org/ComfyUI";
 const RELEASE_REPO = "Kosinkadink/ComfyUI-Launcher-Environments";
 const ENVS_DIR = "envs";
 const DEFAULT_ENV = "default";
@@ -214,13 +216,23 @@ function recommendVariant(variantId, gpu) {
 }
 
 /**
+ * Build effective update info by merging the shared release cache (remote info)
+ * with per-installation state (installedTag).
+ */
+function getEffectiveUpdateInfo(installation, track) {
+  const cached = releaseCache.get(COMFYUI_REPO, track);
+  if (!cached) return null;
+  const perInstall = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+  const installedTag = perInstall?.installedTag || installation.version || "unknown";
+  return { ...cached, installedTag };
+}
+
+/**
  * Determine if an update is available for the given track, using local data only.
  * Handles cross-track switches (e.g. last update was on "latest" but viewing "stable").
  */
 function isUpdateAvailable(installation, track, info) {
   if (!info || !info.latestTag) return false;
-  // The stored check-update result
-  if (info.available) return true;
   // Cross-track: last update was on a different track, so this track's installedTag is stale
   const lastUpdateTrack = installation.lastRollback?.track;
   if (lastUpdateTrack && lastUpdateTrack !== track) return true;
@@ -260,7 +272,7 @@ module.exports = {
 
   getStatusTag(installation) {
     const track = installation.updateTrack || "stable";
-    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+    const info = getEffectiveUpdateInfo(installation, track);
     if (info && isUpdateAvailable(installation, track, info)) {
       return { label: t("standalone.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
     }
@@ -329,7 +341,7 @@ module.exports = {
     // Updates section
     const hasGit = installed && installation.installPath && fs.existsSync(path.join(installation.installPath, "ComfyUI", ".git"));
     const track = installation.updateTrack || "stable";
-    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+    const info = getEffectiveUpdateInfo(installation, track);
     const updateFields = [
       { id: "updateTrack", label: t("standalone.updateTrack"), value: track, editable: true,
         refreshSection: true, onChangeAction: "check-update", editType: "select", options: [
@@ -488,32 +500,29 @@ module.exports = {
   async handleAction(actionId, installation, actionData, { update, sendProgress, sendOutput }) {
     if (actionId === "check-update") {
       const track = installation.updateTrack || "stable";
-      const release = await fetchLatestRelease(track);
-      if (!release) {
+      const entry = await releaseCache.getOrFetch(COMFYUI_REPO, track, async () => {
+        const release = await fetchLatestRelease(track);
+        if (!release) return null;
+        return {
+          checkedAt: Date.now(),
+          latestTag: release.tag_name,
+          releaseName: release.name || release.tag_name,
+          releaseNotes: truncateNotes(release.body, 4000),
+          releaseUrl: release.html_url,
+          publishedAt: release.published_at,
+        };
+      }, /* force */ true);
+      if (!entry) {
         return { ok: false, message: "Could not fetch releases from GitHub." };
       }
+      // Store per-installation installedTag for this track
       const existing = installation.updateInfoByTrack || {};
       const prevTrackInfo = existing[track];
-      // Use stored installedTag for this track if available; otherwise check if
-      // the last update was on a different track (always counts as update available)
-      const lastUpdateTrack = installation.lastRollback?.track;
-      const crossTrack = !prevTrackInfo?.installedTag && lastUpdateTrack && lastUpdateTrack !== track;
       const installedTag = prevTrackInfo?.installedTag || installation.version || "unknown";
-      const latestTag = release.tag_name;
-      const available = crossTrack || installedTag !== latestTag;
       await update({
         updateInfoByTrack: {
           ...existing,
-          [track]: {
-            checkedAt: Date.now(),
-            installedTag,
-            latestTag,
-            available,
-            releaseName: release.name || latestTag,
-            releaseNotes: truncateNotes(release.body, 4000),
-            releaseUrl: release.html_url,
-            publishedAt: release.published_at,
-          },
+          [track]: { installedTag },
         },
       });
       return { ok: true, navigate: "detail" };
@@ -617,8 +626,10 @@ module.exports = {
             });
 
             if (dryRunResult.code !== 0) {
-              sendOutput(`\nRequirements dry-run detected issues:\n${dryRunResult.stderr || dryRunResult.stdout}\n`);
-              sendOutput("Proceeding with install attempt…\n");
+              // TODO(Step 4): When copy-commit-based updating exists, offer it as
+              // the safe alternative here instead of proceeding unconditionally.
+              sendOutput(`\n⚠ Requirements dry-run detected potential conflicts:\n${dryRunResult.stderr || dryRunResult.stdout}\n`);
+              sendOutput("Proceeding with install attempt — some conflicts may be benign.\n");
             } else if (dryRunResult.stderr) {
               sendOutput(dryRunResult.stderr);
             }
@@ -652,13 +663,12 @@ module.exports = {
       }
 
       // Update installation metadata
-      const existing = installation.updateInfoByTrack || {};
-      const trackInfo = existing[track] || {};
+      const cachedRelease = releaseCache.get(COMFYUI_REPO, track) || {};
       // For stable: use the checked-out tag; for latest: use the post-update commit sha
       const postHead = markers.POST_UPDATE_HEAD ? markers.POST_UPDATE_HEAD.slice(0, 7) : null;
-      const installedTag = markers.CHECKED_OUT_TAG || postHead || trackInfo.latestTag || installation.version;
+      const installedTag = markers.CHECKED_OUT_TAG || postHead || cachedRelease.latestTag || installation.version;
       // For display: use releaseName (e.g. "v0.14.2 + 5 commits (abc1234)") for latest
-      const displayVersion = markers.CHECKED_OUT_TAG || trackInfo.releaseName || installedTag;
+      const displayVersion = markers.CHECKED_OUT_TAG || cachedRelease.releaseName || installedTag;
       const rollback = {
         preUpdateHead: markers.PRE_UPDATE_HEAD || null,
         postUpdateHead: markers.POST_UPDATE_HEAD || null,
@@ -666,17 +676,13 @@ module.exports = {
         track,
         updatedAt: Date.now(),
       };
+      const existing = installation.updateInfoByTrack || {};
       await update({
         version: displayVersion,
         lastRollback: rollback,
         updateInfoByTrack: {
           ...existing,
-          [track]: {
-            ...trackInfo,
-            available: false,
-            installedTag,
-            checkedAt: Date.now(),
-          },
+          [track]: { installedTag },
         },
       });
 

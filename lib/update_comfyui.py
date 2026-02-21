@@ -62,9 +62,8 @@ def find_latest_stable_tag(repo):
         prefix = "refs/tags/v"
         if ref_name.startswith(prefix):
             try:
-                parts = list(map(int, ref_name[len(prefix):].split(".")))
-                score = parts[0] * 10000000000 + parts[1] * 100000 + parts[2]
-                versions.append((score, ref_name))
+                parts = tuple(map(int, ref_name[len(prefix):].split(".")))
+                versions.append((parts, ref_name))
             except (ValueError, IndexError):
                 pass
     versions.sort()
