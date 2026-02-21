@@ -7,6 +7,9 @@
     "email": "kosinkadink@users.noreply.github.com"
   },
   "repository": "github:Kosinkadink/ComfyUI-Launcher",
+  "engines": {
+    "node": ">=22"
+  },
   "main": "main.js",
   "scripts": {
     "postinstall": "node -e \"if(process.platform!=='win32'){try{require('fs').chmodSync(require('7zip-bin').path7za,0o755)}catch{}}\"",

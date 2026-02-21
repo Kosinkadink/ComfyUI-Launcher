@@ -1,12 +1,17 @@
 const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
 const { fetchJSON } = require("../lib/fetch");
+const { truncateNotes } = require("../lib/comfyui-releases");
+const releaseCache = require("../lib/release-cache");
 const { deleteAction, untrackAction } = require("../lib/actions");
 const { downloadAndExtract, downloadAndExtractMulti } = require("../lib/installer");
+const { copyDirWithProgress } = require("../lib/copy");
 const { deleteDir } = require("../lib/delete");
 const { parseArgs, formatTime } = require("../lib/util");
 const { t } = require("../lib/i18n");
 
+const COMFYUI_REPO = "Comfy-Org/ComfyUI";
 const RELEASE_REPO = "Kosinkadink/ComfyUI-Launcher-Environments";
 const ENVS_DIR = "envs";
 const DEFAULT_ENV = "default";
@@ -58,58 +63,6 @@ function findSitePackages(envRoot) {
     if (pyDir) return path.join(libDir, pyDir, "site-packages");
   } catch {}
   return null;
-}
-
-async function collectFiles(dir) {
-  const entries = [];
-  const stack = [dir];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    const items = await fs.promises.readdir(current, { withFileTypes: true });
-    for (const item of items) {
-      const full = path.join(current, item.name);
-      if (item.isDirectory()) {
-        stack.push(full);
-      } else {
-        entries.push(path.relative(dir, full));
-      }
-    }
-  }
-  return entries;
-}
-
-async function copyDirWithProgress(src, dest, onProgress) {
-  const files = await collectFiles(src);
-  const total = files.length;
-  let copied = 0;
-  const step = Math.max(1, Math.floor(total / 100));
-  const concurrency = 50;
-  const dirPromises = new Map();
-  const startTime = Date.now();
-
-  const ensureDir = (dir) => {
-    if (dirPromises.has(dir)) return dirPromises.get(dir);
-    const p = fs.promises.mkdir(dir, { recursive: true });
-    dirPromises.set(dir, p);
-    return p;
-  };
-
-  let i = 0;
-  while (i < files.length) {
-    const batch = files.slice(i, i + concurrency);
-    await Promise.all(batch.map(async (rel) => {
-      const destPath = path.join(dest, rel);
-      await ensureDir(path.dirname(destPath));
-      await fs.promises.copyFile(path.join(src, rel), destPath);
-      copied++;
-      if (onProgress && (copied % step === 0 || copied === total)) {
-        const elapsedSecs = (Date.now() - startTime) / 1000;
-        const etaSecs = copied > 0 ? elapsedSecs * ((total - copied) / copied) : -1;
-        onProgress(copied, total, elapsedSecs, etaSecs);
-      }
-    }));
-    i += concurrency;
-  }
 }
 
 async function codesignBinaries(dir) {
@@ -237,6 +190,15 @@ module.exports = {
     return { launchArgs: this.defaultLaunchArgs, launchMode: "window", portConflict: "auto" };
   },
 
+  getStatusTag(installation) {
+    const track = installation.updateTrack || "stable";
+    const info = releaseCache.getEffectiveInfo(COMFYUI_REPO, track, installation);
+    if (info && releaseCache.isUpdateAvailable(installation, track, info)) {
+      return { label: t("standalone.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
+    }
+    return undefined;
+  },
+
   buildInstallation(selections) {
     const manifest = selections.variant?.data?.manifest;
     return {
@@ -280,23 +242,8 @@ module.exports = {
 
   getDetailSections(installation) {
     const installed = installation.status === "installed";
-    const envs = installed && installation.installPath ? listEnvs(installation.installPath) : [];
-    const activeEnv = resolveActiveEnv(installation) || DEFAULT_ENV;
-    const hasEnvs = envs.length > 0;
 
-    const envItems = envs.map((name) => ({
-      label: name,
-      active: name === activeEnv,
-      actions: [
-        ...(name !== activeEnv ? [{ id: "env-activate", label: t("standalone.setActive"), style: "default", data: { env: name } }] : []),
-        { id: "env-delete", label: t("standalone.deleteEnv"), style: "danger", enabled: name !== activeEnv, data: { env: name },
-          showProgress: true, progressTitle: t("standalone.deletingEnv", { env: name }),
-          disabledMessage: t("standalone.cannotDeleteActive"),
-          confirm: { title: t("standalone.deleteEnvConfirmTitle"), message: t("standalone.deleteEnvConfirmMessage", { env: name }) } },
-      ],
-    }));
-
-    return [
+    const sections = [
       {
         title: t("common.installInfo"),
         fields: [
@@ -309,18 +256,77 @@ module.exports = {
           { label: t("common.installed"), value: new Date(installation.createdAt).toLocaleDateString() },
         ],
       },
-      {
-        title: t("standalone.pythonEnvs"),
-        description: hasEnvs
-          ? t("standalone.activeEnv", { env: activeEnv })
-          : t("standalone.noEnvs"),
-        items: envItems,
-        actions: [
-          { id: "env-create", label: t("standalone.newEnv"), style: "default", enabled: installed,
-            showProgress: true, progressTitle: t("standalone.creatingEnv"),
-            prompt: { title: t("standalone.newEnvTitle"), message: t("standalone.newEnvMessage"), placeholder: t("standalone.newEnvPlaceholder"), field: "env", confirmLabel: t("standalone.newEnvCreate"), required: t("standalone.newEnvRequired") } },
-        ],
-      },
+    ];
+
+    // Updates section
+    const hasGit = installed && installation.installPath && fs.existsSync(path.join(installation.installPath, "ComfyUI", ".git"));
+    const track = installation.updateTrack || "stable";
+    const info = releaseCache.getEffectiveInfo(COMFYUI_REPO, track, installation);
+    const updateFields = [
+      { id: "updateTrack", label: t("standalone.updateTrack"), value: track, editable: true,
+        refreshSection: true, onChangeAction: "check-update", editType: "select", options: [
+          { value: "stable", label: t("standalone.trackStable") },
+          { value: "latest", label: t("standalone.trackLatest") },
+        ] },
+    ];
+    if (info) {
+      const installedDisplay = installation.version || info.installedTag || "unknown";
+      const latestDisplay = info.releaseName || info.latestTag || "—";
+      const updateAvail = releaseCache.isUpdateAvailable(installation, track, info);
+      updateFields.push(
+        { label: t("standalone.installedVersion"), value: installedDisplay },
+        { label: t("standalone.latestVersion"), value: latestDisplay },
+        { label: t("standalone.lastChecked"), value: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : "—" },
+        { label: t("standalone.updateStatus"), value: updateAvail ? t("standalone.updateAvailable") : t("standalone.upToDate") },
+      );
+    }
+    const updateActions = [];
+    if (info && releaseCache.isUpdateAvailable(installation, track, info) && hasGit) {
+      const installedDisplay = installation.version || info.installedTag || "unknown";
+      const latestDisplay = info.releaseName || info.latestTag;
+      // Detect downgrade: installed is ahead of target (e.g. "v0.14.2 + 5 commits" → "v0.14.2")
+      const isDowngrade = track === "stable" && installedDisplay.includes(latestDisplay + " +");
+      const msgKey = isDowngrade ? "standalone.updateConfirmMessageDowngrade"
+        : track === "latest" ? "standalone.updateConfirmMessageLatest"
+        : "standalone.updateConfirmMessage";
+      const notes = truncateNotes(info.releaseNotes, 2000);
+      updateActions.push({
+        id: "update-comfyui", label: t("standalone.updateNow"), style: "primary", enabled: installed,
+        showProgress: true, progressTitle: t("standalone.updatingTitle", { version: latestDisplay }),
+        confirm: {
+          title: t("standalone.updateConfirmTitle"),
+          message: t(msgKey, {
+            installed: installedDisplay,
+            latest: latestDisplay,
+            commit: notes || "",
+            notes: notes || "(none)",
+          }),
+        },
+      });
+      updateActions.push({
+        id: "copy-update", label: t("standalone.copyAndUpdate"), style: "default", enabled: installed,
+        showProgress: true, progressTitle: t("standalone.copyUpdatingTitle", { version: latestDisplay }),
+        cancellable: true,
+        prompt: {
+          title: t("standalone.copyAndUpdateTitle"),
+          message: t("standalone.copyAndUpdateMessage", { installed: installedDisplay, latest: latestDisplay }),
+          defaultValue: `${installation.name} (${latestDisplay})`,
+          confirmLabel: t("standalone.copyAndUpdateConfirm"),
+          required: true,
+          field: "name",
+        },
+      });
+    }
+    updateActions.push({
+      id: "check-update", label: t("actions.checkForUpdate"), style: "default", enabled: installed,
+    });
+    sections.push({
+      title: t("standalone.updates"),
+      fields: updateFields,
+      actions: updateActions,
+    });
+
+    sections.push(
       {
         title: t("common.launchSettings"),
         fields: [
@@ -350,13 +356,72 @@ module.exports = {
           { id: "launch", label: t("actions.launch"), style: "primary", enabled: installed,
             ...(!installed && { disabledMessage: t("errors.installNotReady") }),
             showProgress: true, progressTitle: t("common.startingComfyUI"), cancellable: true },
+          { id: "copy", label: t("actions.copyInstallation"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("actions.copyingInstallation"), cancellable: true,
+            prompt: {
+              title: t("actions.copyInstallationTitle"),
+              message: t("actions.copyInstallationMessage"),
+              defaultValue: `${installation.name} (Copy)`,
+              confirmLabel: t("actions.copyInstallationConfirm"),
+              required: true,
+              field: "name",
+            } },
           { id: "open-folder", label: t("actions.openDirectory"), style: "default", enabled: !!installation.installPath },
-          { id: "check-update", label: t("actions.checkForUpdate"), style: "default", enabled: false, disabledMessage: t("actions.featureNotImplemented") },
           deleteAction(installation),
           untrackAction(),
         ],
       },
-    ];
+      {
+        title: t("common.advanced"),
+        collapsed: true,
+        actions: [
+          { id: "release-update", label: t("standalone.releaseUpdate"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("standalone.releaseUpdatingTitle"), cancellable: true,
+            fieldSelects: [
+              { sourceId: "standalone", fieldId: "release", field: "releaseSelection",
+                title: t("standalone.releaseUpdateSelectRelease"),
+                message: t("standalone.releaseUpdateSelectReleaseMessage") },
+              { sourceId: "standalone", fieldId: "variant", field: "variantSelection",
+                title: t("standalone.releaseUpdateSelectVariant"),
+                message: t("standalone.releaseUpdateSelectVariantMessage") },
+            ],
+            prompt: {
+              title: t("standalone.releaseUpdateTitle"),
+              message: t("standalone.releaseUpdateNameMessage"),
+              defaultValue: `${installation.name} (Release Update)`,
+              confirmLabel: t("standalone.releaseUpdateConfirm"),
+              required: true,
+              field: "name",
+            } },
+          { id: "migrate-from", label: t("migrate.migrateFrom"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("migrate.migrating"), cancellable: true,
+            select: {
+              title: t("migrate.selectSource"),
+              message: t("migrate.selectSourceMessage"),
+              emptyMessage: t("migrate.noInstallations"),
+              source: "installations",
+              field: "sourceInstallationId",
+              excludeSelf: true,
+              filters: { status: "installed", sourceCategory: "local" },
+            },
+            confirm: {
+              title: t("migrate.confirmTitle"),
+              message: t("migrate.confirmMessage"),
+              confirmLabel: t("migrate.migrateConfirm"),
+              options: [
+                { id: "customNodes", label: t("migrate.optCustomNodes"), checked: true },
+                { id: "workflows", label: t("migrate.optWorkflows"), checked: false },
+                { id: "userSettings", label: t("migrate.optUserSettings"), checked: false },
+                { id: "models", label: t("migrate.optModels"), checked: false },
+                { id: "input", label: t("migrate.optInput"), checked: false },
+                { id: "output", label: t("migrate.optOutput"), checked: false },
+              ],
+            } },
+        ],
+      },
+    );
+
+    return sections;
   },
 
   async install(installation, tools) {
@@ -423,7 +488,459 @@ module.exports = {
     };
   },
 
-  async handleAction(actionId, installation, actionData, { update, sendProgress }) {
+  async handleAction(actionId, installation, actionData, { update, sendProgress, sendOutput, signal }) {
+    if (actionId === "check-update") {
+      const track = installation.updateTrack || "stable";
+      return releaseCache.checkForUpdate(COMFYUI_REPO, track, installation, update);
+    }
+
+    if (actionId === "update-comfyui") {
+      const installPath = installation.installPath;
+      const comfyuiDir = path.join(installPath, "ComfyUI");
+      const gitDir = path.join(comfyuiDir, ".git");
+
+      if (!fs.existsSync(gitDir)) {
+        return { ok: false, message: t("standalone.updateNoGit") };
+      }
+
+      const masterPython = getMasterPythonPath(installPath);
+      if (!fs.existsSync(masterPython)) {
+        return { ok: false, message: "Master Python not found." };
+      }
+
+      const track = installation.updateTrack || "stable";
+      const stableArgs = track === "stable" ? ["--stable"] : [];
+
+      // Capture pre-update requirements for comparison
+      const reqPath = path.join(comfyuiDir, "requirements.txt");
+      let preReqs = "";
+      try { preReqs = await fs.promises.readFile(reqPath, "utf-8"); } catch {}
+
+      sendProgress("steps", { steps: [
+        { phase: "prepare", label: t("standalone.updatePrepare") },
+        { phase: "run", label: t("standalone.updateRun") },
+        { phase: "deps", label: t("standalone.updateDeps") },
+      ] });
+
+      // Phase 1: Prepare
+      sendProgress("prepare", { percent: -1, status: t("standalone.updatePrepare") });
+
+      // Phase 2: Run launcher-owned update script with master Python (has pygit2)
+      sendProgress("run", { percent: -1, status: t("standalone.updateRun") });
+
+      const updateScript = path.join(__dirname, "..", "lib", "update_comfyui.py");
+      const markers = {};
+      let stdoutBuf = "";
+      const exitCode = await new Promise((resolve) => {
+        const proc = spawn(masterPython, ["-s", updateScript, comfyuiDir, ...stableArgs], {
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        });
+        if (signal) {
+          const onAbort = () => proc.kill();
+          signal.addEventListener("abort", onAbort, { once: true });
+          proc.on("exit", () => signal.removeEventListener("abort", onAbort));
+        }
+        proc.stdout.on("data", (chunk) => {
+          const text = chunk.toString("utf-8");
+          stdoutBuf += text;
+          const lines = stdoutBuf.split(/\r?\n/);
+          stdoutBuf = lines.pop();
+          for (const line of lines) {
+            const match = line.match(/^\[(\w+)\]\s*(.+)$/);
+            if (match) markers[match[1]] = match[2].trim();
+          }
+          sendOutput(text);
+        });
+        proc.stderr.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+        proc.on("error", (err) => {
+          sendOutput(`Error: ${err.message}\n`);
+          resolve(1);
+        });
+        proc.on("exit", (code) => resolve(code ?? 1));
+      });
+      if (stdoutBuf) {
+        const match = stdoutBuf.match(/^\[(\w+)\]\s*(.+)$/);
+        if (match) markers[match[1]] = match[2].trim();
+      }
+
+      if (exitCode !== 0) {
+        return { ok: false, message: t("standalone.updateFailed", { code: exitCode }) };
+      }
+
+      // Phase 3: Requirements sync via uv against active env
+      if (signal?.aborted) return { ok: false, message: "Cancelled" };
+      sendProgress("deps", { percent: -1, status: t("standalone.updateDepsChecking") });
+
+      let postReqs = "";
+      try { postReqs = await fs.promises.readFile(reqPath, "utf-8"); } catch {}
+
+      if (preReqs !== postReqs && postReqs.length > 0) {
+        const uvPath = getUvPath(installPath);
+        const activeEnvPython = getActivePythonPath(installation);
+
+        if (fs.existsSync(uvPath) && activeEnvPython) {
+          // Filter out PyTorch packages — they are tied to the Standalone release
+          // and must never be modified by a commit-based update.
+          const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;\[#]|$)/i;
+          const filteredReqs = postReqs.split("\n").filter((l) => !PYTORCH_RE.test(l.trim())).join("\n");
+          const filteredReqPath = path.join(installPath, ".comfyui-reqs-filtered.txt");
+          await fs.promises.writeFile(filteredReqPath, filteredReqs, "utf-8");
+
+          try {
+            // Dry-run to check for conflicts
+            sendProgress("deps", { percent: -1, status: t("standalone.updateDepsDryRun") });
+            if (signal?.aborted) return { ok: false, message: "Cancelled" };
+            const dryRunResult = await new Promise((resolve) => {
+              const proc = spawn(uvPath, ["pip", "install", "--dry-run", "-r", filteredReqPath, "--python", activeEnvPython], {
+                cwd: installPath,
+                stdio: ["ignore", "pipe", "pipe"],
+                windowsHide: true,
+              });
+              if (signal) {
+                const onAbort = () => proc.kill();
+                signal.addEventListener("abort", onAbort, { once: true });
+                proc.on("exit", () => signal.removeEventListener("abort", onAbort));
+              }
+              let stdout = "";
+              let stderr = "";
+              proc.stdout.on("data", (chunk) => { stdout += chunk.toString("utf-8"); });
+              proc.stderr.on("data", (chunk) => { stderr += chunk.toString("utf-8"); });
+              proc.on("error", (err) => resolve({ code: 1, stdout: "", stderr: err.message }));
+              proc.on("exit", (code) => resolve({ code: code ?? 1, stdout, stderr }));
+            });
+
+            if (dryRunResult.code !== 0) {
+              sendOutput(`\n⚠ Requirements dry-run detected potential conflicts:\n${dryRunResult.stderr || dryRunResult.stdout}\n`);
+              sendOutput("Proceeding with install attempt — some conflicts may be benign.\nTip: Use \"Copy & Update\" for a risk-free update that leaves this installation untouched.\n");
+            } else if (dryRunResult.stderr) {
+              sendOutput(dryRunResult.stderr);
+            }
+
+            // Install requirements
+            if (signal?.aborted) return { ok: false, message: "Cancelled" };
+            sendProgress("deps", { percent: -1, status: t("standalone.updateDepsInstalling") });
+            const installResult = await new Promise((resolve) => {
+              const proc = spawn(uvPath, ["pip", "install", "-r", filteredReqPath, "--python", activeEnvPython], {
+                cwd: installPath,
+                stdio: ["ignore", "pipe", "pipe"],
+                windowsHide: true,
+              });
+              if (signal) {
+                const onAbort = () => proc.kill();
+                signal.addEventListener("abort", onAbort, { once: true });
+                proc.on("exit", () => signal.removeEventListener("abort", onAbort));
+              }
+              proc.stdout.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+              proc.stderr.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+              proc.on("error", (err) => {
+                sendOutput(`Error: ${err.message}\n`);
+                resolve(1);
+              });
+              proc.on("exit", (code) => resolve(code ?? 1));
+            });
+
+            if (installResult !== 0) {
+              sendOutput(`\nWarning: requirements install exited with code ${installResult}\n`);
+            }
+          } finally {
+            try { await fs.promises.unlink(filteredReqPath); } catch {}
+          }
+        }
+      } else {
+        sendProgress("deps", { percent: -1, status: t("standalone.updateDepsUpToDate") });
+      }
+
+      // Update installation metadata
+      const cachedRelease = releaseCache.get(COMFYUI_REPO, track) || {};
+      // For stable: use the checked-out tag; for latest: use the post-update commit sha
+      const postHead = markers.POST_UPDATE_HEAD ? markers.POST_UPDATE_HEAD.slice(0, 7) : null;
+      const installedTag = markers.CHECKED_OUT_TAG || postHead || cachedRelease.latestTag || installation.version;
+      // For display: use releaseName (e.g. "v0.14.2 + 5 commits (abc1234)") for latest
+      const displayVersion = markers.CHECKED_OUT_TAG || cachedRelease.releaseName || installedTag;
+      const rollback = {
+        preUpdateHead: markers.PRE_UPDATE_HEAD || null,
+        postUpdateHead: markers.POST_UPDATE_HEAD || null,
+        backupBranch: markers.BACKUP_BRANCH || null,
+        track,
+        updatedAt: Date.now(),
+      };
+      const existing = installation.updateInfoByTrack || {};
+      await update({
+        version: displayVersion,
+        lastRollback: rollback,
+        updateInfoByTrack: {
+          ...existing,
+          [track]: { installedTag },
+        },
+      });
+
+      sendProgress("done", { percent: 100, status: "Complete" });
+      return { ok: true, navigate: "detail" };
+    }
+
+    if (actionId === "migrate-from") {
+      const sourceId = actionData?.sourceInstallationId;
+      if (!sourceId) return { ok: false, message: "No source installation specified." };
+
+      const wantNodes = actionData?.customNodes === true;
+      const wantAllUserData = actionData?.allUserData === true;
+      const wantWorkflows = !wantAllUserData && actionData?.workflows === true;
+      const wantSettings = !wantAllUserData && actionData?.userSettings === true;
+      const wantModels = actionData?.models === true;
+      const wantInput = actionData?.input === true;
+      const wantOutput = actionData?.output === true;
+
+      const installations = require("../installations");
+      const srcInst = await installations.get(sourceId);
+      if (!srcInst) return { ok: false, message: "Source installation not found." };
+
+      const { listCustomNodes, findComfyUIDir, backupDir, mergeDirFlat } = require("../lib/migrate");
+
+      const srcComfyUI = findComfyUIDir(srcInst.installPath);
+      const dstComfyUI = path.join(installation.installPath, "ComfyUI");
+
+      if (!srcComfyUI) {
+        return { ok: false, message: t("migrate.noComfyUIDir") };
+      }
+
+      // Resolve shared vs local destinations for models/input/output
+      const settings = require("../settings");
+      const useShared = installation.useSharedPaths !== false;
+
+      const srcModels = path.join(srcComfyUI, "models");
+      const dstModels = useShared
+        ? (settings.get("modelsDirs") || settings.defaults.modelsDirs)[0]
+        : path.join(dstComfyUI, "models");
+      const srcInput = path.join(srcComfyUI, "input");
+      const dstInput = useShared
+        ? (settings.get("inputDir") || settings.defaults.inputDir)
+        : path.join(dstComfyUI, "input");
+      const srcOutput = path.join(srcComfyUI, "output");
+      const dstOutput = useShared
+        ? (settings.get("outputDir") || settings.defaults.outputDir)
+        : path.join(dstComfyUI, "output");
+
+      const srcCustomNodes = path.join(srcComfyUI, "custom_nodes");
+      const dstCustomNodes = path.join(dstComfyUI, "custom_nodes");
+      const srcWorkflows = path.join(srcComfyUI, "user", "default", "workflows");
+      const dstWorkflows = path.join(dstComfyUI, "user", "default", "workflows");
+      const srcUserDir = path.join(srcComfyUI, "user");
+
+      // Build step list based on selected categories
+      const steps = [{ phase: "migrate", label: t("migrate.filePhase") }];
+      if (wantNodes) steps.push({ phase: "deps", label: t("migrate.depsPhase") });
+      sendProgress("steps", { steps });
+
+      // Phase 1: File migration
+      sendProgress("migrate", { percent: 0, status: t("migrate.scanning") });
+
+      const srcNodes = wantNodes ? listCustomNodes(srcCustomNodes) : [];
+      const hasAllUserData = wantAllUserData && fs.existsSync(srcUserDir);
+      const hasWorkflows = wantWorkflows && fs.existsSync(srcWorkflows);
+      const hasModels = wantModels && fs.existsSync(srcModels);
+      const hasInput = wantInput && fs.existsSync(srcInput);
+      const hasOutput = wantOutput && fs.existsSync(srcOutput);
+
+      // Collect user profile settings files (e.g. user/default/comfy.settings.json)
+      const settingsFiles = [];
+      if (wantSettings && fs.existsSync(srcUserDir)) {
+        try {
+          for (const d of fs.readdirSync(srcUserDir, { withFileTypes: true })) {
+            if (d.isDirectory() && !d.name.startsWith("_")) {
+              const src = path.join(srcUserDir, d.name, "comfy.settings.json");
+              if (fs.existsSync(src)) {
+                settingsFiles.push({ profile: d.name, src, dst: path.join(dstComfyUI, "user", d.name, "comfy.settings.json") });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Each category counts as one unit for overall progress
+      const total = srcNodes.length + (hasAllUserData ? 1 : 0) + (hasWorkflows ? 1 : 0) + (settingsFiles.length > 0 ? 1 : 0) + (hasModels ? 1 : 0) + (hasInput ? 1 : 0) + (hasOutput ? 1 : 0);
+
+      if (total === 0) {
+        sendProgress("migrate", { percent: 100, status: t("migrate.nothingToMigrate") });
+        if (wantNodes) sendProgress("deps", { percent: 100, status: t("migrate.noDeps") });
+        sendProgress("done", { percent: 100, status: "Complete" });
+        return { ok: true, navigate: "detail" };
+      }
+
+      let migrated = 0;
+      const migratedNodes = [];
+      const backedUp = [];
+      const summary = [];
+
+      // Custom nodes (additive with backup per-node)
+      if (srcNodes.length > 0) {
+        fs.mkdirSync(dstCustomNodes, { recursive: true });
+        for (const node of srcNodes) {
+          const dstNodeDir = path.join(dstCustomNodes, node.name);
+          if (fs.existsSync(dstNodeDir)) {
+            const bak = backupDir(dstNodeDir);
+            if (bak) backedUp.push(node.name);
+          }
+          await copyDirWithProgress(node.dir, dstNodeDir, (copied, fileTotal) => {
+            const sub = fileTotal > 0 ? copied / fileTotal : 1;
+            const percent = Math.round(((migrated + sub) / total) * 100);
+            sendProgress("migrate", { percent, status: t("migrate.copyingNode", { name: node.name, current: migrated + 1, total }) });
+          });
+          migratedNodes.push(node);
+          migrated++;
+        }
+        summary.push(t("migrate.summaryNodes", { count: migratedNodes.length }));
+        if (backedUp.length > 0) summary.push(t("migrate.summaryBackedUp", { count: backedUp.length }));
+      }
+
+      // Full user directory (flat merge — replaces individual workflows/settings)
+      if (hasAllUserData) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingUserData") });
+        const dstUserDir = path.join(dstComfyUI, "user");
+        const result = await mergeDirFlat(srcUserDir, dstUserDir, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingUserData") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryUserData", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // Workflows only (flat merge, skipped when full user data is selected)
+      if (hasWorkflows) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingWorkflows") });
+        const result = await mergeDirFlat(srcWorkflows, dstWorkflows, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingWorkflows") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryWorkflows", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // User settings (copy comfy.settings.json per profile)
+      if (settingsFiles.length > 0) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.copyingSettings") });
+        let copied = 0;
+        for (const sf of settingsFiles) {
+          await fs.promises.mkdir(path.dirname(sf.dst), { recursive: true });
+          await fs.promises.copyFile(sf.src, sf.dst);
+          copied++;
+        }
+        migrated++;
+        summary.push(t("migrate.summarySettings", { count: copied }));
+      }
+
+      // Models (flat merge — skip existing files)
+      if (hasModels) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingModels") });
+        const result = await mergeDirFlat(srcModels, dstModels, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingModels") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryModels", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // Input (flat merge)
+      if (hasInput) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingInput") });
+        const result = await mergeDirFlat(srcInput, dstInput, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingInput") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryInput", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      // Output (flat merge)
+      if (hasOutput) {
+        sendProgress("migrate", { percent: Math.round((migrated / total) * 100), status: t("migrate.mergingOutput") });
+        const result = await mergeDirFlat(srcOutput, dstOutput, (copied, skipped, fileTotal) => {
+          const sub = fileTotal > 0 ? (copied + skipped) / fileTotal : 1;
+          const percent = Math.round(((migrated + sub) / total) * 100);
+          sendProgress("migrate", { percent, status: t("migrate.mergingOutput") });
+        });
+        migrated++;
+        summary.push(t("migrate.summaryOutput", { copied: result.copied, skipped: result.skipped }));
+      }
+
+      sendProgress("migrate", { percent: 100, status: t("common.done") });
+
+      // Phase 2: Dependency reconciliation (only if custom nodes were migrated)
+      if (wantNodes) {
+        sendProgress("deps", { percent: 0, status: t("migrate.checkingDeps") });
+
+        const nodesWithReqs = migratedNodes.filter((n) => n.hasRequirements);
+        if (nodesWithReqs.length === 0) {
+          sendProgress("deps", { percent: 100, status: t("migrate.noDeps") });
+        } else {
+          const uvPath = getUvPath(installation.installPath);
+          const activePython = getActivePythonPath(installation);
+
+          if (!fs.existsSync(uvPath) || !activePython) {
+            sendOutput(t("migrate.noUvOrPython") + "\n");
+            sendProgress("deps", { percent: 100, status: t("migrate.depsSkipped") });
+          } else {
+            const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;\[#]|$)/i;
+            let installed = 0;
+
+            for (const node of nodesWithReqs) {
+              const reqPath = path.join(dstCustomNodes, node.name, "requirements.txt");
+              sendProgress("deps", {
+                percent: Math.round((installed / nodesWithReqs.length) * 100),
+                status: t("migrate.installingNodeDeps", { name: node.name }),
+              });
+
+              try {
+                const reqContent = await fs.promises.readFile(reqPath, "utf-8");
+                const filtered = reqContent.split("\n").filter((l) => !PYTORCH_RE.test(l.trim())).join("\n");
+                const filteredReqPath = path.join(installation.installPath, `.migrate-reqs-${node.name}.txt`);
+                await fs.promises.writeFile(filteredReqPath, filtered, "utf-8");
+
+                try {
+                  const result = await new Promise((resolve) => {
+                    const proc = spawn(uvPath, ["pip", "install", "-r", filteredReqPath, "--python", activePython], {
+                      cwd: installation.installPath,
+                      stdio: ["ignore", "pipe", "pipe"],
+                      windowsHide: true,
+                    });
+                    proc.stdout.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+                    proc.stderr.on("data", (chunk) => sendOutput(chunk.toString("utf-8")));
+                    proc.on("error", (err) => {
+                      sendOutput(`Error: ${err.message}\n`);
+                      resolve(1);
+                    });
+                    proc.on("exit", (code) => resolve(code ?? 1));
+                  });
+
+                  if (result !== 0) {
+                    sendOutput(`\n⚠ ${node.name}: dependency install exited with code ${result}\n`);
+                  }
+                } finally {
+                  try { await fs.promises.unlink(filteredReqPath); } catch {}
+                }
+              } catch (err) {
+                sendOutput(`⚠ ${node.name}: ${err.message}\n`);
+              }
+
+              installed++;
+            }
+
+            sendProgress("deps", { percent: 100, status: t("migrate.depsComplete") });
+            summary.push(t("migrate.summaryDeps", { count: nodesWithReqs.length }));
+          }
+        }
+      }
+
+      sendProgress("done", { percent: 100, status: "Complete" });
+      sendOutput(`\n✓ ${t("migrate.complete")}: ${summary.join(", ")}\n`);
+
+      return { ok: true, navigate: "detail" };
+    }
+
     if (actionId === "env-create") {
       const envName = actionData?.env;
       if (!envName) return { ok: false, message: "No environment name provided." };
@@ -469,6 +986,42 @@ module.exports = {
       return { ok: true, navigate: "detail" };
     }
     return { ok: false, message: `Action "${actionId}" not yet implemented.` };
+  },
+
+  async fixupCopy(srcPath, destPath) {
+    const envsDir = path.join(destPath, ENVS_DIR);
+    if (!fs.existsSync(envsDir)) return;
+
+    for (const envName of listEnvs(destPath)) {
+      const envPath = path.join(envsDir, envName);
+
+      // Rewrite absolute paths in pyvenv.cfg to point to the new location
+      const cfgPath = path.join(envPath, "pyvenv.cfg");
+      if (fs.existsSync(cfgPath)) {
+        let content = await fs.promises.readFile(cfgPath, "utf-8");
+        content = content.replaceAll(srcPath, destPath);
+        await fs.promises.writeFile(cfgPath, content, "utf-8");
+      }
+
+      // Fix shebangs in bin/ scripts (Unix only)
+      if (process.platform !== "win32") {
+        const binDir = path.join(envPath, "bin");
+        if (fs.existsSync(binDir)) {
+          const entries = await fs.promises.readdir(binDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isFile()) continue;
+            const filePath = path.join(binDir, entry.name);
+            try {
+              let content = await fs.promises.readFile(filePath, "utf-8");
+              if (content.startsWith("#!") && content.includes(srcPath)) {
+                content = content.replaceAll(srcPath, destPath);
+                await fs.promises.writeFile(filePath, content, "utf-8");
+              }
+            } catch {}
+          }
+        }
+      }
+    }
   },
 
   async getFieldOptions(fieldId, selections, context) {

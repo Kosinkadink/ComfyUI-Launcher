@@ -4,8 +4,12 @@ const { spawn } = require("child_process");
 const { fetchJSON } = require("../lib/fetch");
 const { deleteAction, untrackAction } = require("../lib/actions");
 const { downloadAndExtract } = require("../lib/installer");
+const releaseCache = require("../lib/release-cache");
 const { parseArgs } = require("../lib/util");
 const { t } = require("../lib/i18n");
+const { truncateNotes } = require("../lib/comfyui-releases");
+
+const COMFYUI_REPO = "Comfy-Org/ComfyUI";
 
 function findPortableRoot(installPath) {
   // Content may be directly in installPath (tracked existing)
@@ -19,55 +23,6 @@ function findPortableRoot(installPath) {
     }
   }
   return null;
-}
-
-async function fetchLatestRelease(track) {
-  if (track === "latest") {
-    // "Latest on GitHub" pulls master, so compare against the latest master commit.
-    // Also fetch the latest stable tag so we can show "v0.14.1 + N commits".
-    const REPO = "Comfy-Org/ComfyUI";
-    const [commit, releases] = await Promise.all([
-      fetchJSON(`https://api.github.com/repos/${REPO}/commits/master`),
-      fetchJSON(`https://api.github.com/repos/${REPO}/releases?per_page=10`).catch(() => []),
-    ]);
-    if (!commit) return null;
-    const sha = commit.sha.slice(0, 7);
-    const date = commit.commit?.committer?.date;
-    const msg = commit.commit?.message?.split("\n")[0] || "";
-    const stable = releases.find((r) => !r.draft && !r.prerelease);
-    let label = sha;
-    if (stable) {
-      // Compare latest tag to master to get commit count ahead
-      try {
-        const cmp = await fetchJSON(`https://api.github.com/repos/${REPO}/compare/${stable.tag_name}...master`);
-        const ahead = cmp.ahead_by;
-        label = ahead > 0
-          ? `${stable.tag_name} + ${ahead} commit${ahead !== 1 ? "s" : ""} (${sha})`
-          : stable.tag_name;
-      } catch {
-        label = `${stable.tag_name}+ (${sha})`;
-      }
-    }
-    return {
-      tag_name: sha,
-      name: label,
-      body: msg || "",
-      html_url: commit.html_url,
-      published_at: date,
-      _commit: true,
-    };
-  }
-  // stable: first non-draft, non-prerelease
-  const releases = await fetchJSON(
-    "https://api.github.com/repos/Comfy-Org/ComfyUI/releases?per_page=30"
-  );
-  return releases.find((r) => !r.draft && !r.prerelease) || null;
-}
-
-function truncateNotes(text, maxLen) {
-  if (!text) return "";
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen) + "\n\n… (truncated)";
 }
 
 module.exports = {
@@ -97,8 +52,8 @@ module.exports = {
 
   getStatusTag(installation) {
     const track = installation.updateTrack || "stable";
-    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
-    if (info && info.available) {
+    const info = releaseCache.getEffectiveInfo(COMFYUI_REPO, track, installation);
+    if (info && releaseCache.isUpdateAvailable(installation, track, info)) {
       return { label: t("portable.updateAvailableTag", { version: info.releaseName || info.latestTag }), style: "update" };
     }
     return undefined;
@@ -157,7 +112,7 @@ module.exports = {
 
     // Updates section
     const track = installation.updateTrack || "stable";
-    const info = installation.updateInfoByTrack && installation.updateInfoByTrack[track];
+    const info = releaseCache.getEffectiveInfo(COMFYUI_REPO, track, installation);
     const updateFields = [
       { id: "updateTrack", label: t("portable.updateTrack"), value: track, editable: true,
         refreshSection: true, editType: "select", options: [
@@ -170,11 +125,11 @@ module.exports = {
         { label: t("portable.installedVersion"), value: info.installedTag || installation.version },
         { label: t("portable.latestVersion"), value: info.releaseName || info.latestTag || "—" },
         { label: t("portable.lastChecked"), value: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : "—" },
-        { label: t("portable.updateStatus"), value: info.available ? t("portable.updateAvailable") : t("portable.upToDate") },
+        { label: t("portable.updateStatus"), value: releaseCache.isUpdateAvailable(installation, track, info) ? t("portable.updateAvailable") : t("portable.upToDate") },
       );
     }
     const updateActions = [];
-    if (info && info.available) {
+    if (info && releaseCache.isUpdateAvailable(installation, track, info)) {
       const msgKey = track === "latest" ? "portable.updateConfirmMessageLatest" : "portable.updateConfirmMessage";
       const notes = truncateNotes(info.releaseNotes, 2000);
       updateActions.push({
@@ -253,30 +208,7 @@ module.exports = {
   async handleAction(actionId, installation, actionData, { update, sendProgress, sendOutput }) {
     if (actionId === "check-update") {
       const track = installation.updateTrack || "stable";
-      const release = await fetchLatestRelease(track);
-      if (!release) {
-        return { ok: false, message: "Could not fetch releases from GitHub." };
-      }
-      const installedTag = installation.version || "unknown";
-      const latestTag = release.tag_name;
-      const available = installedTag !== latestTag;
-      const existing = installation.updateInfoByTrack || {};
-      await update({
-        updateInfoByTrack: {
-          ...existing,
-          [track]: {
-            checkedAt: Date.now(),
-            installedTag,
-            latestTag,
-            available,
-            releaseName: release.name || latestTag,
-            releaseNotes: truncateNotes(release.body, 4000),
-            releaseUrl: release.html_url,
-            publishedAt: release.published_at,
-          },
-        },
-      });
-      return { ok: true, navigate: "detail" };
+      return releaseCache.checkForUpdate(COMFYUI_REPO, track, installation, update);
     }
 
     if (actionId === "update-comfyui") {
@@ -353,19 +285,14 @@ module.exports = {
       sendProgress("deps", { percent: -1, status: "Dependencies checked." });
 
       // Update installation metadata
+      const cachedRelease = releaseCache.get(COMFYUI_REPO, track) || {};
+      const latestTag = cachedRelease.latestTag || installation.version;
       const existing = installation.updateInfoByTrack || {};
-      const trackInfo = existing[track] || {};
-      const latestTag = trackInfo.latestTag || installation.version;
       await update({
         version: latestTag,
         updateInfoByTrack: {
           ...existing,
-          [track]: {
-            ...trackInfo,
-            available: false,
-            installedTag: latestTag,
-            checkedAt: Date.now(),
-          },
+          [track]: { installedTag: latestTag },
         },
       });
 
