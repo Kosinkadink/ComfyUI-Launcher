@@ -22,6 +22,7 @@ function createLauncherWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -161,6 +162,7 @@ function onLaunch({ port, url, process: proc, installation, mode }) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       partition: installation.browserPartition === "unique"
         ? `persist:${installation.id}`
         : "persist:shared",
