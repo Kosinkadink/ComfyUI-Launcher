@@ -440,6 +440,14 @@ window.Launcher.progress = {
         window.Launcher.clearActiveSession(installationId);
         window.Launcher.list.render();
 
+        // Window-mode launch: auto-close since there's nothing useful to show
+        if (result.mode === "window") {
+          if (this._isShowing(installationId)) {
+            window.Launcher.closeViewModal("progress");
+          }
+          return;
+        }
+
         if (!this._isShowing(installationId)) return;
 
         // Show success state instead of auto-closing

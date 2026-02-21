@@ -71,7 +71,7 @@ window.Launcher.modal = {
     });
   },
 
-  prompt({ title, message, placeholder = "", confirmLabel = "OK", required = false }) {
+  prompt({ title, message, placeholder = "", defaultValue = "", confirmLabel = "OK", required = false }) {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.className = "modal-overlay";
@@ -91,6 +91,9 @@ window.Launcher.modal = {
 
       const close = (result) => { overlay.remove(); resolve(result); };
       const input = box.querySelector(".modal-input");
+      if (defaultValue) {
+        input.value = defaultValue;
+      }
       const errorEl = box.querySelector(".modal-error");
 
       const trySubmit = () => {

@@ -236,6 +236,7 @@ window.Launcher.detail = {
         title: action.prompt.title || action.label,
         message: action.prompt.message || "",
         placeholder: action.prompt.placeholder || "",
+        defaultValue: action.prompt.defaultValue || "",
         confirmLabel: action.prompt.confirmLabel || action.label,
         required: action.prompt.required,
       });

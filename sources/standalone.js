@@ -6,6 +6,7 @@ const { truncateNotes } = require("../lib/comfyui-releases");
 const releaseCache = require("../lib/release-cache");
 const { deleteAction, untrackAction } = require("../lib/actions");
 const { downloadAndExtract, downloadAndExtractMulti } = require("../lib/installer");
+const { copyDirWithProgress } = require("../lib/copy");
 const { deleteDir } = require("../lib/delete");
 const { parseArgs, formatTime } = require("../lib/util");
 const { t } = require("../lib/i18n");
@@ -62,58 +63,6 @@ function findSitePackages(envRoot) {
     if (pyDir) return path.join(libDir, pyDir, "site-packages");
   } catch {}
   return null;
-}
-
-async function collectFiles(dir) {
-  const entries = [];
-  const stack = [dir];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    const items = await fs.promises.readdir(current, { withFileTypes: true });
-    for (const item of items) {
-      const full = path.join(current, item.name);
-      if (item.isDirectory()) {
-        stack.push(full);
-      } else {
-        entries.push(path.relative(dir, full));
-      }
-    }
-  }
-  return entries;
-}
-
-async function copyDirWithProgress(src, dest, onProgress) {
-  const files = await collectFiles(src);
-  const total = files.length;
-  let copied = 0;
-  const step = Math.max(1, Math.floor(total / 100));
-  const concurrency = 50;
-  const dirPromises = new Map();
-  const startTime = Date.now();
-
-  const ensureDir = (dir) => {
-    if (dirPromises.has(dir)) return dirPromises.get(dir);
-    const p = fs.promises.mkdir(dir, { recursive: true });
-    dirPromises.set(dir, p);
-    return p;
-  };
-
-  let i = 0;
-  while (i < files.length) {
-    const batch = files.slice(i, i + concurrency);
-    await Promise.all(batch.map(async (rel) => {
-      const destPath = path.join(dest, rel);
-      await ensureDir(path.dirname(destPath));
-      await fs.promises.copyFile(path.join(src, rel), destPath);
-      copied++;
-      if (onProgress && (copied % step === 0 || copied === total)) {
-        const elapsedSecs = (Date.now() - startTime) / 1000;
-        const etaSecs = copied > 0 ? elapsedSecs * ((total - copied) / copied) : -1;
-        onProgress(copied, total, elapsedSecs, etaSecs);
-      }
-    }));
-    i += concurrency;
-  }
 }
 
 async function codesignBinaries(dir) {
@@ -394,6 +343,16 @@ module.exports = {
           { id: "launch", label: t("actions.launch"), style: "primary", enabled: installed,
             ...(!installed && { disabledMessage: t("errors.installNotReady") }),
             showProgress: true, progressTitle: t("common.startingComfyUI"), cancellable: true },
+          { id: "copy", label: t("actions.copyInstallation"), style: "default", enabled: installed,
+            showProgress: true, progressTitle: t("actions.copyingInstallation"), cancellable: true,
+            prompt: {
+              title: t("actions.copyInstallationTitle"),
+              message: t("actions.copyInstallationMessage"),
+              defaultValue: `${installation.name} (Copy)`,
+              confirmLabel: t("actions.copyInstallationConfirm"),
+              required: true,
+              field: "name",
+            } },
           { id: "open-folder", label: t("actions.openDirectory"), style: "default", enabled: !!installation.installPath },
           deleteAction(installation),
           untrackAction(),
@@ -681,6 +640,41 @@ module.exports = {
       return { ok: true, navigate: "detail" };
     }
     return { ok: false, message: `Action "${actionId}" not yet implemented.` };
+  },
+
+  fixupCopy(srcPath, destPath) {
+    const envsDir = path.join(destPath, ENVS_DIR);
+    if (!fs.existsSync(envsDir)) return;
+
+    for (const envName of listEnvs(destPath)) {
+      const envPath = path.join(envsDir, envName);
+
+      // Rewrite absolute paths in pyvenv.cfg to point to the new location
+      const cfgPath = path.join(envPath, "pyvenv.cfg");
+      if (fs.existsSync(cfgPath)) {
+        let content = fs.readFileSync(cfgPath, "utf-8");
+        content = content.replaceAll(srcPath, destPath);
+        fs.writeFileSync(cfgPath, content, "utf-8");
+      }
+
+      // Fix shebangs in bin/ scripts (Unix only)
+      if (process.platform !== "win32") {
+        const binDir = path.join(envPath, "bin");
+        if (fs.existsSync(binDir)) {
+          for (const entry of fs.readdirSync(binDir, { withFileTypes: true })) {
+            if (!entry.isFile()) continue;
+            const filePath = path.join(binDir, entry.name);
+            try {
+              let content = fs.readFileSync(filePath, "utf-8");
+              if (content.startsWith("#!") && content.includes(srcPath)) {
+                content = content.replaceAll(srcPath, destPath);
+                fs.writeFileSync(filePath, content, "utf-8");
+              }
+            } catch {}
+          }
+        }
+      }
+    }
   },
 
   async getFieldOptions(fieldId, selections, context) {
