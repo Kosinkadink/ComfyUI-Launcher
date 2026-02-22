@@ -139,6 +139,7 @@
     "closeQuitMessage": "ComfyUI 实例仍在运行。退出将停止所有实例。",
     "closeQuitConfirm": "退出",
     "autoUpdate": "启动时检查更新",
+    "errorReporting": "发送匿名错误报告（需要重启）",
     "models": "共享模型",
     "downloads": "下载",
     "cacheDir": "缓存目录",
