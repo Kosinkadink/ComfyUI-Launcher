@@ -68,7 +68,7 @@ function handleDrop(e: DragEvent) {
     <div
       v-if="draggable"
       class="drag-handle"
-      title="Drag to reorder"
+      :title="$t('list.dragToReorder')"
       @mousedown="handleHandleMouseDown"
       @mouseup="handleHandleMouseUp"
     >

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useElectronApi } from '../composables/useElectronApi'
 import { useModal } from '../composables/useModal'
 import type { UpdateInfo, UpdateDownloadProgress } from '../types/ipc'
@@ -12,6 +13,7 @@ type UpdateState =
 
 const { api, listen } = useElectronApi()
 const modal = useModal()
+const { t } = useI18n()
 
 const state = ref<UpdateState | null>(null)
 const visible = ref(false)
@@ -24,13 +26,13 @@ const bannerMessage = computed<string>(() => {
   if (!state.value) return ''
   switch (state.value.type) {
     case 'available':
-      return boldify(`Update available: **v${state.value.version}**`)
+      return boldify(t('update.available', { version: state.value.version }))
     case 'downloading':
-      return `Downloading update\u2026 ${state.value.transferred} / ${state.value.total} MB (${Math.round(state.value.percent)}%)`
+      return t('update.downloading', { progress: `${state.value.transferred} / ${state.value.total} MB (${Math.round(state.value.percent)}%)` })
     case 'ready':
-      return boldify(`Update **v${state.value.version}** ready to install`)
+      return boldify(t('update.ready', { version: state.value.version }))
     case 'error':
-      return 'Update check failed'
+      return t('update.checkFailed')
   }
 })
 
@@ -56,7 +58,7 @@ function retry() {
 
 async function showErrorDetails(message: string) {
   await modal.alert({
-    title: 'Update Error',
+    title: t('update.updateError'),
     message,
   })
 }
@@ -102,23 +104,23 @@ onMounted(async () => {
     <div class="update-banner-actions">
       <!-- available -->
       <template v-if="state.type === 'available'">
-        <button class="primary" @click="download">Download</button>
-        <button @click="dismiss">Dismiss</button>
+        <button class="primary" @click="download">{{ $t('update.download') }}</button>
+        <button @click="dismiss">{{ $t('update.dismiss') }}</button>
       </template>
 
       <!-- downloading: no actions, just the message -->
 
       <!-- ready -->
       <template v-else-if="state.type === 'ready'">
-        <button class="primary" @click="install">Restart &amp; Update</button>
-        <button @click="dismiss">Later</button>
+        <button class="primary" @click="install">{{ $t('update.restartUpdate') }}</button>
+        <button @click="dismiss">{{ $t('update.later') }}</button>
       </template>
 
       <!-- error -->
       <template v-else-if="state.type === 'error'">
-        <button @click="showErrorDetails(state.message)">Details</button>
-        <button @click="retry">Retry</button>
-        <button @click="dismiss">Dismiss</button>
+        <button @click="showErrorDetails(state.message)">{{ $t('update.details') }}</button>
+        <button @click="retry">{{ $t('update.retry') }}</button>
+        <button @click="dismiss">{{ $t('update.dismiss') }}</button>
       </template>
     </div>
   </div>

@@ -146,7 +146,7 @@ onUnmounted(() => {
           @click="handleMessageClick"
         ></div>
         <div class="modal-actions">
-          <button @click="close(false)">Cancel</button>
+          <button @click="close(false)">{{ $t('common.cancel') }}</button>
           <button :class="state.confirmStyle" @click="close(true)">
             {{ state.confirmLabel }}
           </button>
@@ -164,7 +164,7 @@ onUnmounted(() => {
           </label>
         </div>
         <div class="modal-actions">
-          <button @click="close(null)">Cancel</button>
+          <button @click="close(null)">{{ $t('common.cancel') }}</button>
           <button
             :class="state.confirmStyle"
             :disabled="!anyChecked"
@@ -191,7 +191,7 @@ onUnmounted(() => {
         </div>
         <div v-if="error" class="modal-error">{{ error }}</div>
         <div class="modal-actions">
-          <button @click="close(null)">Cancel</button>
+          <button @click="close(null)">{{ $t('common.cancel') }}</button>
           <button class="primary" @click="submitPrompt">{{ state.confirmLabel }}</button>
         </div>
       </div>
@@ -214,7 +214,7 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="modal-actions">
-          <button @click="close(null)">Cancel</button>
+          <button @click="close(null)">{{ $t('common.cancel') }}</button>
         </div>
       </div>
     </div>

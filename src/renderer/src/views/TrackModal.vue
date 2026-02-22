@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, toRaw } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useModal } from '../composables/useModal'
 import type { ProbeResult } from '../types/ipc'
@@ -85,10 +85,11 @@ async function handleSave(): Promise<void> {
     trackName.value.trim() ||
     `ComfyUI (${selectedProbe.value.sourceLabel})`
 
+  const rawProbe = JSON.parse(JSON.stringify(toRaw(selectedProbe.value))) as Record<string, unknown>
   const data: Record<string, unknown> = {
     name,
     installPath: trackPath.value,
-    ...selectedProbe.value
+    ...rawProbe
   }
 
   const result = await window.api.trackInstallation(data)
@@ -132,13 +133,13 @@ defineExpose({ open })
         <div class="view-scroll">
           <!-- Track path -->
           <div class="field">
-            <label for="track-path">{{ $t('track.path') }}</label>
+            <label for="track-path">{{ $t('track.installDir') }}</label>
             <div class="path-input">
               <input
                 id="track-path"
                 type="text"
                 v-model="trackPath"
-                :placeholder="$t('track.pathPlaceholder')"
+                :placeholder="$t('track.selectDir')"
               />
               <button @click="handleBrowse">{{ $t('common.browse') }}</button>
             </div>
@@ -146,12 +147,12 @@ defineExpose({ open })
 
           <!-- Installation name -->
           <div class="field">
-            <label for="track-name">{{ $t('track.name') }}</label>
+            <label for="track-name">{{ $t('common.name') }}</label>
             <input
               id="track-name"
               type="text"
               v-model="trackName"
-              :placeholder="$t('track.namePlaceholder')"
+              :placeholder="$t('common.namePlaceholder')"
             />
           </div>
 
@@ -198,7 +199,7 @@ defineExpose({ open })
             :disabled="saveDisabled"
             @click="handleSave"
           >
-            {{ $t('track.save') }}
+            {{ $t('track.trackInstallation') }}
           </button>
         </div>
       </div>

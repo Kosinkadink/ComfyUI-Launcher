@@ -1,4 +1,5 @@
 import { reactive, readonly } from 'vue'
+import { i18n } from '../main'
 
 export type ModalType = 'alert' | 'confirm' | 'confirmWithOptions' | 'prompt' | 'select'
 
@@ -80,7 +81,7 @@ export function useModal() {
       state.type = 'alert'
       state.title = opts.title
       state.message = opts.message
-      state.buttonLabel = opts.buttonLabel ?? 'OK'
+      state.buttonLabel = opts.buttonLabel ?? i18n.global.t('modal.ok')
       state.resolve = () => resolve()
     })
   }
@@ -97,7 +98,7 @@ export function useModal() {
       state.type = 'confirm'
       state.title = opts.title
       state.message = opts.message
-      state.confirmLabel = opts.confirmLabel ?? 'Confirm'
+      state.confirmLabel = opts.confirmLabel ?? i18n.global.t('modal.confirm')
       state.confirmStyle = opts.confirmStyle ?? 'danger'
       state.resolve = resolve as (value: unknown) => void
     })
