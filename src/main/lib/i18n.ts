@@ -10,7 +10,7 @@ interface LocaleInfo {
   label: string
 }
 
-const localesDir = path.join(__dirname, '..', '..', '..', 'locales')
+const localesDir = path.join(__dirname, '..', '..', 'locales')
 
 let currentLocale = 'en'
 let fallback: Messages = {}
