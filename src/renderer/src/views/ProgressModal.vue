@@ -55,6 +55,7 @@ const operations = reactive(new Map<string, Operation>())
 
 const currentId = ref<string | null>(null)
 const terminalRef = ref<HTMLDivElement | null>(null)
+const isTerminalAtBottom = ref(true)
 
 const currentOp = computed(() => {
   const id = currentId.value ?? props.installationId
@@ -64,15 +65,19 @@ const currentOp = computed(() => {
 
 const displayId = computed(() => currentId.value ?? props.installationId)
 
+function handleTerminalScroll(): void {
+  if (!terminalRef.value) return
+  const el = terminalRef.value
+  isTerminalAtBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+}
+
 // Auto-scroll terminal
 watch(
   () => currentOp.value?.terminalOutput,
   async () => {
+    if (!isTerminalAtBottom.value) return
     await nextTick()
-    if (!terminalRef.value) return
-    const el = terminalRef.value
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30
-    if (atBottom) el.scrollTop = el.scrollHeight
+    if (terminalRef.value) terminalRef.value.scrollTop = terminalRef.value.scrollHeight
   }
 )
 
@@ -80,7 +85,10 @@ watch(
 watch(
   () => props.installationId,
   (id) => {
-    if (id) currentId.value = id
+    if (id) {
+      currentId.value = id
+      isTerminalAtBottom.value = true
+    }
   },
   { immediate: true }
 )
@@ -539,6 +547,7 @@ defineExpose({ startOperation, showOperation, getProgressInfo, operations })
           id="progress-terminal"
           ref="terminalRef"
           class="terminal-output"
+          @scroll="handleTerminalScroll"
         >{{ currentOp.terminalOutput }}</div>
       </div>
     </div>
