@@ -1,4 +1,4 @@
-appId: com.kosinkadink.comfyui-launcher
+appId: org.comfy.comfyui-launcher
 productName: ComfyUI Launcher
 directories:
   buildResources: resources
@@ -16,7 +16,7 @@ asarUnpack:
   - node_modules/7zip-bin/**/*
 publish:
   provider: github
-  owner: Kosinkadink
+  owner: Comfy-Org
   repo: ComfyUI-Launcher
 artifactName: ComfyUI-Launcher-${version}-${os}-${arch}.${ext}
 win:
