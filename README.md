@@ -75,7 +75,7 @@ sources/         # Installation source plugins
 ### Setup
 
 ```bash
-git clone https://github.com/Kosinkadink/ComfyUI-Launcher.git
+git clone https://github.com/Comfy-Org/ComfyUI-Launcher.git
 cd ComfyUI-Launcher
 npm install
 ```

@@ -6,7 +6,7 @@
     "name": "Jedrzej Kosinski",
     "email": "kosinkadink@users.noreply.github.com"
   },
-  "repository": "github:Kosinkadink/ComfyUI-Launcher",
+  "repository": "github:Comfy-Org/ComfyUI-Launcher",
   "engines": {
     "node": ">=22"
   },
