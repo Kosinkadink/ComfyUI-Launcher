@@ -206,7 +206,7 @@ let _onStop: StopCallback | null = null
 let _onComfyExited: ExitCallback | null = null
 let _onComfyRestarted: RestartCallback | null = null
 let _onLocaleChanged: LocaleCallback | null = null
-let _detectedGPU: GpuInfo | null | undefined = undefined
+let _gpuPromise: Promise<GpuInfo | null> | null = null
 
 const _operationAborts = new Map<string, AbortController>()
 const _runningSessions = new Map<string, SessionInfo>()
@@ -338,7 +338,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   )
 
   ipcMain.handle('get-field-options', async (_event, sourceId: string, fieldId: string, selections: Record<string, unknown>) => {
-    const gpu = _detectedGPU === undefined ? null : _detectedGPU
+    const gpu = _gpuPromise ? await _gpuPromise : null
     const options = await resolveSource(sourceId).getFieldOptions(
       fieldId,
       selections as Record<string, FieldOption | undefined>,
@@ -348,8 +348,10 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   })
 
   ipcMain.handle('detect-gpu', async () => {
-    if (_detectedGPU === undefined) _detectedGPU = await detectGPU()
-    return _detectedGPU
+    if (!_gpuPromise) {
+      _gpuPromise = detectGPU().catch(() => null)
+    }
+    return _gpuPromise
   })
 
   ipcMain.handle('build-installation', (_event, sourceId: string, selections: Record<string, unknown>) => {

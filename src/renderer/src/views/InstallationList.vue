@@ -250,7 +250,7 @@ defineExpose({ refresh })
         :class="{ active: filter === f }"
         @click="setFilter(f)"
       >
-        {{ filterLabel(f) }}<span v-if="filterStats[f].count > 0" class="filter-count" :class="{ 'has-new': filterStats[f].hasNew }">{{ filterStats[f].count }}</span>
+        {{ filterLabel(f) }}<span v-if="filterStats[f]?.count" class="filter-count" :class="{ 'has-new': filterStats[f]?.hasNew }">{{ filterStats[f]?.count }}</span>
       </button>
     </div>
 

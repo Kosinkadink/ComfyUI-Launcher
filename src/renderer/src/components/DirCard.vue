@@ -8,7 +8,6 @@ interface Props {
 defineProps<Props>()
 
 const emit = defineEmits<{
-  browse: []
   remove: []
   'make-primary': []
   open: []
