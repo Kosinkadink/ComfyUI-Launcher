@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '../stores/sessionStore'
 import { useInstallationStore } from '../stores/installationStore'
 import { useModal } from '../composables/useModal'
 import { useProgressStore } from '../stores/progressStore'
+import { DraggableList } from '../lib/draggableList'
 import InstanceCard from '../components/InstanceCard.vue'
 import type { Installation, ListAction } from '../types/ipc'
 
@@ -16,7 +17,6 @@ const modal = useModal()
 
 const filter = ref('all')
 const listActions = ref(new Map<string, ListAction[]>())
-const dragSrcId = ref<string | null>(null)
 
 const cardProgress = computed(() => {
   const map = new Map<string, { status: string; percent: number }>()
@@ -138,22 +138,47 @@ async function handleListAction(inst: Installation, action: ListAction): Promise
   }
 }
 
-function handleDragStart(installationId: string): void {
-  dragSrcId.value = installationId
+// --- Drag-to-reorder ---
+const listContainerRef = useTemplateRef<HTMLElement>('listContainer')
+let draggableList: DraggableList | null = null
+
+function initDraggable(): void {
+  draggableList?.dispose()
+  draggableList = null
+  if (!listContainerRef.value) return
+  draggableList = new DraggableList(
+    listContainerRef.value,
+    '.instance-card',
+    { onReorder: handleReorder }
+  )
 }
 
-function handleDrop(targetId: string): void {
-  if (!dragSrcId.value || dragSrcId.value === targetId) return
+async function handleReorder(oldIndex: number, newIndex: number): Promise<void> {
+  const visible = filteredInstallations.value
+  const movedId = visible[oldIndex]?.id
+  const targetId = visible[newIndex]?.id
+  if (!movedId || !targetId || movedId === targetId) return
   const ids = installationStore.installations.map((i) => i.id)
-  const fromIdx = ids.indexOf(dragSrcId.value)
+  const fromIdx = ids.indexOf(movedId)
   const toIdx = ids.indexOf(targetId)
   if (fromIdx === -1 || toIdx === -1) return
   const moved = ids.splice(fromIdx, 1)[0]
   if (moved) ids.splice(toIdx, 0, moved)
-  window.api.reorderInstallations(ids)
+  // Optimistically reorder the store so Vue re-renders before next paint
+  const byId = new Map(installationStore.installations.map((i) => [i.id, i]))
+  installationStore.installations = ids.map((id) => byId.get(id)!).filter(Boolean)
+  await window.api.reorderInstallations(ids)
   refresh()
-  dragSrcId.value = null
 }
+
+watch(
+  () => filteredInstallations.value.map((i) => i.id).join('|'),
+  () => initDraggable(),
+  { flush: 'post' }
+)
+
+onMounted(() => initDraggable())
+onBeforeUnmount(() => draggableList?.dispose())
 
 function markSeen(inst: Installation): void {
   if (inst.seen === false) {
@@ -219,7 +244,7 @@ defineExpose({ refresh })
     </div>
 
     <div class="view-list-scroll">
-      <div class="instance-list">
+      <div ref="listContainer" class="instance-list">
         <!-- Empty: has local but filtered out -->
         <div v-if="filteredInstallations.length === 0 && hasLocal" class="empty-state">
           {{ $t('list.emptyFilter') }}
@@ -241,8 +266,6 @@ defineExpose({ refresh })
           :installation-id="inst.id"
           :name="inst.name"
           :draggable="true"
-          @dragstart="handleDragStart(inst.id)"
-          @drop="handleDrop(inst.id)"
           @mousedown="markSeen(inst)"
         >
           <template #meta>
