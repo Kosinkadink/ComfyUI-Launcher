@@ -600,13 +600,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         ],
       },
       {
-        title: i18n.t('settings.sharedDirs'),
-        fields: [
-          { id: 'inputDir', label: i18n.t('settings.inputDir'), type: 'path', value: s.inputDir || settings.defaults.inputDir, openable: true },
-          { id: 'outputDir', label: i18n.t('settings.outputDir'), type: 'path', value: s.outputDir || settings.defaults.outputDir, openable: true },
-        ],
-      },
-      {
         title: i18n.t('settings.downloads'),
         fields: [
           { id: 'cacheDir', label: i18n.t('settings.cacheDir'), type: 'path', value: s.cacheDir, openable: true },
@@ -652,7 +645,21 @@ export function register(callbacks: RegisterCallbacks = {}): void {
           ],
         },
       ],
+
     }
+  })
+
+  ipcMain.handle('get-media-sections', () => {
+    const s = settings.getAll()
+    return [
+      {
+        title: i18n.t('media.sharedDirs'),
+        fields: [
+          { id: 'inputDir', label: i18n.t('media.inputDir'), type: 'path' as const, value: s.inputDir || settings.defaults.inputDir, openable: true },
+          { id: 'outputDir', label: i18n.t('media.outputDir'), type: 'path' as const, value: s.outputDir || settings.defaults.outputDir, openable: true },
+        ],
+      },
+    ]
   })
 
   ipcMain.handle('set-setting', (_event, key: string, value: unknown) => {

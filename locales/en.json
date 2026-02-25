@@ -26,6 +26,13 @@
     "showWindow": "Show Window"
   },
 
+  "media": {
+    "title": "Media",
+    "sharedDirs": "Shared Directories",
+    "inputDir": "Input Directory",
+    "outputDir": "Output Directory"
+  },
+
   "models": {
     "title": "Models",
     "directories": "Shared Directories",
@@ -161,10 +168,7 @@
     "about": "About",
     "version": "Version",
     "platform": "Platform",
-    "language": "Language",
-    "sharedDirs": "Shared Directories",
-    "inputDir": "Input Directory",
-    "outputDir": "Output Directory"
+    "language": "Language"
   },
 
   "update": {

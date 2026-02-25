@@ -54,6 +54,7 @@ const api: ElectronApi = {
   // Settings
   getSettingsSections: () => ipcRenderer.invoke('get-settings-sections'),
   getModelsSections: () => ipcRenderer.invoke('get-models-sections'),
+  getMediaSections: () => ipcRenderer.invoke('get-media-sections'),
   setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
   getSetting: (key) => ipcRenderer.invoke('get-setting', key),
 

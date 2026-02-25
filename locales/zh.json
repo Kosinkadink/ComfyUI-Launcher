@@ -25,6 +25,13 @@
     "showWindow": "显示窗口"
   },
 
+  "media": {
+    "title": "媒体",
+    "sharedDirs": "共享目录",
+    "inputDir": "输入目录",
+    "outputDir": "输出目录"
+  },
+
   "models": {
     "title": "模型",
     "directories": "共享目录",
@@ -159,10 +166,7 @@
     "about": "关于",
     "version": "版本",
     "platform": "平台",
-    "language": "语言",
-    "sharedDirs": "共享目录",
-    "inputDir": "输入目录",
-    "outputDir": "输出目录"
+    "language": "语言"
   },
 
   "update": {

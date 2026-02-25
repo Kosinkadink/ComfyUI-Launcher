@@ -15,6 +15,7 @@ import InstallationList from './views/InstallationList.vue'
 import RunningView from './views/RunningView.vue'
 import SettingsView from './views/SettingsView.vue'
 import ModelsView from './views/ModelsView.vue'
+import MediaView from './views/MediaView.vue'
 import DetailModal from './views/DetailModal.vue'
 import ConsoleModal from './views/ConsoleModal.vue'
 import ProgressModal from './views/ProgressModal.vue'
@@ -22,7 +23,7 @@ import NewInstallModal from './views/NewInstallModal.vue'
 import TrackModal from './views/TrackModal.vue'
 
 // Lucide icons
-import { LayoutDashboard, Box, Play, FolderOpen, Settings } from 'lucide-vue-next'
+import { LayoutDashboard, Box, Play, FolderOpen, Image, Settings } from 'lucide-vue-next'
 
 const { t, setLocaleMessage, locale } = useI18n()
 const sessionStore = useSessionStore()
@@ -32,7 +33,7 @@ const modal = useModal()
 useTheme()
 
 // --- View state ---
-type TabView = 'dashboard' | 'list' | 'running' | 'models' | 'settings'
+type TabView = 'dashboard' | 'list' | 'running' | 'models' | 'media' | 'settings'
 const activeView = ref<TabView>('dashboard')
 
 // --- Modal views ---
@@ -46,6 +47,7 @@ const showTrack = ref(false)
 const listRef = ref<InstanceType<typeof InstallationList> | null>(null)
 const settingsRef = ref<InstanceType<typeof SettingsView> | null>(null)
 const modelsRef = ref<InstanceType<typeof ModelsView> | null>(null)
+const mediaRef = ref<InstanceType<typeof MediaView> | null>(null)
 const progressRef = ref<InstanceType<typeof ProgressModal> | null>(null)
 const newInstallRef = ref<InstanceType<typeof NewInstallModal> | null>(null)
 const trackRef = ref<InstanceType<typeof TrackModal> | null>(null)
@@ -56,6 +58,7 @@ const sidebarItems = computed(() => [
   { key: 'list' as const, icon: Box, labelKey: 'sidebar.installations' },
   { key: 'running' as const, icon: Play, labelKey: 'sidebar.running' },
   { key: 'models' as const, icon: FolderOpen, labelKey: 'models.title' },
+  { key: 'media' as const, icon: Image, labelKey: 'media.title' },
   { key: 'settings' as const, icon: Settings, labelKey: 'settings.title' },
 ])
 
@@ -64,6 +67,7 @@ function switchView(view: TabView): void {
   if (view === 'list') listRef.value?.refresh()
   else if (view === 'settings') settingsRef.value?.loadSettings()
   else if (view === 'models') modelsRef.value?.loadModels()
+  else if (view === 'media') mediaRef.value?.loadMedia()
 }
 
 // --- Modal handlers ---
@@ -243,6 +247,11 @@ onMounted(async () => {
       <ModelsView
         v-show="activeView === 'models'"
         ref="modelsRef"
+      />
+
+      <MediaView
+        v-show="activeView === 'media'"
+        ref="mediaRef"
       />
 
       <SettingsView
