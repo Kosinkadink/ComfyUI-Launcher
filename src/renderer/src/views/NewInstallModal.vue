@@ -109,12 +109,11 @@ function rawSelections(): Record<string, FieldOption> {
   return result
 }
 
-let gpuPromise: Promise<string> | null = null
 let installDirPromise: Promise<string> | null = null
 let sourcesPromise: Promise<Source[]> | null = null
 
 onMounted(() => {
-  gpuPromise = window.api
+  window.api
     .detectGPU()
     .then((gpu) => {
       if (gpu) {
@@ -122,11 +121,9 @@ onMounted(() => {
       } else {
         detectedGpu.value = t('newInstall.noGpuDetected')
       }
-      return detectedGpu.value
     })
     .catch(() => {
       detectedGpu.value = t('newInstall.noGpuDetected')
-      return detectedGpu.value
     })
 
   installDirPromise = window.api.getDefaultInstallDir().catch(() => '')
@@ -148,11 +145,7 @@ async function open(): Promise<void> {
 
   detectedGpu.value = t('newInstall.detectingGpu')
 
-  const [, , installDir] = await Promise.all([
-    loadSources(),
-    gpuPromise,
-    installDirPromise
-  ])
+  const [, installDir] = await Promise.all([loadSources(), installDirPromise])
 
   instPath.value = installDir ?? ''
 
