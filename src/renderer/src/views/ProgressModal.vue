@@ -137,7 +137,8 @@ function startOperation(opts: {
   currentId.value = installationId
 
   sessionStore.startSession(installationId)
-  sessionStore.setActiveSession(installationId, title || t('progress.working'))
+  const sessionLabel = title.split(' — ')[0] || t('progress.working')
+  sessionStore.setActiveSession(installationId, sessionLabel)
 
   const op: Operation = {
     title: title || t('progress.working'),

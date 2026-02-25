@@ -106,6 +106,8 @@ function showProgress(opts: {
   cancellable?: boolean
   returnTo?: string
 }): void {
+  // Close any open modal so they don't stack visually
+  if (opts.returnTo === 'detail') closeDetail()
   progressInstallationId.value = opts.installationId
   // If an in-progress operation already exists for this ID, just show it
   const existingOp = progressRef.value?.operations.get(opts.installationId)
@@ -120,6 +122,10 @@ function showProgress(opts: {
     cancellable: opts.cancellable,
     returnTo: opts.returnTo,
   })
+}
+
+function getProgressInfo(id: string): { status: string; percent: number } | null {
+  return progressRef.value?.getProgressInfo(id) ?? null
 }
 
 function closeProgress(): void {
@@ -207,6 +213,7 @@ onMounted(async () => {
       <InstallationList
         v-show="activeView === 'list'"
         ref="listRef"
+        :get-progress-info="getProgressInfo"
         @show-detail="openDetail"
         @show-console="openConsole"
         @show-progress="showProgress"
@@ -220,6 +227,7 @@ onMounted(async () => {
 
       <RunningView
         v-show="activeView === 'running'"
+        :get-progress-info="getProgressInfo"
         @show-detail="openDetail"
         @show-console="openConsole"
         @show-progress="showProgress"

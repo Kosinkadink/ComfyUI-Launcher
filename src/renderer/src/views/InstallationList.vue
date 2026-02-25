@@ -7,6 +7,14 @@ import { useModal } from '../composables/useModal'
 import InstanceCard from '../components/InstanceCard.vue'
 import type { Installation, ListAction } from '../types/ipc'
 
+interface Props {
+  getProgressInfo?: (id: string) => { status: string; percent: number } | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  getProgressInfo: undefined,
+})
+
 const { t } = useI18n()
 const sessionStore = useSessionStore()
 const installationStore = useInstallationStore()
@@ -15,6 +23,16 @@ const modal = useModal()
 const filter = ref('all')
 const listActions = ref(new Map<string, ListAction[]>())
 const dragSrcId = ref<string | null>(null)
+
+const cardProgress = computed(() => {
+  const map = new Map<string, { status: string; percent: number }>()
+  if (!props.getProgressInfo) return map
+  for (const inst of installationStore.installations) {
+    const info = props.getProgressInfo(inst.id)
+    if (info) map.set(inst.id, info)
+  }
+  return map
+})
 
 const filteredInstallations = computed(() => {
   if (filter.value === 'all') return installationStore.installations
@@ -245,6 +263,21 @@ defineExpose({ refresh })
 
           <template #extra-info>
             <div v-if="getLaunchMeta(inst)" class="instance-meta">{{ getLaunchMeta(inst) }}</div>
+            <div
+              v-if="cardProgress.get(inst.id)"
+              class="card-progress"
+            >
+              <div class="card-progress-status">{{ cardProgress.get(inst.id)!.status }}</div>
+              <div class="card-progress-track">
+                <div
+                  class="card-progress-fill"
+                  :class="{ indeterminate: cardProgress.get(inst.id)!.percent < 0 }"
+                  :style="cardProgress.get(inst.id)!.percent >= 0
+                    ? { width: cardProgress.get(inst.id)!.percent + '%' }
+                    : { width: '100%' }"
+                ></div>
+              </div>
+            </div>
           </template>
 
           <template #actions>

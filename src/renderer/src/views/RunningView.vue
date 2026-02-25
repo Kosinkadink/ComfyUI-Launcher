@@ -6,6 +6,14 @@ import { useInstallationStore } from '../stores/installationStore'
 import InstanceCard from '../components/InstanceCard.vue'
 import type { Installation } from '../types/ipc'
 
+interface Props {
+  getProgressInfo?: (id: string) => { status: string; percent: number } | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  getProgressInfo: undefined,
+})
+
 const { t } = useI18n()
 const sessionStore = useSessionStore()
 const installationStore = useInstallationStore()
@@ -15,6 +23,16 @@ const instMap = computed(() => {
   for (const inst of installationStore.installations) {
     map.set(inst.id, inst)
   }
+  return map
+})
+
+const cardProgress = computed(() => {
+  const map = new Map<string, { status: string; percent: number }>()
+  if (!props.getProgressInfo) return map
+  sessionStore.activeSessions.forEach((_session, id) => {
+    const info = props.getProgressInfo!(id)
+    if (info) map.set(id, info)
+  })
   return map
 })
 
@@ -247,6 +265,20 @@ const emit = defineEmits<{
                   <span v-if="part.class" :class="part.class">{{ part.text }}</span>
                   <template v-else>{{ part.text }}</template>
                 </template>
+              </template>
+              <template v-if="cardProgress.get(installationId)" #extra-info>
+                <div class="card-progress">
+                  <div class="card-progress-status">{{ cardProgress.get(installationId)!.status }}</div>
+                  <div class="card-progress-track">
+                    <div
+                      class="card-progress-fill"
+                      :class="{ indeterminate: cardProgress.get(installationId)!.percent < 0 }"
+                      :style="cardProgress.get(installationId)!.percent >= 0
+                        ? { width: cardProgress.get(installationId)!.percent + '%' }
+                        : { width: '100%' }"
+                    ></div>
+                  </div>
+                </div>
               </template>
               <template #actions>
                 <button
