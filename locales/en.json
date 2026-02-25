@@ -299,6 +299,8 @@
     "deleteEnvConfirmTitle": "Delete Environment",
     "deleteEnvConfirmMessage": "Delete environment \"{env}\"? This cannot be undone.",
     "setupEnv": "Set up environment",
+    "cleanupEnv": "Clean up environment",
+    "cleanupEnvStatus": "Removing redundant packages from template environment…",
     "updates": "Updates",
     "updateTrack": "Update Track",
     "trackStable": "Stable",

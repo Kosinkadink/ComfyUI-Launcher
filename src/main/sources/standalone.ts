@@ -97,6 +97,26 @@ async function codesignBinaries(dir: string): Promise<void> {
   }
 }
 
+const BULKY_PREFIXES = ['torch', 'nvidia', 'triton', 'cuda']
+
+async function stripMasterPackages(installPath: string): Promise<void> {
+  try {
+    const sitePackages = findSitePackages(path.join(installPath, 'standalone-env'))
+    if (!sitePackages || !fs.existsSync(sitePackages)) return
+
+    const entries = await fs.promises.readdir(sitePackages, { withFileTypes: true })
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const lower = entry.name.toLowerCase()
+      if (BULKY_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
+        await fs.promises.rm(path.join(sitePackages, entry.name), { recursive: true, force: true })
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to strip master packages:', err)
+  }
+}
+
 async function createEnv(
   installPath: string,
   envName: string,
@@ -226,6 +246,7 @@ export const standalone: SourcePlugin = {
       { phase: 'download', label: t('common.download') },
       { phase: 'extract', label: t('common.extract') },
       { phase: 'setup', label: t('standalone.setupEnv') },
+      { phase: 'cleanup', label: t('standalone.cleanupEnv') },
     ]
   },
 
@@ -500,6 +521,8 @@ export const standalone: SourcePlugin = {
     })
     const envMethods = { ...(installation.envMethods as Record<string, string> | undefined), [DEFAULT_ENV]: ENV_METHOD }
     await update({ envMethods })
+    sendProgress('cleanup', { percent: -1, status: t('standalone.cleanupEnvStatus') })
+    await stripMasterPackages(installation.installPath)
   },
 
   probeInstallation(dirPath: string): Record<string, unknown> | null {
