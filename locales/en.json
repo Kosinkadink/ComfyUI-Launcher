@@ -1,6 +1,14 @@
 {
   "_label": "English",
 
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to ComfyUI",
+    "welcomeDesc": "Get started by installing ComfyUI on your machine.",
+    "installComfyUI": "Install ComfyUI",
+    "primaryInstall": "Primary Installation"
+  },
+
   "sidebar": {
     "installations": "Installations",
     "running": "Running"

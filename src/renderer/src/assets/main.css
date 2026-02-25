@@ -472,6 +472,30 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   background-size: 200% 100%;
 }
 
+/* Dashboard */
+.dashboard-welcome {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 80px 20px;
+}
+.dashboard-welcome-icon { color: var(--text-faint); margin-bottom: 20px; }
+.dashboard-welcome-title { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.dashboard-welcome-desc { font-size: 16px; color: var(--text-muted); margin-bottom: 28px; max-width: 400px; }
+.dashboard-cta-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; font-size: 15px; }
+.dashboard-section-label {
+  font-size: 13px; font-weight: 600; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+}
+.dashboard-primary-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.dashboard-primary-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.dashboard-primary-name { font-size: 20px; font-weight: 600; }
+.dashboard-primary-meta { font-size: 14px; color: var(--text-muted); }
+.dashboard-primary-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: 16px; }
+
 /* Model directory cards */
 .dir-card-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .dir-card {
