@@ -6,11 +6,11 @@
     "welcome": "Welcome to ComfyUI",
     "welcomeDesc": "Get started by installing ComfyUI on your machine.",
     "installComfyUI": "Install ComfyUI",
-    "primaryInstall": "Primary Installation"
+    "primaryInstall": "Primary Install"
   },
 
   "sidebar": {
-    "installations": "Installations",
+    "installations": "Installs",
     "running": "Running"
   },
 
@@ -36,7 +36,7 @@
   "models": {
     "title": "Models",
     "directories": "Shared Directories",
-    "directoriesDesc": "Directories shared across all installations. The first directory is the primary (default for ComfyUI).",
+    "directoriesDesc": "Directories shared across all installs. The first directory is the primary (default for ComfyUI).",
     "addDir": "Add Directory",
     "removeDir": "Remove",
     "primary": "primary",
@@ -50,7 +50,7 @@
     "cancel": "Cancel",
     "name": "Name",
     "namePlaceholder": "e.g. ComfyUI Main",
-    "installInfo": "Installation Info",
+    "installInfo": "Install Info",
     "installMethod": "Install Method",
     "release": "Release",
     "location": "Location",
@@ -76,12 +76,12 @@
   },
 
   "list": {
-    "title": "Installations",
+    "title": "Installs",
     "trackExisting": "Track Existing",
     "newInstall": "New Install",
-    "empty": "No installations yet.",
+    "empty": "No installs yet.",
     "emptyHint": "Install or track an existing version of ComfyUI.",
-    "emptyFilter": "No installations match this filter.",
+    "emptyFilter": "No installs match this filter.",
 
     "view": "Manage",
     "new": "New",
@@ -96,10 +96,10 @@
   },
 
   "newInstall": {
-    "title": "New Installation",
+    "title": "New Install",
     "installMethod": "Install Method",
     "installLocation": "Install Location",
-    "addInstallation": "Add Installation",
+    "addInstallation": "Add Install",
     "loading": "Loading…",
     "detectingGpu": "Detecting GPU…",
     "detectedGpu": "Detected GPU: {label}",
@@ -111,14 +111,14 @@
   "detail": {},
 
   "track": {
-    "title": "Track Existing Installation",
-    "installDir": "Installation Directory",
+    "title": "Track Existing Install",
+    "installDir": "Install Directory",
     "selectDir": "Select a directory…",
     "detectedType": "Detected Type",
     "browseDirFirst": "Browse to a directory first",
     "detecting": "Detecting…",
-    "noDetected": "No known installation detected",
-    "trackInstallation": "Track Installation",
+    "noDetected": "No known install detected",
+    "trackInstallation": "Track Install",
     "cannotTrack": "Cannot Track",
     "version": "Version",
     "repository": "Repository",
@@ -205,18 +205,18 @@
     "checkForUpdate": "Check for Update",
     "featureNotImplemented": "This feature is not yet implemented.",
     "updateAvailable": "Update Available",
-    "copyInstallation": "Copy Installation",
-    "copyInstallationTitle": "Copy Installation",
+    "copyInstallation": "Copy Install",
+    "copyInstallationTitle": "Copy Install",
     "copyInstallationMessage": "Enter a name for the copy. It will be created next to the original.",
     "copyInstallationConfirm": "Copy",
-    "copyingInstallation": "Copying Installation",
+    "copyingInstallation": "Copying Install",
     "copyingFiles": "Copying files…",
-    "delete": "Delete Installation",
-    "deleteConfirmTitle": "Delete Installation",
-    "deleteConfirmMessage": "This will permanently delete the installation and all its files. This cannot be undone.",
+    "delete": "Delete Install",
+    "deleteConfirmTitle": "Delete Install",
+    "deleteConfirmMessage": "This will permanently delete the install and all its files. This cannot be undone.",
     "untrack": "Untrack",
-    "untrackConfirmTitle": "Untrack Installation",
-    "untrackConfirmMessage": "This will remove the installation from the launcher. The files will not be deleted."
+    "untrackConfirmTitle": "Untrack Install",
+    "untrackConfirmMessage": "This will remove the install from the launcher. The files will not be deleted."
   },
 
   "migrate": {
@@ -224,20 +224,20 @@
     "migrating": "Migrating",
     "migrateConfirm": "Migrate",
     "selectSource": "Migrate From",
-    "selectSourceMessage": "Select a source installation to migrate from.",
+    "selectSourceMessage": "Select a source install to migrate from.",
     "confirmTitle": "Migrate Data",
-    "confirmMessage": "Select what to migrate from the source installation.\n\nCustom nodes are copied additively (existing nodes backed up). Models, input, and output use flat merge (existing files are skipped).",
+    "confirmMessage": "Select what to migrate from the source install.\n\nCustom nodes are copied additively (existing nodes backed up). Models, input, and output use flat merge (existing files are skipped).",
     "optCustomNodes": "Custom Nodes",
     "optWorkflows": "Saved Workflows",
     "optUserSettings": "User Settings (replaces existing)",
     "optModels": "Models",
     "optInput": "Input",
     "optOutput": "Output",
-    "noInstallations": "No other installations available to migrate from.",
-    "noComfyUIDir": "Source installation has no ComfyUI directory.",
+    "noInstallations": "No other installs available to migrate from.",
+    "noComfyUIDir": "Source install has no ComfyUI directory.",
     "filePhase": "Copy Files",
     "depsPhase": "Install Dependencies",
-    "scanning": "Scanning source installation…",
+    "scanning": "Scanning source install…",
     "nothingToMigrate": "Nothing to migrate from source.",
     "copyingNode": "Copying {name}… ({current}/{total})",
     "copyingSettings": "Copying user settings…",
@@ -327,16 +327,16 @@
     "updateNoGit": "No .git directory found in ComfyUI/. Commit-based updating requires a git repository.",
     "copyAndUpdate": "Copy & Update",
     "copyAndUpdateTitle": "Copy & Update",
-    "copyAndUpdateMessage": "Create a copy of this installation and update the copy from {installed} to {latest}.\nThe original installation will not be modified.\n\nEnter a name for the copy:",
+    "copyAndUpdateMessage": "Create a copy of this install and update the copy from {installed} to {latest}.\nThe original install will not be modified.\n\nEnter a name for the copy:",
     "copyAndUpdateConfirm": "Copy & Update",
     "copyUpdatingTitle": "Copy & Update to {version}",
     "releaseUpdate": "Release Update",
     "releaseUpdateSelectRelease": "Select Release",
     "releaseUpdateSelectReleaseMessage": "Choose a Standalone release to install.",
     "releaseUpdateSelectVariant": "Select Variant",
-    "releaseUpdateSelectVariantMessage": "Choose an environment variant for the new installation.",
+    "releaseUpdateSelectVariantMessage": "Choose an environment variant for the new install.",
     "releaseUpdateTitle": "Release Update",
-    "releaseUpdateNameMessage": "Enter a name for the new installation. It will be created next to the original.",
+    "releaseUpdateNameMessage": "Enter a name for the new install. It will be created next to the original.",
     "releaseUpdateConfirm": "Install & Migrate",
     "releaseUpdatingTitle": "Installing Release",
     "releaseUpdateCleaningUp": "Cleaning up…"
@@ -368,7 +368,7 @@
     "updateDeps": "Dependencies",
     "updateFailed": "Update process failed with exit code {code}.",
     "checkingForUpdate": "Checking for update…",
-    "noUpdateDir": "No update directory found in this portable installation."
+    "noUpdateDir": "No update directory found in this portable install."
   },
 
   "installer": {
@@ -391,8 +391,8 @@
     "noLaunchSupport": "This source does not support launching yet.",
     "noEnvFound": "Cannot launch: no Python environment found. Create one first.",
     "alreadyRunning": "ComfyUI is already running. Stop it before launching again.",
-    "installDirEmpty": "Installation folder is missing or empty. Delete this installation and reinstall.",
-    "installNotReady": "This installation is not ready to launch. It may still be installing or may have failed.",
+    "installDirEmpty": "Install folder is missing or empty. Delete this install and reinstall.",
+    "installNotReady": "This install is not ready to launch. It may still be installing or may have failed.",
     "installFailed": "Install Failed",
     "deleteInterrupted": "Delete Interrupted",
     "cannotAdd": "Cannot Add",
@@ -409,6 +409,6 @@
     "portConflictKillConfirmMessage": "This will forcefully stop the process currently using this port. Any unsaved work in that ComfyUI instance will be lost.",
     "portConflictKilling": "Stopping…",
     "portConflictKillFailed": "Could not free port {port}. The process may require manual termination.",
-    "duplicateName": "An installation named \"{name}\" already exists. Please choose a different name."
+    "duplicateName": "An install named \"{name}\" already exists. Please choose a different name."
   }
 }
