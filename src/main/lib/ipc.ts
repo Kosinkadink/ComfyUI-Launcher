@@ -79,7 +79,7 @@ async function resolveInstallation(id: string): Promise<InstallationRecord> {
 
 async function findDuplicatePath(installPath: string): Promise<InstallationRecord | null> {
   const normalized = path.resolve(installPath)
-  return (await installations.list()).find((i) => path.resolve(i.installPath) === normalized) ?? null
+  return (await installations.list()).find((i) => i.installPath && path.resolve(i.installPath) === normalized) ?? null
 }
 
 interface SessionInfo {
