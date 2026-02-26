@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useInstallationStore } from '../stores/installationStore'
 
 // Module-level shared state so all components see the same values
 const primaryInstallId = ref<string | null>(null)
@@ -7,6 +8,7 @@ const loaded = ref(false)
 let loadPromise: Promise<void> | null = null
 
 export function useLauncherPrefs() {
+  const installationStore = useInstallationStore()
   async function loadPrefs(): Promise<void> {
     if (loadPromise) return loadPromise
     loadPromise = (async () => {
@@ -42,8 +44,14 @@ export function useLauncherPrefs() {
     return pinnedInstallIds.value.includes(id)
   }
 
+  function effectivePrimaryId(): string | null {
+    if (primaryInstallId.value) return primaryInstallId.value
+    const firstLocal = installationStore.installations.find((i) => i.sourceCategory === 'local')
+    return firstLocal?.id ?? null
+  }
+
   function isPrimary(id: string): boolean {
-    return primaryInstallId.value === id
+    return effectivePrimaryId() === id
   }
 
   return {
