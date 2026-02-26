@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { app } from 'electron'
 import { spawn, execFile } from 'child_process'
 import { fetchJSON } from '../lib/fetch'
 import { truncateNotes } from '../lib/comfyui-releases'
@@ -601,7 +602,9 @@ export const standalone: SourcePlugin = {
 
       sendProgress('run', { percent: -1, status: t('standalone.updateRun') })
 
-      const updateScript = path.join(__dirname, '..', 'lib', 'update_comfyui.py')
+      const updateScript = app.isPackaged
+        ? path.join(process.resourcesPath, 'lib', 'update_comfyui.py')
+        : path.join(__dirname, '..', '..', 'lib', 'update_comfyui.py')
       const markers: Record<string, string> = {}
       let stdoutBuf = ''
       const exitCode = await new Promise<number>((resolve) => {
