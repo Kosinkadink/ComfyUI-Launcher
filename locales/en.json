@@ -16,7 +16,10 @@
     "cloudSection": "ComfyUI Cloud",
     "allInstalls": "All Installs",
     "viewAllInstalls": "View All",
-    "installCount": "{count} install | {count} installs"
+    "installCount": "{count} Install | {count} Installs",
+    "pinned": "Pinned",
+    "pinToDashboard": "Pin to Dashboard",
+    "unpinFromDashboard": "Unpin from Dashboard"
   },
 
   "sidebar": {

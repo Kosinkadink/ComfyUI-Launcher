@@ -802,10 +802,26 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     const inst = await resolveInstallation(installationId)
     if (actionId === 'remove') {
       await installations.remove(installationId)
+      const pinned = (settings.get('pinnedInstallIds') as string[] | undefined) ?? []
+      if (pinned.includes(installationId)) {
+        settings.set('pinnedInstallIds', pinned.filter((id) => id !== installationId))
+      }
       return { ok: true, navigate: 'list' }
     }
     if (actionId === 'set-primary-install') {
       settings.set('primaryInstallId', installationId)
+      return { ok: true }
+    }
+    if (actionId === 'pin-install') {
+      const pinned = (settings.get('pinnedInstallIds') as string[] | undefined) ?? []
+      if (!pinned.includes(installationId)) {
+        settings.set('pinnedInstallIds', [...pinned, installationId])
+      }
+      return { ok: true }
+    }
+    if (actionId === 'unpin-install') {
+      const pinned = (settings.get('pinnedInstallIds') as string[] | undefined) ?? []
+      settings.set('pinnedInstallIds', pinned.filter((id) => id !== installationId))
       return { ok: true }
     }
     if (actionId === 'delete') {
