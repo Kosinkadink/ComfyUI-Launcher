@@ -222,6 +222,7 @@ onMounted(async () => {
         @show-detail="openDetail"
         @show-console="openConsole"
         @show-progress="showProgress"
+        @show-list="switchView('list')"
       />
 
       <InstallationList

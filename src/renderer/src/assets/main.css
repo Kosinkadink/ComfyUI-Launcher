@@ -526,19 +526,62 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 .dashboard-welcome-title { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
 .dashboard-welcome-desc { font-size: 16px; color: var(--text-muted); margin-bottom: 28px; max-width: 400px; }
 .dashboard-cta-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; font-size: 15px; }
+.dashboard-section { margin-bottom: 24px; }
 .dashboard-section-label {
   font-size: 13px; font-weight: 600; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+  display: flex; align-items: center;
 }
-.dashboard-primary-card {
+
+/* Quick Launch cards */
+.dashboard-quick-launch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.dashboard-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 20px 24px;
+  border-radius: 10px; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.dashboard-card-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted);
+}
+.dashboard-card-badge-primary { color: var(--accent); }
+.dashboard-card-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.dashboard-card-name { font-size: 18px; font-weight: 600; }
+.dashboard-card-meta { font-size: 13px; color: var(--text-muted); }
+.dashboard-card-detail { font-size: 12px; color: var(--text-faint); }
+.dashboard-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.dashboard-change-btn {
+  margin-left: auto; padding: 2px 8px; font-size: 11px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: none; color: var(--text-muted); cursor: pointer;
+  text-transform: none; letter-spacing: 0; font-weight: 500;
+}
+.dashboard-change-btn:hover { color: var(--text); border-color: var(--border-hover); background: none; }
+
+/* Cloud card */
+.dashboard-cloud-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 20px;
   display: flex; justify-content: space-between; align-items: center;
 }
-.dashboard-primary-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-.dashboard-primary-name { font-size: 20px; font-weight: 600; }
-.dashboard-primary-meta { font-size: 14px; color: var(--text-muted); }
-.dashboard-primary-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: 16px; }
+
+/* All Installs summary */
+.dashboard-summary-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.dashboard-summary-info { display: flex; align-items: center; gap: 10px; }
+.dashboard-summary-count {
+  font-size: 24px; font-weight: 700; color: var(--text);
+  line-height: 1;
+}
+.dashboard-summary-text { font-size: 14px; color: var(--text-muted); }
 
 /* Model directory cards */
 .dir-card-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

@@ -224,6 +224,7 @@ function _broadcastToRenderer(channel: string, data: Record<string, unknown>): v
 function _addSession(installationId: string, { proc, port, url, mode, installationName }: Omit<SessionInfo, 'startedAt'>): void {
   _runningSessions.set(installationId, { proc, port, url, mode, installationName, startedAt: Date.now() })
   _broadcastToRenderer('instance-started', { installationId, port, url, mode, installationName })
+  installations.update(installationId, { lastLaunchedAt: Date.now() }).catch(() => {})
 }
 
 function _removeSession(installationId: string): void {
@@ -374,7 +375,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
 
   // Sources
   ipcMain.handle('get-sources', () =>
-    sources.map((s) => ({ id: s.id, label: s.label, category: s.category, description: s.description, fields: s.fields, skipInstall: !!s.skipInstall, hideInstallPath: !!s.skipInstall }))
+    sources.filter((s) => s.category !== 'cloud').map((s) => ({ id: s.id, label: s.label, category: s.category, description: s.description, fields: s.fields, skipInstall: !!s.skipInstall, hideInstallPath: !!s.skipInstall }))
   )
 
   ipcMain.handle('get-field-options', async (_event, sourceId: string, fieldId: string, selections: Record<string, unknown>) => {
@@ -791,6 +792,10 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     if (actionId === 'remove') {
       await installations.remove(installationId)
       return { ok: true, navigate: 'list' }
+    }
+    if (actionId === 'set-primary-install') {
+      settings.set('primaryInstallId', installationId)
+      return { ok: true }
     }
     if (actionId === 'delete') {
       if (!fs.existsSync(inst.installPath)) {
