@@ -19,6 +19,14 @@ export function useLauncherPrefs() {
       primaryInstallId.value = primary ?? null
       pinnedInstallIds.value = Array.isArray(pinned) ? pinned : []
       loaded.value = true
+
+      // Auto-assign primary to the first local install if none is set
+      if (!primaryInstallId.value) {
+        const firstLocal = installationStore.installations.find((i) => i.sourceCategory === 'local')
+        if (firstLocal) {
+          await setPrimary(firstLocal.id)
+        }
+      }
     })()
     return loadPromise
   }
@@ -44,14 +52,8 @@ export function useLauncherPrefs() {
     return pinnedInstallIds.value.includes(id)
   }
 
-  function effectivePrimaryId(): string | null {
-    if (primaryInstallId.value) return primaryInstallId.value
-    const firstLocal = installationStore.installations.find((i) => i.sourceCategory === 'local')
-    return firstLocal?.id ?? null
-  }
-
   function isPrimary(id: string): boolean {
-    return effectivePrimaryId() === id
+    return primaryInstallId.value === id
   }
 
   return {
