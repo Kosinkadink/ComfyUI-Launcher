@@ -29,6 +29,7 @@ import { copyDirWithProgress } from './copy'
 import { fetchJSON } from './fetch'
 import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
 import type { FieldOption, SourcePlugin } from '../types/sources'
+import type { Theme, ResolvedTheme } from '../../types/ipc'
 import type { LaunchCmd } from './process'
 
 const MARKER_FILE = '.comfyui-launcher'
@@ -289,8 +290,8 @@ async function migrateDefaults(): Promise<void> {
   }
 }
 
-function resolveTheme(): string {
-  const theme = (settings.get('theme') as string | undefined) || 'system'
+function resolveTheme(): ResolvedTheme {
+  const theme = (settings.get('theme') as Theme | undefined) || 'system'
   return theme === 'system' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : theme
 }
 

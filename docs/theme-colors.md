@@ -43,9 +43,14 @@ Solarized, Nord, Arc, and GitHub are ported from the frontend's color palettes (
 | Theme | `--bg` | `--surface` | `--text` | `--border` | Source palette |
 |-------|--------|-------------|----------|------------|----------------|
 | Solarized | `#002b36` | `#073642` | `#fdf6e3` | `#657b83` | `solarized.json` |
-| Nord | `#2e3440` | `#161b22` | `#e5eaf0` | `#545d70` | `nord.json` |
-| Arc | `#2b2f38` | `#242730` | `#ffffff` | `#6e7581` | `arc.json` |
-| GitHub | `#161b22` | `#13171d` | `#e5eaf0` | `#30363d` | `github.json` |
+| Nord | `#161b22` | `#2e3440` | `#e5eaf0` | `#545d70` | `nord.json` |
+| Arc | `#242730` | `#2b2f38` | `#ffffff` | `#6e7581` | `arc.json` |
+| GitHub | `#13171d` | `#161b22` | `#e5eaf0` | `#30363d` | `github.json` |
+
+> **Note:** The upstream palettes use `bg-color` for content areas and `comfy-menu-bg` for panels.
+> In the Launcher, `--bg` is the body background and `--surface` is for elevated cards/sidebar,
+> so these values are swapped from the palette source to maintain consistent visual hierarchy
+> (surface always lighter than background in dark themes).
 
 ## Dark / Light Theme Colors
 

@@ -57,13 +57,13 @@
 }
 
 [data-theme="nord"] {
-  --bg: #2e3440;
+  --bg: #161b22;
   --text: #e5eaf0;
   --text-muted: #bcc2c8;
   --text-faint: #545d70;
   --accent: #60a5fa;
   --accent-hover: #93c5fd;
-  --surface: #161b22;
+  --surface: #2e3440;
   --border: #545d70;
   --border-hover: #434c5e;
   --danger: #bf616a;
@@ -74,13 +74,13 @@
 }
 
 [data-theme="arc"] {
-  --bg: #2b2f38;
+  --bg: #242730;
   --text: #ffffff;
   --text-muted: #b2b7bd;
   --text-faint: #5c626d;
   --accent: #60a5fa;
   --accent-hover: #93c5fd;
-  --surface: #242730;
+  --surface: #2b2f38;
   --border: #6e7581;
   --border-hover: #5c626d;
   --danger: #b33a3a;
@@ -91,13 +91,13 @@
 }
 
 [data-theme="github"] {
-  --bg: #161b22;
+  --bg: #13171d;
   --text: #e5eaf0;
   --text-muted: #bcc2c8;
   --text-faint: #30363d;
   --accent: #60a5fa;
   --accent-hover: #93c5fd;
-  --surface: #13171d;
+  --surface: #161b22;
   --border: #30363d;
   --border-hover: #262c33;
   --danger: #b33a3a;

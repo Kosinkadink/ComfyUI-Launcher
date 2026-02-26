@@ -11,4 +11,4 @@ npm run build
 npm run test
 ```
 
-These checks are enforced automatically by a husky pre-commit hook.
+Typecheck and lint are enforced automatically by a husky pre-commit hook.
