@@ -31,10 +31,10 @@
   },
   "mac": {
     "icon": "./assets/Comfy_Logo_x512.png",
-    "category": "public.app-category.developer-tools"
+    "category": "public.app-category.graphics-design"
   },
   "linux": {
     "icon": "./assets/Comfy_Logo_x256.png",
-    "category": "Development"
+    "category": "AudioVideo;Graphics;3DGraphics;"
   }
 }
