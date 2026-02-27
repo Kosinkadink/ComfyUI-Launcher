@@ -89,12 +89,54 @@ jobs:
           const macUrl = safeUrl(build?.mac?.standardDownloadUrl)
           const windowsUrl = safeUrl(build?.windows?.standardDownloadUrl)
           const linuxUrl = safeUrl(build?.linux?.standardDownloadUrl)
+          const universalUrl = safeUrl(build?.standardUniversalDownloadUrl)
           const status = build?.status || 'unknown'
           const buildId = build?.id || ''
 
           if (!buildId) {
             throw new Error('Build ID missing from ToDesktop build output')
           }
+
+          const titleCase = (value) =>
+            String(value)
+              .replace(/[-_]/g, ' ')
+              .replace(/\b\w/g, (m) => m.toUpperCase())
+
+          const collectArtifactLines = (platformName, platformData) => {
+            const lines = []
+            const seen = new Set()
+
+            const visit = (node, path = []) => {
+              if (!node || typeof node !== 'object') return
+
+              const url = safeUrl(node.standardUrl || node.url)
+              if (url) {
+                const artifact = path.map(titleCase).join(' / ') || 'Artifact'
+                const size = Number.isFinite(node.size) ? ` (${node.size} bytes)` : ''
+                const line = `- ${platformName}: ${artifact}${size} -> ${url}`
+                if (!seen.has(line)) {
+                  seen.add(line)
+                  lines.push(line)
+                }
+                return
+              }
+
+              for (const [key, value] of Object.entries(node)) {
+                if (value && typeof value === 'object') {
+                  visit(value, [...path, key])
+                }
+              }
+            }
+
+            visit(platformData?.artifactDownloads)
+            return lines.sort((a, b) => a.localeCompare(b))
+          }
+
+          const assetLines = [
+            ...collectArtifactLines('macOS', build?.mac),
+            ...collectArtifactLines('Windows', build?.windows),
+            ...collectArtifactLines('Linux', build?.linux)
+          ]
 
           const todesktopConfig = JSON.parse(fs.readFileSync('todesktop.json', 'utf8'))
           const appId = todesktopConfig.id
@@ -106,13 +148,17 @@ jobs:
             `- Build ID: \`${buildId}\``,
             `- Status: \`${status}\``,
             `- ToDesktop build page: ${buildPageUrl}`,
+            universalUrl ? `- Universal download page: ${universalUrl}` : '',
             '',
-            '## Downloads',
+            '## Platform Pages',
             macUrl ? `- macOS: ${macUrl}` : '- macOS: n/a',
             windowsUrl ? `- Windows: ${windowsUrl}` : '- Windows: n/a',
             linuxUrl ? `- Linux: ${linuxUrl}` : '- Linux: n/a',
+            '',
+            '## Built Assets',
+            ...(assetLines.length > 0 ? assetLines : ['- n/a']),
             ''
-          ].join('\n')
+          ].filter(Boolean).join('\n')
 
           fs.writeFileSync('release-notes.md', releaseNotes)
 
