@@ -1,6 +1,5 @@
-const { writeFile } = require('node:fs/promises')
-
 module.exports = async ({ pkgJsonPath, pkgJson }) => {
+  const { writeFile } = await import('node:fs/promises')
   const removedScripts = []
 
   if (pkgJson?.scripts?.postinstall) {
