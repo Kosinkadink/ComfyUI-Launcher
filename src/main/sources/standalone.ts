@@ -582,7 +582,8 @@ export const standalone: SourcePlugin = {
     // Capture initial snapshot so the detail view shows "Current" immediately
     try {
       const filename = await snapshots.saveSnapshot(installation.installPath, installation, 'boot')
-      await update({ lastSnapshot: filename, snapshotCount: 1 })
+      const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
+      await update({ lastSnapshot: filename, snapshotCount })
     } catch (err) {
       console.warn('Initial snapshot failed:', err)
     }
@@ -626,7 +627,8 @@ export const standalone: SourcePlugin = {
     if (actionId === 'snapshot-save') {
       const label = (actionData?.label as string | undefined) || undefined
       const filename = await snapshots.saveSnapshot(installation.installPath, installation, 'manual', label)
-      await update({ lastSnapshot: filename, snapshotCount: ((installation.snapshotCount as number) || 0) + 1 })
+      const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
+      await update({ lastSnapshot: filename, snapshotCount })
       return { ok: true, navigate: 'detail' }
     }
 
@@ -634,6 +636,10 @@ export const standalone: SourcePlugin = {
       const file = actionData?.file as string | undefined
       if (!file) return { ok: false, message: 'No snapshot file specified.' }
       await snapshots.deleteSnapshot(installation.installPath, file)
+      const remaining = await snapshots.listSnapshots(installation.installPath)
+      const snapshotCount = remaining.length
+      const lastSnapshot = remaining.length > 0 ? remaining[0]!.filename : null
+      await update({ snapshotCount, ...(file === installation.lastSnapshot ? { lastSnapshot } : {}) })
       return { ok: true, navigate: 'detail' }
     }
 
@@ -674,7 +680,8 @@ export const standalone: SourcePlugin = {
       // Auto-snapshot before update
       try {
         const filename = await snapshots.saveSnapshot(installPath, installation, 'pre-update', 'before-update')
-        await update({ lastSnapshot: filename, snapshotCount: ((installation.snapshotCount as number) || 0) + 1 })
+        const snapshotCount = await snapshots.getSnapshotCount(installPath)
+        await update({ lastSnapshot: filename, snapshotCount })
       } catch (err) {
         console.warn('Pre-update snapshot failed:', err)
       }

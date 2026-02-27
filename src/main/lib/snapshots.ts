@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import { scanCustomNodes } from './nodes'
+import { readGitHead } from './git'
+import { scanCustomNodes, nodeKey } from './nodes'
 import { pipFreeze } from './pip'
 import type { ScannedNode } from './nodes'
 import type { InstallationRecord } from '../installations'
@@ -52,36 +53,42 @@ const SNAPSHOTS_DIR = path.join('.launcher', 'snapshots')
 const MANIFEST_FILE = 'manifest.json'
 const AUTO_SNAPSHOT_LIMIT = 50
 
+// --- Per-install mutex ---
+
+const _locks = new Map<string, Promise<void>>()
+
+async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  while (_locks.has(key)) {
+    try { await _locks.get(key) } catch {}
+  }
+  let resolve!: () => void
+  const lock = new Promise<void>((r) => (resolve = r))
+  _locks.set(key, lock)
+  try {
+    return await fn()
+  } finally {
+    _locks.delete(key)
+    resolve()
+  }
+}
+
 // --- Helpers ---
 
 function snapshotsDir(installPath: string): string {
   return path.join(installPath, SNAPSHOTS_DIR)
 }
 
-function readGitHead(comfyuiDir: string): string | null {
-  const headPath = path.join(comfyuiDir, '.git', 'HEAD')
-  try {
-    const content = fs.readFileSync(headPath, 'utf-8').trim()
-    if (!content.startsWith('ref: ')) return content || null
-    const refPath = path.join(comfyuiDir, '.git', content.slice(5))
-    try {
-      return fs.readFileSync(refPath, 'utf-8').trim() || null
-    } catch {
-      const packedRefsPath = path.join(comfyuiDir, '.git', 'packed-refs')
-      try {
-        const packed = fs.readFileSync(packedRefsPath, 'utf-8')
-        const ref = content.slice(5)
-        for (const line of packed.split('\n')) {
-          if (line.startsWith('#') || !line.trim()) continue
-          const [sha, name] = line.trim().split(/\s+/)
-          if (name === ref) return sha || null
-        }
-      } catch {}
-      return null
-    }
-  } catch {
-    return null
-  }
+/**
+ * Validate and resolve a snapshot filename to an absolute path.
+ * Returns null if the filename is invalid or escapes the snapshots directory.
+ */
+function resolveSnapshotPath(installPath: string, filename: string): string | null {
+  if (!filename || filename !== path.basename(filename)) return null
+  if (!filename.endsWith('.json')) return null
+  const dir = path.resolve(snapshotsDir(installPath))
+  const resolved = path.resolve(dir, filename)
+  if (!resolved.startsWith(dir + path.sep)) return null
+  return resolved
 }
 
 function readManifest(installPath: string): { comfyui_ref: string; version: string; id: string } {
@@ -98,8 +105,8 @@ function readManifest(installPath: string): { comfyui_ref: string; version: stri
 }
 
 function formatTimestamp(date: Date): string {
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+  const pad = (n: number, len = 2): string => String(n).padStart(len, '0')
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}_${pad(date.getMilliseconds(), 3)}`
 }
 
 function getUvPath(installPath: string): string {
@@ -153,11 +160,11 @@ function statesMatch(a: Snapshot, b: Omit<Snapshot, 'createdAt' | 'trigger' | 'l
   // ComfyUI version/commit
   if (a.comfyui.ref !== b.comfyui.ref || a.comfyui.commit !== b.comfyui.commit) return false
 
-  // Custom nodes — compare by id, type, version, commit, enabled
+  // Custom nodes — compare by nodeKey (type:dirName)
   if (a.customNodes.length !== b.customNodes.length) return false
-  const aNodes = new Map(a.customNodes.map((n) => [n.id, n]))
+  const aNodes = new Map(a.customNodes.map((n) => [nodeKey(n), n]))
   for (const bn of b.customNodes) {
-    const an = aNodes.get(bn.id)
+    const an = aNodes.get(nodeKey(bn))
     if (!an) return false
     if (an.type !== bn.type || an.version !== bn.version || an.commit !== bn.commit || an.enabled !== bn.enabled) return false
   }
@@ -197,9 +204,9 @@ async function deduplicateRestartSnapshot(installPath: string, justSavedFilename
 
   // Custom nodes must match exactly (same set, same versions)
   if (prev.snapshot.customNodes.length !== saved.snapshot.customNodes.length) return undefined
-  const prevNodes = new Map(prev.snapshot.customNodes.map((n) => [n.id, n]))
+  const prevNodes = new Map(prev.snapshot.customNodes.map((n) => [nodeKey(n), n]))
   for (const node of saved.snapshot.customNodes) {
-    const pn = prevNodes.get(node.id)
+    const pn = prevNodes.get(nodeKey(node))
     if (!pn) return undefined
     if (pn.type !== node.type || pn.version !== node.version || pn.commit !== node.commit || pn.enabled !== node.enabled) return undefined
   }
@@ -214,34 +221,36 @@ export async function captureSnapshotIfChanged(
   installation: InstallationRecord,
   trigger: 'boot' | 'restart' | 'manual' | 'pre-update'
 ): Promise<{ saved: boolean; filename?: string; deduplicated?: string }> {
-  const current = await captureState(installPath, installation)
+  return withLock(installPath, async () => {
+    const current = await captureState(installPath, installation)
 
-  // Load last snapshot for comparison
-  const lastFilename = installation.lastSnapshot as string | undefined
-  if (lastFilename && trigger === 'boot') {
-    try {
-      const last = await loadSnapshot(installPath, lastFilename)
-      if (statesMatch(last, current)) {
-        return { saved: false }
+    // Load last snapshot for comparison
+    const lastFilename = installation.lastSnapshot as string | undefined
+    if (lastFilename && trigger === 'boot') {
+      try {
+        const last = await loadSnapshot(installPath, lastFilename)
+        if (statesMatch(last, current)) {
+          return { saved: false }
+        }
+      } catch {
+        // Last snapshot unreadable — save a new one
       }
-    } catch {
-      // Last snapshot unreadable — save a new one
     }
-  }
 
-  const filename = await writeSnapshot(installPath, { ...current, trigger, label: null })
+    const filename = await writeSnapshot(installPath, { ...current, trigger, label: null })
 
-  // Deduplicate: if this is a restart snapshot, remove the previous intermediate
-  // restart that captured state before pip packages were installed.
-  let deduplicated: string | undefined
-  if (trigger === 'restart') {
-    deduplicated = await deduplicateRestartSnapshot(installPath, filename).catch(() => undefined)
-  }
+    // Deduplicate: if this is a restart snapshot, remove the previous intermediate
+    // restart that captured state before pip packages were installed.
+    let deduplicated: string | undefined
+    if (trigger === 'restart') {
+      deduplicated = await deduplicateRestartSnapshot(installPath, filename).catch(() => undefined)
+    }
 
-  // Prune old auto snapshots
-  await pruneAutoSnapshots(installPath, AUTO_SNAPSHOT_LIMIT).catch(() => {})
+    // Prune old auto snapshots
+    await pruneAutoSnapshots(installPath, AUTO_SNAPSHOT_LIMIT).catch(() => {})
 
-  return { saved: true, filename, deduplicated }
+    return { saved: true, filename, deduplicated }
+  })
 }
 
 export async function saveSnapshot(
@@ -250,8 +259,10 @@ export async function saveSnapshot(
   trigger: 'boot' | 'restart' | 'manual' | 'pre-update',
   label?: string
 ): Promise<string> {
-  const current = await captureState(installPath, installation)
-  return writeSnapshot(installPath, { ...current, trigger, label: label || null })
+  return withLock(installPath, async () => {
+    const current = await captureState(installPath, installation)
+    return writeSnapshot(installPath, { ...current, trigger, label: label || null })
+  })
 }
 
 async function writeSnapshot(
@@ -271,9 +282,10 @@ async function writeSnapshot(
 
   const dir = snapshotsDir(installPath)
   await fs.promises.mkdir(dir, { recursive: true })
-  const filename = `${formatTimestamp(now)}-${data.trigger}.json`
+  const suffix = Math.random().toString(16).slice(2, 8)
+  const filename = `${formatTimestamp(now)}-${data.trigger}-${suffix}.json`
   const filePath = path.join(dir, filename)
-  const tmpPath = filePath + '.tmp'
+  const tmpPath = `${filePath}.${suffix}.tmp`
   await fs.promises.writeFile(tmpPath, JSON.stringify(snapshot, null, 2))
   await fs.promises.rename(tmpPath, filePath)
   return filename
@@ -289,7 +301,9 @@ export async function listSnapshots(installPath: string): Promise<SnapshotEntry[
       try {
         const content = await fs.promises.readFile(path.join(dir, file), 'utf-8')
         entries.push({ filename: file, snapshot: JSON.parse(content) as Snapshot })
-      } catch {}
+      } catch (err) {
+        console.warn(`Snapshot: failed to read ${file}:`, (err as Error).message)
+      }
     }
     // Sort newest first
     entries.sort((a, b) => b.snapshot.createdAt.localeCompare(a.snapshot.createdAt))
@@ -309,7 +323,9 @@ export function listSnapshotsSync(installPath: string): SnapshotEntry[] {
       try {
         const content = fs.readFileSync(path.join(dir, file), 'utf-8')
         entries.push({ filename: file, snapshot: JSON.parse(content) as Snapshot })
-      } catch {}
+      } catch (err) {
+        console.warn(`Snapshot: failed to read ${file}:`, (err as Error).message)
+      }
     }
     entries.sort((a, b) => b.snapshot.createdAt.localeCompare(a.snapshot.createdAt))
     return entries
@@ -319,17 +335,21 @@ export function listSnapshotsSync(installPath: string): SnapshotEntry[] {
 }
 
 export async function loadSnapshot(installPath: string, filename: string): Promise<Snapshot> {
-  const filePath = path.join(snapshotsDir(installPath), filename)
+  const filePath = resolveSnapshotPath(installPath, filename)
+  if (!filePath) throw new Error(`Invalid snapshot filename: ${filename}`)
   const content = await fs.promises.readFile(filePath, 'utf-8')
   return JSON.parse(content) as Snapshot
 }
 
 export async function deleteSnapshot(installPath: string, filename: string): Promise<void> {
-  const dir = snapshotsDir(installPath)
-  const filePath = path.join(dir, filename)
-  // Ensure the resolved path is within the snapshots directory
-  if (!filePath.startsWith(dir + path.sep) && filePath !== dir) return
+  const filePath = resolveSnapshotPath(installPath, filename)
+  if (!filePath) throw new Error(`Invalid snapshot filename: ${filename}`)
   await fs.promises.unlink(filePath)
+}
+
+/** Recompute snapshot count from disk. */
+export async function getSnapshotCount(installPath: string): Promise<number> {
+  return (await listSnapshots(installPath)).length
 }
 
 export function diffSnapshots(a: Snapshot, b: Snapshot): SnapshotDiff {
@@ -352,25 +372,25 @@ export function diffSnapshots(a: Snapshot, b: Snapshot): SnapshotDiff {
     }
   }
 
-  // Custom nodes
-  const aNodes = new Map(a.customNodes.map((n) => [n.id, n]))
-  const bNodes = new Map(b.customNodes.map((n) => [n.id, n]))
+  // Custom nodes — keyed by (type, dirName)
+  const aNodes = new Map(a.customNodes.map((n) => [nodeKey(n), n]))
+  const bNodes = new Map(b.customNodes.map((n) => [nodeKey(n), n]))
 
-  for (const [id, bn] of bNodes) {
-    const an = aNodes.get(id)
+  for (const [key, bn] of bNodes) {
+    const an = aNodes.get(key)
     if (!an) {
       diff.nodesAdded.push(bn)
-    } else if (an.version !== bn.version || an.commit !== bn.commit || an.enabled !== bn.enabled) {
+    } else if (an.version !== bn.version || an.commit !== bn.commit || an.enabled !== bn.enabled || an.type !== bn.type) {
       diff.nodesChanged.push({
-        id,
+        id: bn.id,
         type: bn.type,
         from: { version: an.version, commit: an.commit, enabled: an.enabled },
         to: { version: bn.version, commit: bn.commit, enabled: bn.enabled },
       })
     }
   }
-  for (const [id, an] of aNodes) {
-    if (!bNodes.has(id)) {
+  for (const [key, an] of aNodes) {
+    if (!bNodes.has(key)) {
       diff.nodesRemoved.push(an)
     }
   }
