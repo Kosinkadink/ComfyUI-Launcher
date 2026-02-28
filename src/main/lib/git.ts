@@ -1,3 +1,4 @@
+import { execFile, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
@@ -28,7 +29,8 @@ export function readGitHead(repoPath: string): string | null {
     // Detached HEAD — contains sha directly
     if (!content.startsWith('ref: ')) return content || null
     // Symbolic ref — resolve it
-    const refPath = path.join(gitDir, content.slice(5))
+    const refPath = path.resolve(gitDir, content.slice(5))
+    if (!refPath.startsWith(gitDir + path.sep) && refPath !== gitDir) return null
     try {
       return fs.readFileSync(refPath, 'utf-8').trim() || null
     } catch {
@@ -82,4 +84,59 @@ function redactUrl(url: string): string {
 /** Check whether a path has a .git directory or file (worktree/submodule). */
 export function hasGitDir(nodePath: string): boolean {
   return resolveGitDir(nodePath) !== null
+}
+
+export function isGitAvailable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile('git', ['--version'], { windowsHide: true, timeout: 5000 }, (error) => {
+      resolve(!error)
+    })
+  })
+}
+
+export function gitClone(
+  url: string,
+  dest: string,
+  sendOutput: (text: string) => void
+): Promise<number> {
+  return new Promise((resolve) => {
+    const proc = spawn('git', ['clone', url, dest], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true
+    })
+    proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
+    proc.stderr.on('data', (data: Buffer) => sendOutput(data.toString()))
+    proc.on('error', (err) => {
+      sendOutput(err.message)
+      resolve(1)
+    })
+    proc.on('close', (code) => resolve(code ?? 1))
+  })
+}
+
+export function gitFetchAndCheckout(
+  repoPath: string,
+  commit: string,
+  sendOutput: (text: string) => void
+): Promise<number> {
+  const runGit = (args: string[]): Promise<number> =>
+    new Promise((resolve) => {
+      const proc = spawn('git', args, {
+        cwd: repoPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      })
+      proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
+      proc.stderr.on('data', (data: Buffer) => sendOutput(data.toString()))
+      proc.on('error', (err) => {
+        sendOutput(err.message)
+        resolve(1)
+      })
+      proc.on('close', (code) => resolve(code ?? 1))
+    })
+
+  return runGit(['fetch', 'origin']).then((code) => {
+    if (code !== 0) return code
+    return runGit(['checkout', commit])
+  })
 }

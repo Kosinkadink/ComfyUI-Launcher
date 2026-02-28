@@ -432,15 +432,16 @@
     "snapshotDelete": "Delete",
     "snapshotDeleteTitle": "Delete Snapshot",
     "snapshotDeleteMessage": "Delete this snapshot? This cannot be undone.",
-    "snapshotRestore": "Restore Packages",
-    "snapshotRestoreTitle": "Restore Pip Packages",
-    "snapshotRestoreMessage": "Restore pip packages to match this snapshot? ComfyUI must not be running. A backup of affected packages will be created before making changes.",
+    "snapshotRestore": "Restore",
+    "snapshotRestoreTitle": "Restore Snapshot",
+    "snapshotRestoreMessage": "Restore custom nodes and pip packages to match this snapshot? ComfyUI must not be running. A backup of affected packages will be created before making changes.",
     "snapshotRestoreStopRequired": "ComfyUI must be stopped before restoring a snapshot. Please stop the running instance and try again.",
-    "snapshotRestoringTitle": "Restoring Pip Packages",
-    "snapshotRestorePhase": "Restore",
-    "snapshotRestoreComplete": "Pip package restore complete",
-    "snapshotRestoreReverted": "Restore failed — reverted to pre-restore state",
-    "snapshotRestoreNothingToDo": "No pip package changes needed — environment already matches snapshot."
+    "snapshotRestoringTitle": "Restoring Snapshot",
+    "snapshotRestoreNodesPhase": "Restore Nodes",
+    "snapshotRestorePipPhase": "Restore Packages",
+    "snapshotRestoreComplete": "Snapshot restore complete",
+    "snapshotRestoreReverted": "Pip restore failed — reverted to pre-restore state",
+    "snapshotRestoreNothingToDo": "No changes needed — environment already matches snapshot."
   },
 
   "portable": {

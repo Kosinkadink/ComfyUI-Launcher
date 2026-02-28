@@ -1,9 +1,10 @@
 import fs from 'fs'
 import path from 'path'
 import { spawn } from 'child_process'
-import { readGitHead } from './git'
+import { readGitHead, isGitAvailable, gitClone, gitFetchAndCheckout } from './git'
 import { scanCustomNodes, nodeKey } from './nodes'
 import { pipFreeze } from './pip'
+import { installCnrNode, switchCnrVersion, isSafePathComponent } from './cnr'
 import type { ScannedNode } from './nodes'
 import type { InstallationRecord } from '../installations'
 
@@ -799,5 +800,279 @@ export async function restorePipPackages(
     }
   }
 
+  return result
+}
+
+// --- Custom Node Restore ---
+
+export interface NodeRestoreResult {
+  installed: string[]
+  switched: string[]
+  enabled: string[]
+  disabled: string[]
+  skipped: string[]
+  failed: Array<{ id: string; error: string }>
+  unreportable: string[]
+}
+
+const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;[#]|$)/i
+
+function isManagerNode(node: ScannedNode): boolean {
+  return node.id.toLowerCase().includes('comfyui-manager')
+}
+
+async function disableNode(customNodesDir: string, dirName: string): Promise<void> {
+  const src = path.join(customNodesDir, dirName)
+  const disabledDir = path.join(customNodesDir, '.disabled')
+  await fs.promises.mkdir(disabledDir, { recursive: true })
+  const dst = path.join(disabledDir, dirName)
+  await fs.promises.rm(dst, { recursive: true, force: true }).catch(() => {})
+  await fs.promises.rename(src, dst)
+}
+
+async function enableNode(customNodesDir: string, dirName: string): Promise<void> {
+  const src = path.join(customNodesDir, '.disabled', dirName)
+  const dst = path.join(customNodesDir, dirName)
+  await fs.promises.rm(dst, { recursive: true, force: true }).catch(() => {})
+  await fs.promises.rename(src, dst)
+}
+
+async function runPostInstallScripts(
+  nodePath: string,
+  uvPath: string,
+  pythonPath: string,
+  installPath: string,
+  sendOutput: (text: string) => void
+): Promise<void> {
+  const reqPath = path.join(nodePath, 'requirements.txt')
+  if (fs.existsSync(reqPath)) {
+    try {
+      const reqContent = await fs.promises.readFile(reqPath, 'utf-8')
+      const filtered = reqContent.split('\n').filter((l) => !PYTORCH_RE.test(l.trim())).join('\n')
+      const filteredReqPath = path.join(installPath, `.restore-reqs-${path.basename(nodePath)}.txt`)
+      await fs.promises.writeFile(filteredReqPath, filtered, 'utf-8')
+
+      try {
+        await runUvPip(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', pythonPath], installPath, sendOutput)
+      } finally {
+        try { await fs.promises.unlink(filteredReqPath) } catch {}
+      }
+    } catch (err) {
+      sendOutput(`⚠ requirements.txt failed for ${path.basename(nodePath)}: ${(err as Error).message}\n`)
+    }
+  }
+
+  const installScript = path.join(nodePath, 'install.py')
+  if (fs.existsSync(installScript)) {
+    try {
+      await new Promise<void>((resolve) => {
+        const proc = spawn(pythonPath, ['-s', installScript], {
+          cwd: nodePath,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+        })
+        proc.stdout.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
+        proc.stderr.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
+        proc.on('error', (err) => {
+          sendOutput(`⚠ install.py error: ${err.message}\n`)
+          resolve()
+        })
+        proc.on('exit', () => resolve())
+      })
+    } catch (err) {
+      sendOutput(`⚠ install.py failed for ${path.basename(nodePath)}: ${(err as Error).message}\n`)
+    }
+  }
+}
+
+export async function restoreCustomNodes(
+  installPath: string,
+  installation: InstallationRecord,
+  targetSnapshot: Snapshot,
+  sendProgress: (phase: string, data: Record<string, unknown>) => void,
+  sendOutput: (text: string) => void
+): Promise<NodeRestoreResult> {
+  const result: NodeRestoreResult = {
+    installed: [], switched: [], enabled: [], disabled: [],
+    skipped: [], failed: [], unreportable: [],
+  }
+
+  const comfyuiDir = path.join(installPath, 'ComfyUI')
+  const customNodesDir = path.join(comfyuiDir, 'custom_nodes')
+
+  // 1. Scan current custom nodes
+  sendProgress('restore-nodes', { percent: 5, status: 'Scanning custom nodes…' })
+  const currentNodes = await scanCustomNodes(comfyuiDir)
+  const currentByKey = new Map(currentNodes.map((n) => [nodeKey(n), n]))
+  const targetByKey = new Map(targetSnapshot.customNodes.map((n) => [nodeKey(n), n]))
+
+  // Check git availability for git node operations
+  const needsGit = targetSnapshot.customNodes.some((n) =>
+    n.type === 'git' && (
+      !currentByKey.has(nodeKey(n)) ||
+      currentByKey.get(nodeKey(n))?.commit !== n.commit
+    )
+  )
+  const gitAvailable = needsGit ? await isGitAvailable() : false
+  if (needsGit && !gitAvailable) {
+    sendOutput('⚠ git is not available in PATH — git node operations will be skipped\n')
+  }
+
+  // 2. Disable extras: enabled nodes not in target
+  for (const [key, currentNode] of currentByKey) {
+    if (isManagerNode(currentNode)) continue
+    if (!targetByKey.has(key) && currentNode.enabled) {
+      try {
+        await disableNode(customNodesDir, currentNode.dirName)
+        result.disabled.push(currentNode.id)
+        sendOutput(`Disabled ${currentNode.id}\n`)
+      } catch (err) {
+        result.failed.push({ id: currentNode.id, error: `disable failed: ${(err as Error).message}` })
+      }
+    }
+  }
+
+  // 3. Process target nodes
+  const targetList = targetSnapshot.customNodes.filter((n) => !isManagerNode(n))
+  const nodesNeedingPostInstall: string[] = []
+
+  for (let i = 0; i < targetList.length; i++) {
+    const targetNode = targetList[i]!
+    const key = nodeKey(targetNode)
+    const currentNode = currentByKey.get(key)
+    const percent = 10 + Math.round((i / targetList.length) * 80)
+    sendProgress('restore-nodes', { percent, status: `Processing ${targetNode.id}…` })
+
+    if (!currentNode) {
+      // Node not present — install or report
+      if (targetNode.type === 'cnr') {
+        if (!targetNode.version) {
+          result.failed.push({ id: targetNode.id, error: 'no version in snapshot' })
+          continue
+        }
+        if (!isSafePathComponent(targetNode.id)) {
+          result.failed.push({ id: targetNode.id, error: 'invalid node ID' })
+          continue
+        }
+        try {
+          await installCnrNode(targetNode.id, targetNode.version, customNodesDir, sendOutput)
+          result.installed.push(targetNode.id)
+          nodesNeedingPostInstall.push(path.join(customNodesDir, targetNode.id))
+          if (!targetNode.enabled) {
+            await disableNode(customNodesDir, targetNode.id)
+          }
+        } catch (err) {
+          result.failed.push({ id: targetNode.id, error: (err as Error).message })
+        }
+      } else if (targetNode.type === 'git') {
+        if (!gitAvailable) {
+          result.failed.push({ id: targetNode.id, error: 'git not available' })
+          continue
+        }
+        if (!targetNode.url) {
+          result.failed.push({ id: targetNode.id, error: 'no URL in snapshot' })
+          continue
+        }
+        if (!isSafePathComponent(targetNode.dirName)) {
+          result.failed.push({ id: targetNode.id, error: 'invalid directory name' })
+          continue
+        }
+        try {
+          const dest = path.join(customNodesDir, targetNode.dirName)
+          const cloneResult = await gitClone(targetNode.url, dest, sendOutput)
+          if (cloneResult !== 0) {
+            result.failed.push({ id: targetNode.id, error: `git clone failed (exit ${cloneResult})` })
+            continue
+          }
+          if (targetNode.commit) {
+            const checkoutResult = await gitFetchAndCheckout(dest, targetNode.commit, sendOutput)
+            if (checkoutResult !== 0) {
+              sendOutput(`⚠ git checkout to ${targetNode.commit} failed for ${targetNode.id}\n`)
+            }
+          }
+          result.installed.push(targetNode.id)
+          nodesNeedingPostInstall.push(dest)
+          if (!targetNode.enabled) {
+            await disableNode(customNodesDir, targetNode.dirName)
+          }
+        } catch (err) {
+          result.failed.push({ id: targetNode.id, error: (err as Error).message })
+        }
+      } else if (targetNode.type === 'file') {
+        result.unreportable.push(targetNode.id)
+      }
+      continue
+    }
+
+    // Node exists — handle enable/disable and version changes
+    if (!currentNode.enabled && targetNode.enabled) {
+      try {
+        await enableNode(customNodesDir, currentNode.dirName)
+        result.enabled.push(targetNode.id)
+        sendOutput(`Enabled ${targetNode.id}\n`)
+      } catch (err) {
+        result.failed.push({ id: targetNode.id, error: `enable failed: ${(err as Error).message}` })
+        continue
+      }
+    } else if (currentNode.enabled && !targetNode.enabled) {
+      try {
+        await disableNode(customNodesDir, currentNode.dirName)
+        result.disabled.push(targetNode.id)
+        sendOutput(`Disabled ${targetNode.id}\n`)
+      } catch (err) {
+        result.failed.push({ id: targetNode.id, error: `disable failed: ${(err as Error).message}` })
+      }
+      continue
+    }
+
+    // Version/commit changes (only if the node is/will be enabled)
+    if (targetNode.enabled || currentNode.enabled) {
+      const nodePath = path.join(customNodesDir, currentNode.dirName)
+
+      if (targetNode.type === 'cnr' && targetNode.version && currentNode.version !== targetNode.version) {
+        try {
+          await switchCnrVersion(targetNode.id, targetNode.version, nodePath, sendOutput)
+          result.switched.push(targetNode.id)
+          nodesNeedingPostInstall.push(nodePath)
+        } catch (err) {
+          result.failed.push({ id: targetNode.id, error: (err as Error).message })
+        }
+      } else if (targetNode.type === 'git' && targetNode.commit && currentNode.commit !== targetNode.commit) {
+        if (!gitAvailable) {
+          result.failed.push({ id: targetNode.id, error: 'git not available' })
+        } else {
+          const checkoutResult = await gitFetchAndCheckout(nodePath, targetNode.commit, sendOutput)
+          if (checkoutResult === 0) {
+            result.switched.push(targetNode.id)
+            nodesNeedingPostInstall.push(nodePath)
+          } else {
+            result.failed.push({ id: targetNode.id, error: `git checkout failed (exit ${checkoutResult})` })
+          }
+        }
+      } else {
+        result.skipped.push(targetNode.id)
+      }
+    } else {
+      result.skipped.push(targetNode.id)
+    }
+  }
+
+  // 4. Run post-install scripts for installed/switched nodes
+  if (nodesNeedingPostInstall.length > 0) {
+    const uvPath = getUvPath(installPath)
+    const pythonPath = getActivePythonPath(installation)
+
+    if (pythonPath && fs.existsSync(uvPath)) {
+      sendProgress('restore-nodes', { percent: 92, status: 'Installing node dependencies…' })
+      for (const nodePath of nodesNeedingPostInstall) {
+        sendOutput(`\nRunning post-install for ${path.basename(nodePath)}…\n`)
+        await runPostInstallScripts(nodePath, uvPath, pythonPath, installPath, sendOutput)
+      }
+    } else {
+      sendOutput('⚠ Cannot run post-install scripts: uv or Python environment not found\n')
+    }
+  }
+
+  sendProgress('restore-nodes', { percent: 100, status: 'Node restore complete' })
   return result
 }

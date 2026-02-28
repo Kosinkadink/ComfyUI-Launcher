@@ -643,20 +643,48 @@ export const standalone: SourcePlugin = {
       const targetSnapshot = await snapshots.loadSnapshot(installation.installPath, file)
 
       sendProgress('steps', { steps: [
-        { phase: 'restore', label: t('standalone.snapshotRestorePhase') },
+        { phase: 'restore-nodes', label: t('standalone.snapshotRestoreNodesPhase') },
+        { phase: 'restore-pip', label: t('standalone.snapshotRestorePipPhase') },
       ] })
 
-      const result = await snapshots.restorePipPackages(
+      // Phase 3: Restore custom nodes first (node installs may add pip dependencies)
+      const nodeResult = await snapshots.restoreCustomNodes(
         installation.installPath, installation, targetSnapshot, sendProgress, sendOutput
       )
 
-      // Build summary
+      // Phase 2: Restore pip packages (syncs to exact target state)
+      const pipResult = await snapshots.restorePipPackages(
+        installation.installPath, installation, targetSnapshot,
+        (phase, data) => sendProgress(phase === 'restore' ? 'restore-pip' : phase, data),
+        sendOutput
+      )
+
+      // Build combined summary
       const summary: string[] = []
-      if (result.installed.length > 0) summary.push(`${result.installed.length} installed`)
-      if (result.changed.length > 0) summary.push(`${result.changed.length} changed`)
-      if (result.removed.length > 0) summary.push(`${result.removed.length} removed`)
-      if (result.protectedSkipped.length > 0) summary.push(`${result.protectedSkipped.length} protected (skipped)`)
-      if (result.failed.length > 0) summary.push(`${result.failed.length} failed`)
+      const nodeActions = nodeResult.installed.length + nodeResult.switched.length +
+        nodeResult.enabled.length + nodeResult.disabled.length
+      if (nodeActions > 0) {
+        const parts: string[] = []
+        if (nodeResult.installed.length > 0) parts.push(`${nodeResult.installed.length} installed`)
+        if (nodeResult.switched.length > 0) parts.push(`${nodeResult.switched.length} switched`)
+        if (nodeResult.enabled.length > 0) parts.push(`${nodeResult.enabled.length} enabled`)
+        if (nodeResult.disabled.length > 0) parts.push(`${nodeResult.disabled.length} disabled`)
+        summary.push(`Nodes: ${parts.join(', ')}`)
+      }
+      if (nodeResult.failed.length > 0) summary.push(`${nodeResult.failed.length} node(s) failed`)
+      if (nodeResult.unreportable.length > 0) summary.push(`${nodeResult.unreportable.length} standalone .py file(s) not restorable`)
+
+      if (pipResult.installed.length > 0 || pipResult.changed.length > 0 || pipResult.removed.length > 0) {
+        const parts: string[] = []
+        if (pipResult.installed.length > 0) parts.push(`${pipResult.installed.length} installed`)
+        if (pipResult.changed.length > 0) parts.push(`${pipResult.changed.length} changed`)
+        if (pipResult.removed.length > 0) parts.push(`${pipResult.removed.length} removed`)
+        summary.push(`Packages: ${parts.join(', ')}`)
+      }
+      if (pipResult.protectedSkipped.length > 0) summary.push(`${pipResult.protectedSkipped.length} protected (skipped)`)
+      if (pipResult.failed.length > 0) summary.push(`${pipResult.failed.length} package(s) failed`)
+
+      const totalFailures = nodeResult.failed.length + pipResult.failed.length
 
       if (summary.length === 0) {
         sendOutput(`\n✓ ${t('standalone.snapshotRestoreNothingToDo')}\n`)
@@ -664,9 +692,9 @@ export const standalone: SourcePlugin = {
         return { ok: true, navigate: 'detail' }
       }
 
-      sendOutput(`\n${result.failed.length > 0 ? '⚠' : '✓'} ${t('standalone.snapshotRestoreComplete')}: ${summary.join(', ')}\n`)
+      sendOutput(`\n${totalFailures > 0 ? '⚠' : '✓'} ${t('standalone.snapshotRestoreComplete')}: ${summary.join('; ')}\n`)
 
-      if (result.failed.length > 0) {
+      if (pipResult.failed.length > 0) {
         return { ok: false, message: t('standalone.snapshotRestoreReverted') }
       }
 
@@ -678,7 +706,8 @@ export const standalone: SourcePlugin = {
       } catch {}
 
       sendProgress('done', { percent: 100, status: t('standalone.snapshotRestoreComplete') })
-      return { ok: true, navigate: 'detail' }
+      return { ok: totalFailures === 0, navigate: 'detail',
+        ...(totalFailures > 0 ? { message: `${totalFailures} operation(s) failed` } : {}) }
     }
 
     if (actionId === 'snapshot-delete') {
