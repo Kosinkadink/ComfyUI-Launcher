@@ -213,20 +213,12 @@ jobs:
     name: Publish Release
 
     steps:
-<<<<<<< HEAD
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-          merge-multiple: true
-=======
       - name: Create GitHub Release (gh CLI)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
->>>>>>> origin/main
 
           tag="${GITHUB_REF_NAME}"
 
