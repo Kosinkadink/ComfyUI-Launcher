@@ -117,18 +117,52 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs')
 
+          const stripAnsi = (text) => text.replace(/\u001b\[[0-9;]*m/g, '')
+
+          const tryParseJson = (text) => {
+            const trimmed = text.trim()
+            if (!trimmed) return null
+            try {
+              return JSON.parse(trimmed)
+            } catch {
+              return null
+            }
+          }
+
+          const extractJsonPayload = (raw) => {
+            const cleaned = stripAnsi(raw)
+
+            const direct = tryParseJson(cleaned)
+            if (direct !== null) return direct
+
+            const starts = []
+            for (let i = 0; i < cleaned.length; i += 1) {
+              const ch = cleaned[i]
+              if (ch === '{' || ch === '[') starts.push(i)
+            }
+
+            // Try right-most candidates first since CLI often prints logs before JSON.
+            for (let s = starts.length - 1; s >= 0; s -= 1) {
+              const start = starts[s]
+              const open = cleaned[start]
+              const close = open === '{' ? '}' : ']'
+
+              for (let end = cleaned.length - 1; end > start; end -= 1) {
+                if (cleaned[end] !== close) continue
+                const parsed = tryParseJson(cleaned.slice(start, end + 1))
+                if (parsed !== null) return parsed
+              }
+            }
+
+            throw new Error('Unable to find a valid JSON payload in ToDesktop output')
+          }
+
           const parseBuildOutput = (filePath) => {
             const raw = fs.readFileSync(filePath, 'utf8')
-            const start = raw.indexOf('[')
-            const end = raw.lastIndexOf(']')
-            const jsonText =
-              start !== -1 && end !== -1 && end > start
-                ? raw.slice(start, end + 1)
-                : raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
 
             let parsed
             try {
-              parsed = JSON.parse(jsonText)
+              parsed = extractJsonPayload(raw)
             } catch (err) {
               console.error(`Failed to parse ToDesktop build JSON output from ${filePath}`)
               console.error(raw.slice(0, 1000))
