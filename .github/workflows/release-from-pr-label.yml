@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   actions: write
+  pull-requests: read
 
 concurrency:
   group: release-from-pr-${{ github.event.pull_request.number }}
@@ -35,22 +36,40 @@ jobs:
         with:
           node-version: 22
 
-      - name: Detect package.json version change
+      - name: Detect package.json version change from pull request files
         id: version
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
           set -euo pipefail
 
-          PREV_VERSION="$(git show "${MERGE_SHA}^:package.json" | node -e 'let d = ""; process.stdin.on("data", (c) => d += c); process.stdin.on("end", () => { process.stdout.write(String(JSON.parse(d).version ?? "")); });')"
+          PACKAGE_PATCH="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+            --jq '.[] | select(.filename=="package.json") | .patch // ""')"
           CUR_VERSION="$(node -p "require('./package.json').version")"
+          PREV_VERSION="$(printf '%s\n' "${PACKAGE_PATCH}" | sed -nE 's/^- *\"version\": *\"([^\"]+)\".*/\1/p' | head -n1)"
+          PATCH_NEXT_VERSION="$(printf '%s\n' "${PACKAGE_PATCH}" | sed -nE 's/^\+ *\"version\": *\"([^\"]+)\".*/\1/p' | head -n1)"
 
           echo "previous_version=${PREV_VERSION}" >> "$GITHUB_OUTPUT"
           echo "current_version=${CUR_VERSION}" >> "$GITHUB_OUTPUT"
 
-          if [ "${PREV_VERSION}" = "${CUR_VERSION}" ]; then
+          if [ -z "${PACKAGE_PATCH}" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No package.json version change detected in ${MERGE_SHA}; skipping tag/release."
+            echo "No package.json change detected in PR #${PR_NUMBER}; skipping tag/release."
+            exit 0
+          fi
+
+          if [ -z "${PREV_VERSION}" ] || [ -z "${PATCH_NEXT_VERSION}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "package.json changed but version field diff was not detected; skipping tag/release."
+            exit 0
+          fi
+
+          if [ "${PREV_VERSION}" = "${PATCH_NEXT_VERSION}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "package.json version did not change (${CUR_VERSION}); skipping tag/release."
             exit 0
           fi
 
