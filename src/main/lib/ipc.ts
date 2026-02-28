@@ -1281,7 +1281,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
 
       const SENSITIVE_ARG_RE = /^--(api[-_]?key|token|secret|password|auth)$/i
       const PORT_RETRY_MAX = 3
+      const REBOOT_RETRY_MAX = 5
       let portRetries = 0
+      let rebootRetries = 0
 
       const tryLaunch = async (): Promise<{ ok: true; proc: ChildProcess; getStderr: () => string } | { ok: false; message: string }> => {
         const cmdLine = [launchCmd.cmd!, ...launchCmd.args!].map((a, ci, ca) => {
@@ -1326,6 +1328,13 @@ export function register(callbacks: RegisterCallbacks = {}): void {
           return { ok: true, proc: spawned.proc, getStderr: spawned.getStderr }
         } catch (err) {
           killProcessTree(spawned.proc)
+          // Manager's prestartup_script may finish a queued install and request
+          // a reboot before ComfyUI's port opens. Detect the marker and respawn.
+          if (checkRebootMarker(sessionPath) && rebootRetries < REBOOT_RETRY_MAX) {
+            rebootRetries++
+            sendOutput('\n--- Manager requested restart during startup, respawning… ---\n\n')
+            return tryLaunch()
+          }
           const stderr = spawned.getStderr().toLowerCase()
           const isPortConflict = stderr.includes('address already in use') || (stderr.includes('port') && stderr.includes('in use'))
           if (isPortConflict && portRetries < PORT_RETRY_MAX) {

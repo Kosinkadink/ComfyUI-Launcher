@@ -986,6 +986,10 @@ export async function restoreCustomNodes(
     if (signal?.aborted) break
     if (isManagerNode(currentNode)) continue
     if (!targetByKey.has(key)) {
+      if (!isSafePathComponent(currentNode.dirName)) {
+        result.failed.push({ id: currentNode.id, error: 'invalid directory name' })
+        continue
+      }
       try {
         const nodePath = currentNode.enabled
           ? path.join(customNodesDir, currentNode.dirName)
