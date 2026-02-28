@@ -668,12 +668,13 @@ export const standalone: SourcePlugin = {
       // Build combined summary
       const summary: string[] = []
       const nodeActions = nodeResult.installed.length + nodeResult.switched.length +
-        nodeResult.enabled.length + nodeResult.disabled.length
+        nodeResult.enabled.length + nodeResult.disabled.length + nodeResult.removed.length
       if (nodeActions > 0) {
         const parts: string[] = []
         if (nodeResult.installed.length > 0) parts.push(`${nodeResult.installed.length} installed`)
         if (nodeResult.switched.length > 0) parts.push(`${nodeResult.switched.length} switched`)
         if (nodeResult.enabled.length > 0) parts.push(`${nodeResult.enabled.length} enabled`)
+        if (nodeResult.removed.length > 0) parts.push(`${nodeResult.removed.length} removed`)
         if (nodeResult.disabled.length > 0) parts.push(`${nodeResult.disabled.length} disabled`)
         summary.push(`Nodes: ${parts.join(', ')}`)
       }

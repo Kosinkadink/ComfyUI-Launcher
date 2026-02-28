@@ -829,6 +829,7 @@ export interface NodeRestoreResult {
   switched: string[]
   enabled: string[]
   disabled: string[]
+  removed: string[]
   skipped: string[]
   failed: Array<{ id: string; error: string }>
   unreportable: string[]
@@ -914,7 +915,7 @@ export async function restoreCustomNodes(
 ): Promise<NodeRestoreResult> {
   const result: NodeRestoreResult = {
     installed: [], switched: [], enabled: [], disabled: [],
-    skipped: [], failed: [], unreportable: [],
+    removed: [], skipped: [], failed: [], unreportable: [],
   }
 
   const comfyuiDir = path.join(installPath, 'ComfyUI')
@@ -941,13 +942,14 @@ export async function restoreCustomNodes(
   }
 
   // Compute and print the plan
+  const toRemove: string[] = []
   const toDisable: string[] = []
   const toInstallNodes: string[] = []
   const toSwitch: string[] = []
   const toEnable: string[] = []
   for (const [key, currentNode] of currentByKey) {
     if (isManagerNode(currentNode)) continue
-    if (!targetByKey.has(key) && currentNode.enabled) toDisable.push(currentNode.id)
+    if (!targetByKey.has(key)) toRemove.push(currentNode.id)
   }
   for (const targetNode of targetSnapshot.customNodes) {
     if (isManagerNode(targetNode)) continue
@@ -971,6 +973,7 @@ export async function restoreCustomNodes(
   if (toInstallNodes.length > 0) planParts.push(`install ${toInstallNodes.length}`)
   if (toSwitch.length > 0) planParts.push(`switch ${toSwitch.length}`)
   if (toEnable.length > 0) planParts.push(`enable ${toEnable.length}`)
+  if (toRemove.length > 0) planParts.push(`remove ${toRemove.length}`)
   if (toDisable.length > 0) planParts.push(`disable ${toDisable.length}`)
   if (planParts.length > 0) {
     sendOutput(`\nPlan: ${planParts.join(', ')} node(s)\n\n`)
@@ -978,17 +981,20 @@ export async function restoreCustomNodes(
     sendOutput('\nNo node changes needed\n')
   }
 
-  // 2. Disable extras: enabled nodes not in target
+  // 2. Remove extras: nodes not in target snapshot (enabled or disabled)
   for (const [key, currentNode] of currentByKey) {
     if (signal?.aborted) break
     if (isManagerNode(currentNode)) continue
-    if (!targetByKey.has(key) && currentNode.enabled) {
+    if (!targetByKey.has(key)) {
       try {
-        await disableNode(customNodesDir, currentNode.dirName)
-        result.disabled.push(currentNode.id)
-        sendOutput(`Disabled ${currentNode.id}\n`)
+        const nodePath = currentNode.enabled
+          ? path.join(customNodesDir, currentNode.dirName)
+          : path.join(customNodesDir, '.disabled', currentNode.dirName)
+        await fs.promises.rm(nodePath, { recursive: true, force: true })
+        result.removed.push(currentNode.id)
+        sendOutput(`Removed ${currentNode.id}\n`)
       } catch (err) {
-        result.failed.push({ id: currentNode.id, error: `disable failed: ${(err as Error).message}` })
+        result.failed.push({ id: currentNode.id, error: `remove failed: ${(err as Error).message}` })
       }
     }
   }
