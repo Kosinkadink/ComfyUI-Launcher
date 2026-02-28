@@ -13,6 +13,7 @@ import { t } from '../lib/i18n'
 import * as installations from '../installations'
 import { listCustomNodes, findComfyUIDir, backupDir, mergeDirFlat } from '../lib/migrate'
 import * as settings from '../settings'
+import * as snapshots from '../lib/snapshots'
 import type { InstallationRecord } from '../installations'
 import type {
   SourcePlugin,
@@ -326,6 +327,54 @@ export const standalone: SourcePlugin = {
       },
     ]
 
+    // Snapshot history section
+    if (installed && installation.installPath) {
+      const snapshotEntries = snapshots.listSnapshotsSync(installation.installPath)
+      const snapshotCount = snapshotEntries.length
+      const formatLabel = (s: snapshots.SnapshotEntry, isCurrent: boolean): string => {
+        const date = new Date(s.snapshot.createdAt).toLocaleString()
+        const trigger = s.snapshot.trigger === 'boot' ? t('standalone.snapshotBoot')
+          : s.snapshot.trigger === 'restart' ? t('standalone.snapshotRestart')
+          : s.snapshot.trigger === 'pre-update' ? t('standalone.snapshotPreUpdate')
+          : t('standalone.snapshotManual')
+        if (isCurrent) {
+          return s.snapshot.label
+            ? `★ ${t('standalone.snapshotCurrent')}  ·  ${trigger}: ${s.snapshot.label}  ·  ${date}`
+            : `★ ${t('standalone.snapshotCurrent')}  ·  ${trigger}  ·  ${date}`
+        }
+        return s.snapshot.label ? `${trigger}: ${s.snapshot.label}  ·  ${date}` : `${trigger}  ·  ${date}`
+      }
+      sections.push({
+        tab: 'status',
+        title: t('standalone.snapshotHistory'),
+        description: snapshotCount > 0
+          ? t('standalone.snapshotHistoryDesc', { count: snapshotCount })
+          : t('standalone.snapshotHistoryEmpty'),
+        collapsed: snapshotCount > 0,
+        items: snapshotEntries.slice(0, 20).map((s, i) => ({
+          label: formatLabel(s, i === 0),
+          actions: i === 0 ? [] : [
+            { id: 'snapshot-restore', label: t('standalone.snapshotRestore'),
+              data: { file: s.filename },
+              showProgress: true, progressTitle: t('standalone.snapshotRestoringTitle'), cancellable: true,
+              confirm: { title: t('standalone.snapshotRestoreTitle'), message: t('standalone.snapshotRestoreMessage') } },
+            { id: 'snapshot-delete', label: t('standalone.snapshotDelete'), style: 'danger',
+              data: { file: s.filename },
+              confirm: { title: t('standalone.snapshotDeleteTitle'), message: t('standalone.snapshotDeleteMessage') } },
+          ],
+        })),
+        actions: [
+          { id: 'snapshot-save', label: t('standalone.snapshotSave'),
+            prompt: {
+              title: t('standalone.snapshotSaveTitle'),
+              message: t('standalone.snapshotSaveMessage'),
+              placeholder: t('standalone.snapshotLabelPlaceholder'),
+              field: 'label',
+            } },
+        ],
+      })
+    }
+
     // Updates section
     const hasGit = installed && installation.installPath && fs.existsSync(path.join(installation.installPath, 'ComfyUI', '.git'))
     const track = (installation.updateTrack as string | undefined) || 'stable'
@@ -533,6 +582,15 @@ export const standalone: SourcePlugin = {
     await update({ envMethods })
     sendProgress('cleanup', { percent: -1, status: t('standalone.cleanupEnvStatus') })
     await stripMasterPackages(installation.installPath)
+
+    // Capture initial snapshot so the detail view shows "Current" immediately
+    try {
+      const filename = await snapshots.saveSnapshot(installation.installPath, installation, 'boot')
+      const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
+      await update({ lastSnapshot: filename, snapshotCount })
+    } catch (err) {
+      console.warn('Initial snapshot failed:', err)
+    }
   },
 
   probeInstallation(dirPath: string): Record<string, unknown> | null {
@@ -570,6 +628,106 @@ export const standalone: SourcePlugin = {
     actionData: Record<string, unknown> | undefined,
     { update, sendProgress, sendOutput, signal }: ActionTools
   ): Promise<ActionResult> {
+    if (actionId === 'snapshot-save') {
+      const label = (actionData?.label as string | undefined) || undefined
+      const filename = await snapshots.saveSnapshot(installation.installPath, installation, 'manual', label)
+      const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
+      await update({ lastSnapshot: filename, snapshotCount })
+      return { ok: true, navigate: 'detail' }
+    }
+
+    if (actionId === 'snapshot-restore') {
+      const file = actionData?.file as string | undefined
+      if (!file) return { ok: false, message: 'No snapshot file specified.' }
+
+      sendProgress('steps', { steps: [
+        { phase: 'restore-nodes', label: t('standalone.snapshotRestoreNodesPhase') },
+        { phase: 'restore-pip', label: t('standalone.snapshotRestorePipPhase') },
+      ] })
+      sendProgress('restore-nodes', { percent: 0, status: 'Loading snapshot…' })
+      sendOutput('Loading snapshot…\n')
+
+      const targetSnapshot = await snapshots.loadSnapshot(installation.installPath, file)
+
+      // Phase 3: Restore custom nodes first (node installs may add pip dependencies)
+      sendOutput('\n── Restore Nodes ──\n')
+      const nodeResult = await snapshots.restoreCustomNodes(
+        installation.installPath, installation, targetSnapshot, sendProgress, sendOutput, signal
+      )
+
+      if (signal?.aborted) return { ok: false, message: 'Cancelled' }
+
+      // Phase 2: Restore pip packages (syncs to exact target state)
+      sendOutput('\n── Restore Packages ──\n')
+      const pipResult = await snapshots.restorePipPackages(
+        installation.installPath, installation, targetSnapshot,
+        (phase, data) => sendProgress(phase === 'restore' ? 'restore-pip' : phase, data),
+        sendOutput, signal
+      )
+
+      // Build combined summary
+      const summary: string[] = []
+      const nodeActions = nodeResult.installed.length + nodeResult.switched.length +
+        nodeResult.enabled.length + nodeResult.disabled.length + nodeResult.removed.length
+      if (nodeActions > 0) {
+        const parts: string[] = []
+        if (nodeResult.installed.length > 0) parts.push(`${nodeResult.installed.length} installed`)
+        if (nodeResult.switched.length > 0) parts.push(`${nodeResult.switched.length} switched`)
+        if (nodeResult.enabled.length > 0) parts.push(`${nodeResult.enabled.length} enabled`)
+        if (nodeResult.removed.length > 0) parts.push(`${nodeResult.removed.length} removed`)
+        if (nodeResult.disabled.length > 0) parts.push(`${nodeResult.disabled.length} disabled`)
+        summary.push(`Nodes: ${parts.join(', ')}`)
+      }
+      if (nodeResult.failed.length > 0) summary.push(`${nodeResult.failed.length} node(s) failed`)
+      if (nodeResult.unreportable.length > 0) summary.push(`${nodeResult.unreportable.length} standalone .py file(s) not restorable`)
+
+      if (pipResult.installed.length > 0 || pipResult.changed.length > 0 || pipResult.removed.length > 0) {
+        const parts: string[] = []
+        if (pipResult.installed.length > 0) parts.push(`${pipResult.installed.length} installed`)
+        if (pipResult.changed.length > 0) parts.push(`${pipResult.changed.length} changed`)
+        if (pipResult.removed.length > 0) parts.push(`${pipResult.removed.length} removed`)
+        summary.push(`Packages: ${parts.join(', ')}`)
+      }
+      if (pipResult.protectedSkipped.length > 0) summary.push(`${pipResult.protectedSkipped.length} protected (skipped)`)
+      if (pipResult.failed.length > 0) summary.push(`${pipResult.failed.length} package(s) failed`)
+
+      const totalFailures = nodeResult.failed.length + pipResult.failed.length
+
+      if (summary.length === 0) {
+        sendOutput(`\n✓ ${t('standalone.snapshotRestoreNothingToDo')}\n`)
+        sendProgress('done', { percent: 100, status: t('standalone.snapshotRestoreNothingToDo') })
+        return { ok: true, navigate: 'detail' }
+      }
+
+      sendOutput(`\n${totalFailures > 0 ? '⚠' : '✓'} ${t('standalone.snapshotRestoreComplete')}: ${summary.join('; ')}\n`)
+
+      if (pipResult.failed.length > 0) {
+        return { ok: false, message: t('standalone.snapshotRestoreReverted') }
+      }
+
+      // Capture a new snapshot reflecting the restored state
+      try {
+        const filename = await snapshots.saveSnapshot(installation.installPath, installation, 'manual', 'after-restore')
+        const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
+        await update({ lastSnapshot: filename, snapshotCount })
+      } catch {}
+
+      sendProgress('done', { percent: 100, status: t('standalone.snapshotRestoreComplete') })
+      return { ok: totalFailures === 0, navigate: 'detail',
+        ...(totalFailures > 0 ? { message: `${totalFailures} operation(s) failed` } : {}) }
+    }
+
+    if (actionId === 'snapshot-delete') {
+      const file = actionData?.file as string | undefined
+      if (!file) return { ok: false, message: 'No snapshot file specified.' }
+      await snapshots.deleteSnapshot(installation.installPath, file)
+      const remaining = await snapshots.listSnapshots(installation.installPath)
+      const snapshotCount = remaining.length
+      const lastSnapshot = remaining.length > 0 ? remaining[0]!.filename : null
+      await update({ snapshotCount, ...(file === installation.lastSnapshot ? { lastSnapshot } : {}) })
+      return { ok: true, navigate: 'detail' }
+    }
+
     if (actionId === 'check-update') {
       const track = (installation.updateTrack as string | undefined) || 'stable'
       return releaseCache.checkForUpdate(COMFYUI_REPO, track, installation, update)
@@ -602,9 +760,18 @@ export const standalone: SourcePlugin = {
         { phase: 'deps', label: t('standalone.updateDeps') },
       ] })
 
-      sendProgress('prepare', { percent: -1, status: t('standalone.updatePrepare') })
+      sendProgress('prepare', { percent: -1, status: t('standalone.updatePrepareSnapshot') })
 
-      sendProgress('run', { percent: -1, status: t('standalone.updateRun') })
+      // Auto-snapshot before update
+      try {
+        const filename = await snapshots.saveSnapshot(installPath, installation, 'pre-update', 'before-update')
+        const snapshotCount = await snapshots.getSnapshotCount(installPath)
+        await update({ lastSnapshot: filename, snapshotCount })
+      } catch (err) {
+        console.warn('Pre-update snapshot failed:', err)
+      }
+
+      sendProgress('run', { percent: -1, status: t('standalone.updateFetching') })
 
       const updateScript = app.isPackaged
         ? path.join(process.resourcesPath, 'lib', 'update_comfyui.py')

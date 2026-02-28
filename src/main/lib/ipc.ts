@@ -28,6 +28,7 @@ import { ensureModelPathsConfig } from './models'
 import { copyDirWithProgress } from './copy'
 import { fetchJSON } from './fetch'
 import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
+import { captureSnapshotIfChanged, getSnapshotCount } from './snapshots'
 import type { FieldOption, SourcePlugin } from '../types/sources'
 import type { Theme, ResolvedTheme } from '../../types/ipc'
 import type { LaunchCmd } from './process'
@@ -1320,7 +1321,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
 
       const SENSITIVE_ARG_RE = /^--(api[-_]?key|token|secret|password|auth)$/i
       const PORT_RETRY_MAX = 3
+      const REBOOT_RETRY_MAX = 5
       let portRetries = 0
+      let rebootRetries = 0
 
       const tryLaunch = async (): Promise<{ ok: true; proc: ChildProcess; getStderr: () => string } | { ok: false; message: string }> => {
         const cmdLine = [launchCmd.cmd!, ...launchCmd.args!].map((a, ci, ca) => {
@@ -1365,6 +1368,13 @@ export function register(callbacks: RegisterCallbacks = {}): void {
           return { ok: true, proc: spawned.proc, getStderr: spawned.getStderr }
         } catch (err) {
           killProcessTree(spawned.proc)
+          // Manager's prestartup_script may finish a queued install and request
+          // a reboot before ComfyUI's port opens. Detect the marker and respawn.
+          if (checkRebootMarker(sessionPath) && rebootRetries < REBOOT_RETRY_MAX) {
+            rebootRetries++
+            sendOutput('\n--- Manager requested restart during startup, respawning… ---\n\n')
+            return tryLaunch()
+          }
           const stderr = spawned.getStderr().toLowerCase()
           const isPortConflict = stderr.includes('address already in use') || (stderr.includes('port') && stderr.includes('in use'))
           if (isPortConflict && portRetries < PORT_RETRY_MAX) {
@@ -1392,6 +1402,18 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       _addSession(installationId, { proc, port: launchCmd.port!, mode, installationName: inst.name })
       writePortLock(launchCmd.port!, { pid: proc.pid!, installationName: inst.name })
 
+      // Capture snapshot in background after successful launch
+      if (inst.sourceId === 'standalone') {
+        captureSnapshotIfChanged(inst.installPath, inst, 'boot')
+          .then(async ({ saved, filename }) => {
+            if (saved) {
+              const snapshotCount = await getSnapshotCount(inst.installPath)
+              installations.update(installationId, { lastSnapshot: filename, snapshotCount })
+            }
+          })
+          .catch((err) => console.warn('Snapshot capture failed:', err))
+      }
+
       function attachExitHandler(p: ChildProcess): void {
         p.on('exit', (code) => {
           if (checkRebootMarker(sessionPath)) {
@@ -1403,6 +1425,20 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             writePortLock(launchCmd.port!, { pid: proc.pid!, installationName: inst.name })
             attachExitHandler(proc)
             if (_onComfyRestarted) _onComfyRestarted({ installationId, process: proc })
+            // Capture snapshot after Manager-triggered restart
+            if (inst.sourceId === 'standalone') {
+              installations.get(installationId).then((currentInst) => {
+                if (!currentInst) return
+                captureSnapshotIfChanged(currentInst.installPath, currentInst, 'restart')
+                  .then(async ({ saved, filename }) => {
+                    if (saved) {
+                      const snapshotCount = await getSnapshotCount(currentInst.installPath)
+                      installations.update(installationId, { lastSnapshot: filename, snapshotCount })
+                    }
+                  })
+                  .catch((err) => console.warn('Snapshot capture failed:', err))
+              })
+            }
             return
           }
           const crashed = _runningSessions.has(installationId)
@@ -1420,24 +1456,29 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       }
       return { ok: true, mode, port: launchCmd.port }
     }
+    // Actions that modify the pip environment require ComfyUI to be stopped
+    if (actionId === 'snapshot-restore' && _runningSessions.has(installationId)) {
+      return { ok: false, message: i18n.t('standalone.snapshotRestoreStopRequired') }
+    }
     // Delegate to source plugin's handleAction
+    const abort = new AbortController()
+    _operationAborts.set(installationId, abort)
     const sender = _event.sender
     const sendProgress = (phase: string, detail: Record<string, unknown>): void => {
-      if (!sender.isDestroyed()) {
-        sender.send('install-progress', { installationId, phase, ...detail })
-      }
+      try { if (!sender.isDestroyed()) sender.send('install-progress', { installationId, phase, ...detail }) } catch {}
     }
     const sendOutput = (text: string): void => {
-      if (!sender.isDestroyed()) {
-        sender.send('comfy-output', { installationId, text })
-      }
+      try { if (!sender.isDestroyed()) sender.send('comfy-output', { installationId, text }) } catch {}
     }
     const update = (data: Record<string, unknown>): Promise<void> =>
       installations.update(installationId, data).then(() => {})
     try {
-      return await resolveSource(inst.sourceId).handleAction(actionId, inst, actionData, { update, sendProgress, sendOutput })
+      return await resolveSource(inst.sourceId).handleAction(actionId, inst, actionData, { update, sendProgress, sendOutput, signal: abort.signal })
     } catch (err) {
+      if (abort.signal.aborted) return { ok: false, message: 'Cancelled' }
       return { ok: false, message: (err as Error).message }
+    } finally {
+      _operationAborts.delete(installationId)
     }
   })
 }
