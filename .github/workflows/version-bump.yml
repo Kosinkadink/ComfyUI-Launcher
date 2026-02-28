@@ -17,15 +17,16 @@ on:
           - patch
           - minor
           - major
-      push_tag:
-        description: Create and push a matching v<version> tag for the PR commit
+      release:
+        description: Apply Release label (tag + draft release after merge)
         required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: version-bump-${{ github.event.inputs.target_branch }}
@@ -130,9 +131,7 @@ jobs:
           git checkout -B "${PR_BRANCH}"
           git add package.json
           git commit -m "chore: bump version to ${NEW_VERSION}"
-          git push --force-with-lease origin "${PR_BRANCH}"
-
-          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git push --force origin "${PR_BRANCH}"
 
       - name: Create or update version bump pull request
         id: pr
@@ -143,7 +142,8 @@ jobs:
           OLD_VERSION: ${{ steps.bump.outputs.old_version }}
           NEW_VERSION: ${{ steps.bump.outputs.new_version }}
           BUMP_TYPE: ${{ inputs.bump }}
-          PUSH_TAG: ${{ inputs.push_tag }}
+          RELEASE_REQUESTED: ${{ inputs.release }}
+          RELEASE_LABEL: Release
         run: |
           set -euo pipefail
 
@@ -156,7 +156,7 @@ jobs:
           ## Details
           - target branch: \`${TARGET_BRANCH}\`
           - bump type: \`${BUMP_TYPE}\`
-          - requested tag creation: \`${PUSH_TAG}\`
+          - release label requested: \`${RELEASE_REQUESTED}\`
           EOF
 
           EXISTING_PR_NUMBER="$(gh pr list \
@@ -177,6 +177,7 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --json url \
               --jq '.url')"
+            PR_NUMBER="${EXISTING_PR_NUMBER}"
           else
             PR_URL="$(gh pr create \
               --repo "${GITHUB_REPOSITORY}" \
@@ -184,30 +185,34 @@ jobs:
               --head "${PR_BRANCH}" \
               --title "chore: bump version to ${NEW_VERSION}" \
               --body-file "${BODY_FILE}")"
+            PR_NUMBER="${PR_URL##*/}"
           fi
 
+          if [ "${RELEASE_REQUESTED}" = "true" ]; then
+            if ! gh api --silent --method GET "repos/${GITHUB_REPOSITORY}/labels/${RELEASE_LABEL}" >/dev/null 2>&1; then
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/labels" \
+                -f name="${RELEASE_LABEL}" \
+                -f color="0e8a16" \
+                -f description="Create a post-merge version tag and draft release" >/dev/null
+            fi
+
+            gh pr edit "${PR_NUMBER}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --add-label "${RELEASE_LABEL}"
+          else
+            gh pr edit "${PR_NUMBER}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --remove-label "${RELEASE_LABEL}" >/dev/null 2>&1 || true
+          fi
+
+          echo "pull_request_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "pull_request_url=${PR_URL}" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push version tag
-        if: ${{ inputs.push_tag && steps.branch.outputs.head_sha != '' }}
-        env:
-          PR_HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-
-          TAG="v${{ steps.bump.outputs.new_version }}"
-
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists on origin."
-            exit 1
-          fi
-
-          git tag "${TAG}" "${PR_HEAD_SHA}"
-          git push origin "${TAG}"
+          echo "release_label=${RELEASE_REQUESTED}" >> "$GITHUB_OUTPUT"
 
       - name: Print results
         run: |
           echo "pull_request_url=${{ steps.pr.outputs.pull_request_url }}"
-          if [ "${{ inputs.push_tag }}" = "true" ]; then
-            echo "tag=v${{ steps.bump.outputs.new_version }}"
+          if [ "${{ steps.pr.outputs.release_label }}" = "true" ]; then
+            echo "release_label=Release"
+            echo "post_merge_release=v${{ steps.bump.outputs.new_version }}"
           fi
