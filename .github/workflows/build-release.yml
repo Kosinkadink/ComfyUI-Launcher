@@ -65,6 +65,7 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs')
+
           const raw = fs.readFileSync('todesktop-builds.json', 'utf8')
           const start = raw.indexOf('[')
           const end = raw.lastIndexOf(']')
