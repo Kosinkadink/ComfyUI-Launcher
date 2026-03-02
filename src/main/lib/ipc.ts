@@ -695,6 +695,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             console.warn('Post-install snapshot restore failed:', restoreErr)
             sendOutput(`\n⚠ Snapshot restore failed: ${(restoreErr as Error).message}\nThe installation completed successfully. You can restore the snapshot manually from the Snapshots tab.\n`)
             await update({ pendingSnapshotRestore: undefined })
+          } finally {
+            // Clean up the staged temp file
+            fs.promises.unlink(pendingFile).catch(() => {})
           }
         }
 
@@ -982,10 +985,17 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     const duplicate = await findDuplicatePath(installPath)
     if (duplicate) return { ok: false, message: `Directory already used by "${duplicate.name}".` }
 
+    // Copy snapshot file to a temp location so it survives if the user
+    // moves/deletes the original during the (potentially long) installation.
+    const stagingDir = path.join(os.tmpdir(), 'comfyui-launcher-snapshots')
+    await fs.promises.mkdir(stagingDir, { recursive: true })
+    const stagedFile = path.join(stagingDir, `pending-${Date.now()}.json`)
+    await fs.promises.copyFile(filePaths[0]!, stagedFile)
+
     const entry = await installations.add({
       name,
       installPath,
-      pendingSnapshotRestore: filePaths[0],
+      pendingSnapshotRestore: stagedFile,
       ...instData,
       seen: false,
     })
