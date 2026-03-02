@@ -442,6 +442,14 @@ export interface SnapshotDiffData {
   empty: boolean
 }
 
+export interface SnapshotFilePreview {
+  filePath: string
+  installationName: string
+  snapshotCount: number
+  snapshots: SnapshotSummary[]
+  newestSnapshot: SnapshotDetailData
+}
+
 // --- IPC API interface ---
 export interface ElectronApi {
   // Sources / New Install
@@ -507,7 +515,8 @@ export interface ElectronApi {
   exportSnapshot(installationId: string, filename: string): Promise<{ ok: boolean; message?: string }>
   exportAllSnapshots(installationId: string): Promise<{ ok: boolean; message?: string }>
   importSnapshots(installationId: string): Promise<{ ok: boolean; imported?: number; skipped?: number; message?: string }>
-  createFromSnapshot(): Promise<{ ok: boolean; entry?: { id: string; name: string }; message?: string }>
+  previewSnapshotFile(): Promise<{ ok: boolean; preview?: SnapshotFilePreview; message?: string }>
+  createFromSnapshot(filePath: string): Promise<{ ok: boolean; entry?: { id: string; name: string }; message?: string }>
 
   // Settings
   getSettingsSections(): Promise<SettingsSection[]>

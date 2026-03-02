@@ -67,8 +67,10 @@ const api: ElectronApi = {
     ipcRenderer.invoke('export-all-snapshots', installationId),
   importSnapshots: (installationId) =>
     ipcRenderer.invoke('import-snapshots', installationId),
-  createFromSnapshot: () =>
-    ipcRenderer.invoke('create-from-snapshot'),
+  previewSnapshotFile: () =>
+    ipcRenderer.invoke('preview-snapshot-file'),
+  createFromSnapshot: (filePath: string) =>
+    ipcRenderer.invoke('create-from-snapshot', filePath),
 
   // Settings
   getSettingsSections: () => ipcRenderer.invoke('get-settings-sections'),

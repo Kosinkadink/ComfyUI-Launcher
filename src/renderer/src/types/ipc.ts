@@ -52,5 +52,6 @@ export type {
   SnapshotDiffNodeChange,
   SnapshotDiffResult,
   SnapshotDiffData,
+  SnapshotFilePreview,
   ElectronApi,
 } from '../../../types/ipc'
