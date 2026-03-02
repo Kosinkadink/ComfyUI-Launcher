@@ -9,6 +9,7 @@ import { deleteAction, untrackAction } from '../lib/actions'
 import { downloadAndExtract, downloadAndExtractMulti } from '../lib/installer'
 import { copyDirWithProgress } from '../lib/copy'
 import { parseArgs, formatTime } from '../lib/util'
+import { ARG_SCHEMA } from '../lib/args-schema'
 import { t } from '../lib/i18n'
 import * as installations from '../installations'
 import { listCustomNodes, findComfyUIDir, backupDir, mergeDirFlat } from '../lib/migrate'
@@ -440,7 +441,8 @@ export const standalone: SourcePlugin = {
         title: t('common.launchSettings'),
         fields: [
           { id: 'useSharedPaths', label: t('common.useSharedPaths'), value: (installation.useSharedPaths as boolean | undefined) !== false, editable: true, editType: 'boolean' },
-          { id: 'launchArgs', label: t('common.startupArgs'), value: (installation.launchArgs as string | undefined) ?? DEFAULT_LAUNCH_ARGS, editable: true },
+          { id: 'launchArgs', label: t('common.startupArgs'), value: (installation.launchArgs as string | undefined) ?? DEFAULT_LAUNCH_ARGS, editable: true,
+            editType: 'args-builder', data: { schema: ARG_SCHEMA, version: installation.version as string | undefined } },
           { id: 'launchMode', label: t('common.launchMode'), value: (installation.launchMode as string | undefined) || 'window', editable: true,
             editType: 'select', options: [
               { value: 'window', label: t('common.launchModeWindow') },

@@ -97,11 +97,12 @@ export interface DetailField {
   label: string
   value: string | boolean | number | null
   editable?: boolean
-  editType?: 'select' | 'boolean' | 'text' | 'channel-cards'
+  editType?: 'select' | 'boolean' | 'text' | 'channel-cards' | 'args-builder'
   options?: DetailFieldOption[]
   channelActions?: ActionDef[]
   refreshSection?: boolean
   onChangeAction?: string
+  data?: Record<string, unknown>
 }
 
 export interface ActionDef {
