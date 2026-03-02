@@ -30,9 +30,11 @@ import { copyDirWithProgress } from './copy'
 import { fetchJSON } from './fetch'
 import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
 import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot } from './snapshots'
+import { reportRendererError } from './analytics'
 import { getVariantLabel } from '../sources/standalone'
 import type { FieldOption, SourcePlugin } from '../types/sources'
 import type { Theme, ResolvedTheme, QuitActiveItem } from '../../types/ipc'
+import type { RendererErrorReport } from '../../types/ipc'
 import type { LaunchCmd } from './process'
 
 const MARKER_FILE = '.comfyui-launcher'
@@ -845,6 +847,13 @@ export function register(callbacks: RegisterCallbacks = {}): void {
           { id: 'maxCachedFiles', label: i18n.t('settings.maxCachedFiles'), type: 'number', value: s.maxCachedFiles, min: 1, max: 50 },
         ],
       },
+      {
+        title: i18n.t('settings.privacy'),
+        fields: [
+          { id: 'telemetryEnabled', label: i18n.t('settings.telemetryEnabled'), type: 'boolean', value: s.telemetryEnabled === true },
+          { id: 'errorReportingEnabled', label: i18n.t('settings.errorReportingEnabled'), type: 'boolean', value: s.errorReportingEnabled !== false },
+        ],
+      },
     ]
     const sourceSections = sources.flatMap((src) => {
       const plugin = src as unknown as Record<string, unknown>
@@ -921,6 +930,10 @@ export function register(callbacks: RegisterCallbacks = {}): void {
 
   ipcMain.handle('get-setting', (_event, key: string) => {
     return settings.get(key)
+  })
+
+  ipcMain.handle('report-renderer-error', (_event, payload: RendererErrorReport) => {
+    reportRendererError(payload)
   })
 
   ipcMain.handle('get-locale-messages', () => i18n.getMessages())

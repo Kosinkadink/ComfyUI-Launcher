@@ -319,6 +319,16 @@ export interface UpdateDownloadProgress {
   percent: number
 }
 
+export interface RendererErrorReport {
+  type: 'error' | 'unhandledrejection'
+  message?: string
+  stack?: string
+  source?: string
+  line?: number
+  column?: number
+  reason?: string
+}
+
 // --- Model download types ---
 export type ModelDownloadStatus =
   | 'pending'
@@ -524,6 +534,7 @@ export interface ElectronApi {
   // App
   quitApp(): Promise<void>
   resetZoom(): Promise<void>
+  reportRendererError(payload: RendererErrorReport): Promise<void>
 
   // Updates
   checkForUpdate(): Promise<void>

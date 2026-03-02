@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import todesktop from '@todesktop/runtime'
 import * as settings from '../settings'
 import { evaluateUpdaterCanaryGate } from './updateGate'
+import { captureError, captureTelemetry } from './analytics'
 
 interface UpdateInfo {
   version: string
@@ -81,6 +82,7 @@ function bindUpdaterEvents(): void {
   updater.on('update-available', (info: unknown) => {
     const version = versionFromPayload(info)
     if (!version) return
+    captureTelemetry('updater_update_available', { version })
     broadcast('update-available', { version })
   })
 
@@ -99,17 +101,27 @@ function bindUpdaterEvents(): void {
   updater.on('update-downloaded', (event: unknown) => {
     const version = versionFromPayload(event)
     if (!version) return
+    captureTelemetry('updater_update_downloaded', { version })
     _updateInfo = { version }
     broadcast('update-downloaded', _updateInfo)
   })
 
   updater.on('error', (...args: unknown[]) => {
-    broadcast('update-error', { message: updaterErrorMessage(args) })
+    const message = updaterErrorMessage(args)
+    captureError('updater_runtime_error', new Error(message), { phase: 'event' })
+    broadcast('update-error', { message })
   })
 }
 
 async function runCheck({ source, userInitiated = false }: CheckOptions): Promise<CheckResult> {
+  const startedAt = Date.now()
   const gate = await evaluateUpdaterCanaryGate()
+  captureTelemetry('updater_gate_evaluated', {
+    source,
+    userInitiated,
+    allowed: gate.allowed,
+    reason: gate.reason,
+  })
   const gateSummary = `[updater] canary gate ${source}: ${gate.allowed ? 'allow' : 'block'} (${gate.reason})`
   if (gate.allowed) {
     console.info(gateSummary)
@@ -124,16 +136,35 @@ async function runCheck({ source, userInitiated = false }: CheckOptions): Promis
 
   const updater = getAutoUpdater()
   if (!updater) {
+    captureError('updater_unavailable', new Error(UPDATER_UNAVAILABLE_MESSAGE), { source, userInitiated })
     return { available: false, error: UPDATER_UNAVAILABLE_MESSAGE }
   }
   bindUpdaterEvents()
 
-  const result = await updater.checkForUpdates({
-    source,
-    disableUpdateReadyAction: true,
-  })
-  const version = versionFromPayload(result)
-  return version ? { available: true, version } : { available: false }
+  captureTelemetry('updater_check_started', { source, userInitiated })
+
+  try {
+    const result = await updater.checkForUpdates({
+      source,
+      disableUpdateReadyAction: true,
+    })
+    const version = versionFromPayload(result)
+    captureTelemetry('updater_check_result', {
+      source,
+      userInitiated,
+      available: version !== null,
+      version: version ?? undefined,
+      durationMs: Date.now() - startedAt,
+    })
+    return version ? { available: true, version } : { available: false }
+  } catch (err) {
+    captureError('updater_check_failed', err, {
+      source,
+      userInitiated,
+      durationMs: Date.now() - startedAt,
+    })
+    throw err
+  }
 }
 
 export function register(): void {
@@ -152,9 +183,11 @@ export function register(): void {
       const result = await runCheck({ source: 'download-button', userInitiated: true })
       if (result.blocked) return
       if (!result.available && !_updateInfo) {
+        captureTelemetry('updater_download_without_available_update', { source: 'download-button' })
         broadcast('update-error', { message: result.error || NO_UPDATE_AVAILABLE_MESSAGE })
       }
     } catch (err) {
+      captureError('updater_download_update_failed', err, { source: 'download-button' })
       broadcast('update-error', { message: err instanceof Error ? err.message : String(err) })
     }
   })
@@ -162,12 +195,18 @@ export function register(): void {
   ipcMain.handle('install-update', () => {
     const updater = getAutoUpdater()
     if (!updater) {
+      captureError('updater_install_unavailable', new Error(UPDATER_UNAVAILABLE_MESSAGE), { source: 'install-update' })
       broadcast('update-error', { message: UPDATER_UNAVAILABLE_MESSAGE })
       return
     }
     try {
+      captureTelemetry('updater_install_triggered', {
+        source: 'install-update',
+        version: _updateInfo?.version,
+      })
       updater.restartAndInstall()
     } catch (err) {
+      captureError('updater_install_failed', err, { source: 'install-update', version: _updateInfo?.version })
       broadcast('update-error', { message: err instanceof Error ? err.message : String(err) })
     }
   })

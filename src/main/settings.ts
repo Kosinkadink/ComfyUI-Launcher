@@ -8,6 +8,8 @@ export interface Settings {
   cacheDir: string
   maxCachedFiles: number
   onLauncherClose: string
+  telemetryEnabled: boolean
+  errorReportingEnabled: boolean
   modelsDirs: string[]
   inputDir: string
   outputDir: string
@@ -22,6 +24,8 @@ export const defaults: Settings = {
   cacheDir: path.join(cacheDir(), "download-cache"),
   maxCachedFiles: 5,
   onLauncherClose: "tray",
+  telemetryEnabled: false,
+  errorReportingEnabled: true,
   modelsDirs: [path.join(SHARED_ROOT, "models")],
   inputDir: path.join(SHARED_ROOT, "input"),
   outputDir: path.join(SHARED_ROOT, "output"),

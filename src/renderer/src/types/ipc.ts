@@ -41,6 +41,7 @@ export type {
   PathIssue,
   UpdateInfo,
   UpdateDownloadProgress,
+  RendererErrorReport,
   ModelDownloadStatus,
   ModelDownloadProgress,
   TrackResult,

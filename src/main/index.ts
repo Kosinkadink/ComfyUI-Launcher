@@ -18,8 +18,10 @@ import {
   setLauncherWindow,
 } from './lib/comfyDownloadManager'
 import { getModelDownloadContentScript } from './lib/comfyContentScript'
+import { captureError, registerProcessErrorHandlers } from './lib/analytics'
 
 todesktop.init({ autoUpdater: false })
+registerProcessErrorHandlers()
 
 const APP_ICON = path.join(__dirname, '..', '..', 'assets', 'Comfy_Logo_x256.png')
 const TRAY_ICON = path.join(__dirname, '..', '..', 'assets', 'Comfy_Logo_x32.png')
@@ -403,8 +405,13 @@ function onLaunch({ port, url, process: proc, installation, mode }: {
   })
 
   let failRetryTimer: ReturnType<typeof setTimeout> | null = null
-  comfyWindow.webContents.on('did-fail-load', (_e, code, _desc, _failUrl, isMainFrame) => {
+  comfyWindow.webContents.on('did-fail-load', (_e, code, desc, failUrl, isMainFrame) => {
     if (!isMainFrame || code === -3 || failRetryTimer) return
+    captureError('comfy_window_load_failed', new Error(desc || 'did-fail-load'), {
+      installationId,
+      code,
+      failUrl,
+    })
     failRetryTimer = setTimeout(() => {
       failRetryTimer = null
       if (!comfyWindow.isDestroyed()) {
@@ -413,7 +420,12 @@ function onLaunch({ port, url, process: proc, installation, mode }: {
     }, 2000)
   })
 
-  comfyWindow.webContents.on('render-process-gone', () => {
+  comfyWindow.webContents.on('render-process-gone', (_event, details) => {
+    captureError('comfy_window_render_process_gone', new Error(`render-process-gone (${details.reason})`), {
+      installationId,
+      reason: details.reason,
+      exitCode: details.exitCode,
+    })
     reloadComfy()
   })
 

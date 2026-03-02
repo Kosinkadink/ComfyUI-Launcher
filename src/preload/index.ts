@@ -76,6 +76,7 @@ const api: ElectronApi = {
   // App
   quitApp: () => ipcRenderer.invoke('quit-app'),
   resetZoom: () => ipcRenderer.invoke('reset-zoom'),
+  reportRendererError: (payload) => ipcRenderer.invoke('report-renderer-error', payload),
 
   // Model downloads
   listModelDownloads: () => ipcRenderer.invoke('model-download-list'),
