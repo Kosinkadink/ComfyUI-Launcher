@@ -970,7 +970,11 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     if (!matched) matched = variantOptions[0]!
 
     // 6. Build installation
-    const instData = source.buildInstallation({ release: latestRelease, variant: matched })
+    const instData = {
+      sourceId: source.id,
+      sourceLabel: source.label,
+      ...source.buildInstallation({ release: latestRelease, variant: matched }),
+    }
     const baseName = envelope.installationName || 'ComfyUI'
     const name = await uniqueName(baseName)
     const dirName = name.replace(/[<>:"/\\|?*]+/g, '_').trim() || 'ComfyUI'
