@@ -109,6 +109,10 @@ function cancel(url: string): void {
   window.api.cancelModelDownload(url)
 }
 
+function showInFolder(savePath: string): void {
+  window.api.showDownloadInFolder(savePath)
+}
+
 function dismiss(url: string): void {
   downloadStore.dismiss(url)
 }
@@ -182,6 +186,12 @@ function dismiss(url: string): void {
           </div>
         </div>
         <div class="instance-actions">
+          <button
+            v-if="d.status === 'completed' && d.savePath"
+            @click="showInFolder(d.savePath)"
+          >
+            {{ t('downloads.view') }}
+          </button>
           <button @click="dismiss(d.url)">
             {{ t('downloads.dismiss') }}
           </button>

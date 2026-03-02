@@ -82,6 +82,7 @@ const api: ElectronApi = {
   pauseModelDownload: (url) => ipcRenderer.invoke('model-download-pause', { url }),
   resumeModelDownload: (url) => ipcRenderer.invoke('model-download-resume', { url }),
   cancelModelDownload: (url) => ipcRenderer.invoke('model-download-cancel', { url }),
+  showDownloadInFolder: (savePath) => ipcRenderer.invoke('show-download-in-folder', { savePath }),
 
   // Updates
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),

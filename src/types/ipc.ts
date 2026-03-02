@@ -326,6 +326,7 @@ export interface ModelDownloadProgress {
   url: string
   filename: string
   directory?: string
+  savePath?: string
   progress: number
   receivedBytes?: number
   totalBytes?: number
@@ -529,6 +530,7 @@ export interface ElectronApi {
   pauseModelDownload(url: string): Promise<boolean>
   resumeModelDownload(url: string): Promise<boolean>
   cancelModelDownload(url: string): Promise<boolean>
+  showDownloadInFolder(savePath: string): Promise<void>
 
   // Event listeners (return unsubscribe functions)
   onInstallProgress(callback: (data: ProgressData) => void): Unsubscribe

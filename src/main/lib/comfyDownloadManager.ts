@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import * as settings from '../settings'
@@ -9,6 +9,7 @@ export interface DownloadProgress {
   url: string
   filename: string
   directory?: string
+  savePath?: string
   progress: number
   receivedBytes?: number
   totalBytes?: number
@@ -160,7 +161,7 @@ export async function startModelDownload(
 
   if (await fileExists(savePath)) {
     // File already exists — report completed without starting a download
-    const progress = makeProgress({ progress: 1, status: 'completed' })
+    const progress = makeProgress({ progress: 1, status: 'completed', savePath })
     broadcastProgress(progress)
     return true
   }
@@ -275,11 +276,11 @@ export function attachSessionDownloadHandler(sess: Electron.Session): void {
             url: pending.url,
             filename: pending.filename,
             directory: pending.directory,
+            savePath: pending.savePath,
             progress: 1,
             status: 'completed',
           })
           pendingDownloads.delete(pending.url)
-          // Progress already broadcast to toast UI and Launcher panel
         } else if (state === 'cancelled') {
           try { fs.unlinkSync(pending.tempPath) } catch {}
           reportProgress({
@@ -310,14 +311,16 @@ export function attachSessionDownloadHandler(sess: Electron.Session): void {
       const downloadsDir = app.getPath('downloads')
       const win = BrowserWindow.fromWebContents(webContents)
 
+      let savePath: string | undefined
       if (win) {
         const filePath = dialog.showSaveDialogSync(win, {
           defaultPath: path.join(downloadsDir, suggestedName),
         })
         if (filePath) {
-          item.setSavePath(filePath)
+          savePath = filePath
         } else {
           item.cancel()
+          return
         }
       } else {
         // setSavePath must be synchronous within will-download
@@ -329,8 +332,70 @@ export function attachSessionDownloadHandler(sess: Electron.Session): void {
           candidate = path.join(downloadsDir, `${base} (${i})${ext}`)
           i++
         }
-        item.setSavePath(candidate)
+        savePath = candidate
       }
+
+      item.setSavePath(savePath)
+
+      const url = item.getURL()
+      const filename = path.basename(savePath)
+      const general: PendingDownload = {
+        url,
+        filename,
+        directory: '',
+        savePath,
+        tempPath: '',
+        window: win || BrowserWindow.getAllWindows()[0]!,
+        subscriberWindows: new Set(),
+        item,
+        lastProgress: { url, filename, progress: 0, status: 'pending' },
+        lastSpeedBytes: 0,
+        lastSpeedTime: Date.now(),
+      }
+      pendingDownloads.set(url, general)
+      reportProgress(general.lastProgress)
+
+      item.on('updated', (_ev, state) => {
+        if (state !== 'progressing') return
+        const total = item.getTotalBytes()
+        const received = item.getReceivedBytes()
+        const progress = total > 0 ? received / total : 0
+
+        const now = Date.now()
+        const elapsed = (now - general.lastSpeedTime) / 1000
+        let speed: number | undefined
+        let eta: number | undefined
+        if (elapsed >= 0.5) {
+          const delta = received - general.lastSpeedBytes
+          speed = delta / elapsed
+          general.lastSpeedBytes = received
+          general.lastSpeedTime = now
+          if (speed > 0 && total > 0) {
+            eta = (total - received) / speed
+          }
+        } else {
+          speed = general.lastProgress.speedBytesPerSec
+          eta = general.lastProgress.etaSeconds
+        }
+
+        reportProgress({
+          url, filename, progress,
+          receivedBytes: received, totalBytes: total,
+          speedBytesPerSec: speed, etaSeconds: eta,
+          status: item.isPaused() ? 'paused' : 'downloading',
+        })
+      })
+
+      item.once('done', (_ev, state) => {
+        if (state === 'completed') {
+          reportProgress({ url, filename, savePath, progress: 1, status: 'completed' })
+        } else if (state === 'cancelled') {
+          reportProgress({ url, filename, progress: 0, status: 'cancelled' })
+        } else {
+          reportProgress({ url, filename, progress: 0, status: 'error', error: `Download failed: ${state}` })
+        }
+        pendingDownloads.delete(url)
+      })
     }
   })
 }
@@ -438,4 +503,10 @@ export function registerDownloadIpc(): void {
   )
 
   ipcMain.handle('model-download-list', () => getActiveDownloads())
+
+  ipcMain.handle('show-download-in-folder', (_event, { savePath }: { savePath: string }) => {
+    if (typeof savePath === 'string' && savePath) {
+      shell.showItemInFolder(path.resolve(savePath))
+    }
+  })
 }

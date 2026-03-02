@@ -45,6 +45,7 @@
     "resume": "Resume",
     "cancel": "Cancel",
     "dismiss": "Dismiss",
+    "view": "View",
     "pending": "Starting…",
     "downloading": "Downloading… {percent}%",
     "paused": "Paused · {percent}%",
