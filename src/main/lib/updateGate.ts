@@ -74,7 +74,8 @@ function parseTimeoutMs(value: string | undefined): number {
 function parseFlagAssignment(rawFeatureFlags: unknown, flagKey: string): ParsedFlagAssignment {
   if (Array.isArray(rawFeatureFlags)) {
     const enabled = rawFeatureFlags.some((key) => key === flagKey)
-    return { found: enabled, enabled }
+    // Array payloads list only enabled flags, so absence means explicit false.
+    return { found: true, enabled }
   }
 
   if (rawFeatureFlags && typeof rawFeatureFlags === 'object') {

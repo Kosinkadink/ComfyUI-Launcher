@@ -80,6 +80,16 @@ describe('evaluateUpdaterCanaryGate', () => {
     expect(decision.reason).toBe('flag-allow')
   })
 
+  it('treats missing array-style flag keys as disabled', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      featureFlags: ['other_flag'],
+    })
+    const decision = await evaluateUpdaterCanaryGate(buildConfig({ fallbackPolicy: 'allow' }), fetcher)
+
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('flag-block')
+  })
+
   it('falls back to block when the flag is missing from response', async () => {
     const fetcher = vi.fn().mockResolvedValue({
       featureFlags: {
