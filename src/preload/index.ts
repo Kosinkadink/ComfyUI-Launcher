@@ -106,6 +106,16 @@ const api: ElectronApi = {
     ipcRenderer.on('comfy-exited', handler)
     return () => ipcRenderer.removeListener('comfy-exited', handler)
   },
+  onInstanceLaunching: (callback) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data as Parameters<typeof callback>[0])
+    ipcRenderer.on('instance-launching', handler)
+    return () => ipcRenderer.removeListener('instance-launching', handler)
+  },
+  onInstanceLaunchFailed: (callback) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data as Parameters<typeof callback>[0])
+    ipcRenderer.on('instance-launch-failed', handler)
+    return () => ipcRenderer.removeListener('instance-launch-failed', handler)
+  },
   onInstanceStarted: (callback) => {
     const handler = (_event: IpcRendererEvent, data: unknown) => callback(data as Parameters<typeof callback>[0])
     ipcRenderer.on('instance-started', handler)
@@ -127,7 +137,7 @@ const api: ElectronApi = {
     return () => ipcRenderer.removeListener('locale-changed', handler)
   },
   onConfirmQuit: (callback) => {
-    const handler = () => callback()
+    const handler = (_event: IpcRendererEvent, details: unknown) => callback(details as Parameters<typeof callback>[0])
     ipcRenderer.on('confirm-quit', handler)
     return () => ipcRenderer.removeListener('confirm-quit', handler)
   },

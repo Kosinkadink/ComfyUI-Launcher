@@ -91,7 +91,7 @@ watch(
     if (!id) return null
     const op = progressStore.operations.get(id)
     if (!op) return null
-    return op.finished && op.result?.ok && op.result.mode === 'window' ? id : null
+    return op.finished && (op.result?.cancelled || (op.result?.ok && op.result.mode === 'window')) ? id : null
   },
   (autoCloseId) => {
     if (autoCloseId && displayId.value === autoCloseId && props.installationId !== null) {
@@ -353,7 +353,8 @@ defineExpose({ startOperation, showOperation })
 
         <!-- Flat progress -->
         <template v-else>
-          <div class="progress-status">{{ currentOp.flatStatus }}</div>
+          <div v-if="currentOp.finished && currentOp.error" class="progress-status progress-error-message">{{ currentOp.error }}</div>
+          <div v-else class="progress-status">{{ currentOp.flatStatus }}</div>
           <div
             v-if="!currentOp.finished"
             class="progress-bar-track"

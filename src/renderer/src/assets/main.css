@@ -456,6 +456,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 
 /* Progress */
 .progress-status { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; user-select: text; }
+.progress-error-message { color: var(--danger); }
 .progress-bar-track { width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 16px; }
 .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; width: 0%; transition: width 0.3s ease; }
 .progress-bar-track.indeterminate {
@@ -570,6 +571,13 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   max-height: 50vh; overflow-y: auto;
 }
 .modal-message a { color: var(--accent); text-decoration: underline; cursor: pointer; }
+.modal-body { max-height: 50vh; overflow-y: auto; margin-bottom: 20px; }
+.modal-body .modal-message { max-height: none; overflow-y: visible; margin-bottom: 8px; }
+.modal-details { margin-bottom: 0; }
+.modal-detail-group { margin-bottom: 6px; }
+.modal-detail-label { font-weight: 600; color: var(--text); font-size: 13px; }
+.modal-detail-list { margin: 2px 0 0; padding-left: 20px; list-style: disc; }
+.modal-detail-list li { font-size: 13px; color: var(--text-muted); }
 .modal-input-wrap { margin-bottom: 4px; }
 .modal-error { font-size: 13px; color: var(--danger); min-height: 12px; margin-bottom: 4px; }
 .modal-input { width: 100%; padding: 6px 8px; font-size: 14px; }

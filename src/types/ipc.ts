@@ -182,6 +182,7 @@ export interface ActionResult {
   message?: string
   mode?: 'console' | 'window'
   portConflict?: PortConflictInfo
+  cancelled?: boolean
 }
 
 export interface PortConflictInfo {
@@ -199,6 +200,11 @@ export interface AddResult {
 
 export interface KillResult {
   ok: boolean
+}
+
+export interface QuitActiveItem {
+  name: string
+  type: 'session' | 'operation' | 'download'
 }
 
 // --- Settings types ---
@@ -536,11 +542,13 @@ export interface ElectronApi {
   onInstallProgress(callback: (data: ProgressData) => void): Unsubscribe
   onComfyOutput(callback: (data: ComfyOutputData) => void): Unsubscribe
   onComfyExited(callback: (data: ComfyExitedData) => void): Unsubscribe
+  onInstanceLaunching(callback: (data: { installationId: string; installationName: string }) => void): Unsubscribe
+  onInstanceLaunchFailed(callback: (data: { installationId: string }) => void): Unsubscribe
   onInstanceStarted(callback: (data: RunningInstance) => void): Unsubscribe
   onInstanceStopped(callback: (data: { installationId: string }) => void): Unsubscribe
   onThemeChanged(callback: (theme: ResolvedTheme) => void): Unsubscribe
   onLocaleChanged(callback: (messages: Record<string, unknown>) => void): Unsubscribe
-  onConfirmQuit(callback: () => void): Unsubscribe
+  onConfirmQuit(callback: (details: QuitActiveItem[]) => void): Unsubscribe
   onInstallationsChanged(callback: () => void): Unsubscribe
   onUpdateAvailable(callback: (info: UpdateInfo) => void): Unsubscribe
   onUpdateDownloadProgress(callback: (progress: UpdateDownloadProgress) => void): Unsubscribe
