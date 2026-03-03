@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { ElectronApi, ResolvedTheme } from '../types/ipc'
 
@@ -69,8 +69,11 @@ const api: ElectronApi = {
     ipcRenderer.invoke('import-snapshots', installationId),
   previewSnapshotFile: () =>
     ipcRenderer.invoke('preview-snapshot-file'),
+  previewSnapshotPath: (filePath: string) =>
+    ipcRenderer.invoke('preview-snapshot-path', filePath),
   createFromSnapshot: (filePath: string) =>
     ipcRenderer.invoke('create-from-snapshot', filePath),
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
 
   // Settings
   getSettingsSections: () => ipcRenderer.invoke('get-settings-sections'),

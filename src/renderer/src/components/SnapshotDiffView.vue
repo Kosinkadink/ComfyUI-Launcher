@@ -71,7 +71,7 @@ function formatNodeVersion(node: { version?: string; commit?: string }): string 
 }
 
 .diff-section-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -80,7 +80,7 @@ function formatNodeVersion(node: { version?: string; commit?: string }): string 
 }
 
 .diff-line {
-  font-size: 12px;
+  font-size: 13px;
   font-family: monospace;
   padding: 1px 0;
   white-space: nowrap;

@@ -154,7 +154,10 @@ function createLauncherWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
     },
   })
-  launcherWindow.once('ready-to-show', () => launcherWindow?.show())
+  launcherWindow.once('ready-to-show', () => {
+    launcherWindow?.show()
+    launcherWindow?.focus()
+  })
 
   launcherWindow.setMenuBarVisibility(false)
   launcherWindow.webContents.on('did-finish-load', () => {

@@ -564,7 +564,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
                   :placeholder="t('snapshots.searchNodes')"
                 >
                 <div v-if="filteredCustomNodes.length === 0" class="inspector-empty">—</div>
-                <div v-else class="node-list">
+                <div v-else class="node-list recessed-list">
                   <div v-for="node in filteredCustomNodes" :key="node.id" class="node-row">
                     <span class="node-status" :class="node.enabled ? 'node-enabled' : 'node-disabled'" />
                     <span class="node-name">{{ node.id }}</span>
@@ -591,7 +591,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
                   type="text"
                   :placeholder="t('snapshots.searchPackages')"
                 >
-                <div class="pip-list">
+                <div class="pip-list recessed-list">
                   <div v-for="[name, version] in filteredPipPackages" :key="name" class="pip-row">
                     <span class="pip-name">{{ name }}</span>
                     <span class="pip-version">{{ version }}</span>
@@ -616,6 +616,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
 .snapshot-header {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding: 0 4px 12px;
 }
 
@@ -1092,12 +1093,12 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
 }
 
 .inspector-section-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .inspector-section-title.collapsible {
   cursor: pointer;
@@ -1107,11 +1108,11 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   user-select: none;
 }
 .collapse-indicator {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .inspector-empty {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -1129,16 +1130,24 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
 }
 
 .inspector-field-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
 .inspector-field-value {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Recessed list container */
+.recessed-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
 }
 
 /* Node list */
@@ -1154,13 +1163,13 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   padding: 2px 0;
 }
 
 .node-status {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -1177,18 +1186,18 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
 }
 
 .node-type-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 0 4px;
+  padding: 1px 5px;
   border: 1px solid var(--border);
   border-radius: 3px;
   flex-shrink: 0;
 }
 
 .node-version {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   flex-shrink: 0;
   font-family: monospace;
@@ -1198,7 +1207,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
 .pip-search {
   width: 100%;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 13px;
   border-radius: 5px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -1221,7 +1230,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   justify-content: space-between;
   align-items: center;
   padding: 2px 0;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .pip-name {

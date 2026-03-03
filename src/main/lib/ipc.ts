@@ -947,6 +947,45 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     return { ok: true, imported: result.imported, skipped: result.skipped }
   })
 
+  function buildSnapshotPreview(filePath: string, envelope: SnapshotExportEnvelope): Record<string, unknown> {
+    const newest = envelope.snapshots[0]!
+    const snapshots = envelope.snapshots.map((s, i) => ({
+      filename: `imported-${i}`,
+      createdAt: s.createdAt,
+      trigger: s.trigger,
+      label: s.label,
+      comfyuiVersion: s.comfyui.displayVersion || s.comfyui.ref,
+      nodeCount: s.customNodes.length,
+      pipPackageCount: Object.keys(s.pipPackages).length,
+    }))
+    return {
+      filePath,
+      installationName: envelope.installationName,
+      snapshotCount: envelope.snapshots.length,
+      snapshots,
+      newestSnapshot: {
+        filename: 'imported-0',
+        createdAt: newest.createdAt,
+        trigger: newest.trigger,
+        label: newest.label,
+        comfyui: newest.comfyui,
+        pythonVersion: newest.pythonVersion,
+        updateChannel: newest.updateChannel,
+        customNodes: newest.customNodes.map((n) => ({
+          id: n.id,
+          type: n.type,
+          dirName: n.dirName,
+          enabled: n.enabled,
+          version: n.version,
+          commit: n.commit,
+          url: n.url,
+        })),
+        pipPackageCount: Object.keys(newest.pipPackages).length,
+        pipPackages: newest.pipPackages,
+      },
+    }
+  }
+
   ipcMain.handle('preview-snapshot-file', async (_event) => {
     const win = BrowserWindow.fromWebContents(_event.sender)
     if (!win) return { ok: false, message: 'No window.' }
@@ -963,49 +1002,19 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     let envelope: SnapshotExportEnvelope
     try { envelope = validateExportEnvelope(parsed) } catch (err) { return { ok: false, message: (err as Error).message } }
 
-    const newest = envelope.snapshots[0]!
-    const snapshots = envelope.snapshots.map((s, i) => {
-      const summary: Record<string, unknown> = {
-        filename: `imported-${i}`,
-        createdAt: s.createdAt,
-        trigger: s.trigger,
-        label: s.label,
-        comfyuiVersion: s.comfyui.displayVersion || s.comfyui.ref,
-        nodeCount: s.customNodes.length,
-        pipPackageCount: Object.keys(s.pipPackages).length,
-      }
-      return summary
-    })
+    return { ok: true, preview: buildSnapshotPreview(filePaths[0]!, envelope) }
+  })
 
-    return {
-      ok: true,
-      preview: {
-        filePath: filePaths[0]!,
-        installationName: envelope.installationName,
-        snapshotCount: envelope.snapshots.length,
-        snapshots,
-        newestSnapshot: {
-          filename: 'imported-0',
-          createdAt: newest.createdAt,
-          trigger: newest.trigger,
-          label: newest.label,
-          comfyui: newest.comfyui,
-          pythonVersion: newest.pythonVersion,
-          updateChannel: newest.updateChannel,
-          customNodes: newest.customNodes.map((n) => ({
-            id: n.id,
-            type: n.type,
-            dirName: n.dirName,
-            enabled: n.enabled,
-            version: n.version,
-            commit: n.commit,
-            url: n.url,
-          })),
-          pipPackageCount: Object.keys(newest.pipPackages).length,
-          pipPackages: newest.pipPackages,
-        },
-      },
-    }
+  ipcMain.handle('preview-snapshot-path', async (_event, filePath: string) => {
+    if (!filePath || !fs.existsSync(filePath)) return { ok: false, message: 'Snapshot file not found.' }
+
+    const content = await fs.promises.readFile(filePath, 'utf-8')
+    let parsed: unknown
+    try { parsed = JSON.parse(content) } catch { return { ok: false, message: 'Invalid JSON file.' } }
+    let envelope: SnapshotExportEnvelope
+    try { envelope = validateExportEnvelope(parsed) } catch (err) { return { ok: false, message: (err as Error).message } }
+
+    return { ok: true, preview: buildSnapshotPreview(filePath, envelope) }
   })
 
   ipcMain.handle('create-from-snapshot', async (_event, filePath: string) => {
