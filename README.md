@@ -149,42 +149,6 @@ git push origin v0.1.0
 
 The workflow enforces `tag == package.json version`. Once the build finishes, go to the [Releases](../../releases) page to review and publish the draft.
 
-## Canary Updater Gating
-
-The launcher supports PostHog-gated auto-update checks/downloads so we can do canary rollouts without shipping a new build.
-
-Set these environment variables in packaged builds:
-
-| Variable | Required | Default | Description |
-|---------|----------|---------|-------------|
-| `COMFY_POSTHOG_PROJECT_TOKEN` | Yes (for gating) | - | PostHog project token (`phc_...`) used for feature flag evaluation. |
-| `COMFY_UPDATER_CANARY_FLAG_KEY` | Yes (for gating) | - | Feature flag key that controls whether updates are allowed. |
-| `COMFY_POSTHOG_HOST` | No | `https://us.i.posthog.com` | PostHog host for feature flag evaluation. |
-| `COMFY_UPDATER_CANARY_FALLBACK` | No | `allow` | Fallback when flag lookup fails or flag is missing (`allow` or `block`). |
-| `COMFY_UPDATER_CANARY_TIMEOUT_MS` | No | `5000` | Timeout (milliseconds) for feature flag evaluation. |
-| `COMFY_UPDATER_CANARY_OVERRIDE` | No | - | Local override for testing (`allow` or `block`). |
-| `COMFY_POSTHOG_DISTINCT_ID` | No | auto-generated | Stable distinct ID used for flag evaluation. |
-
-Behavior summary:
-- If required variables are missing, updater gating is disabled and updates proceed normally.
-- If gating is enabled, update checks and downloads run only when the flag allows them.
-- If PostHog is unavailable, fallback behavior is controlled by `COMFY_UPDATER_CANARY_FALLBACK` (default `allow`).
-
-### Telemetry And Error Reporting
-
-The launcher now sends PostHog events in two independent categories:
-
-- Telemetry events (usage/update flow metrics): **opt-in** (`telemetryEnabled` setting defaults to `false`).
-- Error/crash reporting (main/renderer/updater failures): **enabled by default** (`errorReportingEnabled` defaults to `true`).
-
-Optional environment overrides:
-
-| Variable | Default | Description |
-|---------|---------|-------------|
-| `COMFY_POSTHOG_TELEMETRY_ENABLED` | unset | Overrides settings for telemetry (`true`/`false`). |
-| `COMFY_POSTHOG_ERROR_REPORTING_ENABLED` | unset | Overrides settings for crash/error reporting (`true`/`false`). |
-| `COMFY_POSTHOG_TIMEOUT_MS` | `5000` | Timeout for PostHog capture requests. |
-
 ## Data Locations
 
 On **Windows** and **macOS**, all app data lives under the standard Electron `userData` path (`%APPDATA%\comfyui-launcher` / `~/Library/Application Support/comfyui-launcher`).
