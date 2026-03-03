@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useModal } from '../composables/useModal'
 import type { SnapshotFilePreview } from '../types/ipc'
@@ -20,17 +20,24 @@ const { t } = useI18n()
 const modal = useModal()
 
 const preview = ref<SnapshotFilePreview | null>(null)
+const installName = ref('')
 const nodesExpanded = ref(true)
 const pipExpanded = ref(false)
 const loading = ref(false)
+const creating = ref(false)
 const dragging = ref(false)
+
+const INVALID_NAME_CHARS = /[<>:"/\\|?*]/
+const nameHasInvalidChars = computed(() => INVALID_NAME_CHARS.test(installName.value))
 const mouseDownOnOverlay = ref(false)
 
 function open(): void {
   preview.value = null
+  installName.value = ''
   nodesExpanded.value = true
   pipExpanded.value = false
   loading.value = false
+  creating.value = false
   dragging.value = false
 }
 
@@ -46,6 +53,7 @@ async function loadFromPath(filePath: string): Promise<void> {
     }
     if (result.preview) {
       preview.value = result.preview
+      installName.value = result.preview.installationName || ''
       nodesExpanded.value = true
     }
   } finally {
@@ -63,6 +71,7 @@ async function handleBrowse(): Promise<void> {
   }
   if (result.preview) {
     preview.value = result.preview
+    installName.value = result.preview.installationName || ''
     nodesExpanded.value = true
   }
 }
@@ -95,25 +104,31 @@ function handleClearPreview(): void {
 }
 
 async function handleCreate(): Promise<void> {
-  if (!preview.value) return
+  if (!preview.value || creating.value) return
+  creating.value = true
   const filePath = preview.value.filePath
-  preview.value = null
 
-  const result = await window.api.createFromSnapshot(filePath)
-  if (!result.ok) {
-    if (result.message) {
-      await modal.alert({ title: t('list.loadSnapshot'), message: result.message })
+  try {
+    const result = await window.api.createFromSnapshot(filePath, installName.value || undefined)
+    if (!result.ok) {
+      if (result.message) {
+        await modal.alert({ title: t('list.loadSnapshot'), message: result.message })
+      }
+      return
     }
-    return
-  }
-  if (result.entry) {
-    emit('close')
-    emit('show-progress', {
-      installationId: result.entry.id,
-      title: `${t('newInstall.installing')} — ${result.entry.name}`,
-      apiCall: () => window.api.installInstance(result.entry!.id),
-      cancellable: true,
-    })
+    if (result.entry) {
+      creating.value = false
+      emit('close')
+      emit('show-progress', {
+        installationId: result.entry.id,
+        title: `${t('newInstall.installing')} — ${result.entry.name}`,
+        apiCall: () => window.api.installInstance(result.entry!.id),
+        cancellable: true,
+      })
+      return
+    }
+  } finally {
+    creating.value = false
   }
 }
 
@@ -206,6 +221,20 @@ defineExpose({ open })
 
           <!-- Preview content -->
           <template v-if="preview">
+            <!-- Install name -->
+            <div class="ls-section">
+              <div class="ls-field">
+                <span class="ls-label">{{ $t('common.name') }}</span>
+                <input
+                  v-model="installName"
+                  class="ls-name-input"
+                  type="text"
+                  :placeholder="$t('common.namePlaceholder')"
+                >
+                <span v-if="nameHasInvalidChars" class="ls-name-hint">{{ $t('list.snapshotNameHint') }}</span>
+              </div>
+            </div>
+
             <!-- Source info -->
             <div class="ls-section">
               <div class="ls-field">
@@ -270,7 +299,7 @@ defineExpose({ open })
                       <span class="ls-node-status" :class="node.enabled ? 'ls-node-enabled' : 'ls-node-disabled'" />
                       <span class="ls-node-name">{{ node.id }}</span>
                       <span class="ls-node-type">{{ node.type }}</span>
-                      <span class="ls-node-version">{{ formatNodeVersion(node) }}</span>
+                      <span class="ls-node-version" :title="formatNodeVersion(node)">{{ formatNodeVersion(node) }}</span>
                     </div>
                   </div>
                   <div v-else class="ls-empty">—</div>
@@ -287,7 +316,7 @@ defineExpose({ open })
                   <div v-if="preview.newestSnapshot.pipPackageCount > 0" class="ls-recessed-list">
                     <div v-for="(version, name) in preview.newestSnapshot.pipPackages" :key="name" class="ls-pip-row">
                       <span class="ls-pip-name">{{ name }}</span>
-                      <span class="ls-pip-version">{{ version }}</span>
+                      <span class="ls-pip-version" :title="version">{{ version }}</span>
                     </div>
                   </div>
                   <div v-else class="ls-empty">—</div>
@@ -302,10 +331,10 @@ defineExpose({ open })
           <button v-if="preview" @click="handleClearPreview">{{ $t('common.back') }}</button>
           <button
             class="primary"
-            :disabled="!preview"
+            :disabled="!preview || creating"
             @click="handleCreate"
           >
-            {{ $t('list.snapshotCreateInstall') }}
+            {{ creating ? $t('newInstall.loading') : $t('list.snapshotCreateInstall') }}
           </button>
         </div>
       </div>
@@ -405,6 +434,28 @@ defineExpose({ open })
 .ls-value {
   font-size: 14px;
   color: var(--text);
+  user-select: text;
+}
+
+.ls-name-input {
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-sizing: border-box;
+  width: 100%;
+}
+.ls-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ls-name-hint {
+  font-size: 11px;
+  color: var(--warning, #fd9903);
+  margin-top: 2px;
 }
 
 /* Timeline */
@@ -432,21 +483,22 @@ defineExpose({ open })
 
 .ls-trigger {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
-  padding: 2px 6px;
+  letter-spacing: 0.3px;
+  padding: 1px 6px;
   border-radius: 3px;
   flex-shrink: 0;
   color: var(--text-muted);
   background: var(--surface);
-  border: 1px solid var(--border);
 }
 
-.ls-trigger-boot { color: var(--info, #58a6ff); border-color: color-mix(in srgb, var(--info, #58a6ff) 40%, var(--border)); }
-.ls-trigger-manual { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-.ls-trigger-pre-update,
-.ls-trigger-post-update { color: var(--warning, #fd9903); border-color: color-mix(in srgb, var(--warning, #fd9903) 40%, var(--border)); }
-.ls-trigger-post-restore { color: var(--success, #00cd72); border-color: color-mix(in srgb, var(--success, #00cd72) 40%, var(--border)); }
+.ls-trigger-boot { color: var(--text-muted); }
+.ls-trigger-restart { color: var(--info, #58a6ff); }
+.ls-trigger-manual { color: var(--success, #00cd72); }
+.ls-trigger-pre-update { color: var(--success, #00cd72); }
+.ls-trigger-post-update { color: var(--warning, #fd9903); }
+.ls-trigger-post-restore { color: var(--warning, #fd9903); }
 
 .ls-current-tag {
   font-size: 11px;
@@ -527,6 +579,7 @@ defineExpose({ open })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: text;
 }
 
 .ls-node-type {
@@ -545,6 +598,7 @@ defineExpose({ open })
   color: var(--text-muted);
   font-family: monospace;
   flex-shrink: 0;
+  user-select: text;
 }
 
 .ls-empty {
@@ -568,12 +622,17 @@ defineExpose({ open })
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+  user-select: text;
 }
 
 .ls-pip-version {
   color: var(--text-muted);
   font-family: monospace;
-  flex-shrink: 0;
   margin-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+  user-select: text;
 }
 </style>

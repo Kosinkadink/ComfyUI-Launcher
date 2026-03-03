@@ -71,8 +71,8 @@ const api: ElectronApi = {
     ipcRenderer.invoke('preview-snapshot-file'),
   previewSnapshotPath: (filePath: string) =>
     ipcRenderer.invoke('preview-snapshot-path', filePath),
-  createFromSnapshot: (filePath: string) =>
-    ipcRenderer.invoke('create-from-snapshot', filePath),
+  createFromSnapshot: (filePath: string, name?: string) =>
+    ipcRenderer.invoke('create-from-snapshot', filePath, name),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
 
   // Settings

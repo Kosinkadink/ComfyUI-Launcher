@@ -556,21 +556,24 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
                 <span class="collapse-indicator">{{ nodesExpanded ? '▾' : '▸' }}</span>
               </div>
               <template v-if="nodesExpanded">
-                <input
-                  v-if="detail.customNodes.length > 5"
-                  v-model="nodeSearch"
-                  class="pip-search"
-                  type="text"
-                  :placeholder="t('snapshots.searchNodes')"
-                >
-                <div v-if="filteredCustomNodes.length === 0" class="inspector-empty">—</div>
+                <div v-if="detail.customNodes.length === 0" class="inspector-empty">—</div>
                 <div v-else class="node-list recessed-list">
-                  <div v-for="node in filteredCustomNodes" :key="node.id" class="node-row">
-                    <span class="node-status" :class="node.enabled ? 'node-enabled' : 'node-disabled'" />
-                    <span class="node-name">{{ node.id }}</span>
-                    <span class="node-type-badge">{{ node.type }}</span>
-                    <span class="node-version">{{ formatNodeVersion(node) }}</span>
-                  </div>
+                  <input
+                    v-if="detail.customNodes.length > 5"
+                    v-model="nodeSearch"
+                    class="recessed-search"
+                    type="text"
+                    :placeholder="t('snapshots.searchNodes')"
+                  >
+                  <div v-if="filteredCustomNodes.length === 0 && nodeSearch" class="inspector-empty">{{ t('snapshots.searchNoResults') }}</div>
+                  <template v-else>
+                    <div v-for="node in filteredCustomNodes" :key="node.id" class="node-row">
+                      <span class="node-status" :class="node.enabled ? 'node-enabled' : 'node-disabled'" />
+                      <span class="node-name">{{ node.id }}</span>
+                      <span class="node-type-badge">{{ node.type }}</span>
+                      <span class="node-version" :title="formatNodeVersion(node)">{{ formatNodeVersion(node) }}</span>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -585,17 +588,20 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
                 <span class="collapse-indicator">{{ pipExpanded ? '▾' : '▸' }}</span>
               </div>
               <template v-if="pipExpanded">
-                <input
-                  v-model="pipSearch"
-                  class="pip-search"
-                  type="text"
-                  :placeholder="t('snapshots.searchPackages')"
-                >
                 <div class="pip-list recessed-list">
-                  <div v-for="[name, version] in filteredPipPackages" :key="name" class="pip-row">
-                    <span class="pip-name">{{ name }}</span>
-                    <span class="pip-version">{{ version }}</span>
-                  </div>
+                  <input
+                    v-model="pipSearch"
+                    class="recessed-search"
+                    type="text"
+                    :placeholder="t('snapshots.searchPackages')"
+                  >
+                  <div v-if="filteredPipPackages.length === 0 && pipSearch" class="inspector-empty">{{ t('snapshots.searchNoResults') }}</div>
+                  <template v-else>
+                    <div v-for="[name, version] in filteredPipPackages" :key="name" class="pip-row">
+                      <span class="pip-name">{{ name }}</span>
+                      <span class="pip-version" :title="version">{{ version }}</span>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -1140,6 +1146,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: text;
 }
 
 /* Recessed list container */
@@ -1183,6 +1190,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: text;
 }
 
 .node-type-badge {
@@ -1201,10 +1209,11 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   color: var(--text-muted);
   flex-shrink: 0;
   font-family: monospace;
+  user-select: text;
 }
 
-/* Pip packages */
-.pip-search {
+/* Search input inside recessed containers */
+.recessed-search {
   width: 100%;
   padding: 6px 10px;
   font-size: 13px;
@@ -1215,7 +1224,7 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   margin-bottom: 6px;
   box-sizing: border-box;
 }
-.pip-search:focus {
+.recessed-search:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -1240,12 +1249,17 @@ function diffHasChanges(diff: SnapshotDiffResult): boolean {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+  user-select: text;
 }
 
 .pip-version {
   color: var(--text-muted);
   font-family: monospace;
-  flex-shrink: 0;
   margin-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+  user-select: text;
 }
 </style>

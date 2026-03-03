@@ -86,6 +86,7 @@ function formatNodeVersion(node: { version?: string; commit?: string }): string 
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: text;
 }
 .diff-added { color: var(--success, #00cd72); }
 .diff-removed { color: var(--danger); }

@@ -1017,7 +1017,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     return { ok: true, preview: buildSnapshotPreview(filePath, envelope) }
   })
 
-  ipcMain.handle('create-from-snapshot', async (_event, filePath: string) => {
+  ipcMain.handle('create-from-snapshot', async (_event, filePath: string, customName?: string) => {
     if (!filePath || !fs.existsSync(filePath)) return { ok: false, message: 'Snapshot file not found.' }
 
     const content = await fs.promises.readFile(filePath, 'utf-8')
@@ -1065,7 +1065,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       sourceLabel: source.label,
       ...source.buildInstallation({ release: latestRelease, variant: matched }),
     }
-    const baseName = envelope.installationName || 'ComfyUI'
+    const baseName = customName || envelope.installationName || 'ComfyUI'
     const name = await uniqueName(baseName)
     const dirName = name.replace(/[<>:"/\\|?*]+/g, '_').trim() || 'ComfyUI'
     const installDir = defaultInstallDir()

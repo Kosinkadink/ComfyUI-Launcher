@@ -159,6 +159,7 @@ function createLauncherWindow(): void {
     launcherWindow?.focus()
   })
 
+  attachContextMenu(launcherWindow)
   launcherWindow.setMenuBarVisibility(false)
   launcherWindow.webContents.on('did-finish-load', () => {
     if (launcherWindow && !launcherWindow.isDestroyed()) {
