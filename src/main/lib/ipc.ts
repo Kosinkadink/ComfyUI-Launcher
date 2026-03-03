@@ -1004,7 +1004,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     const baseGpu = strippedVariant.replace(/-.*$/, '') // e.g. "nvidia" from "nvidia-cu128"
 
     // 5. Fetch latest release and find matching variant
-    const source = resolveSource('standalone')
+    const source = sourceMap['standalone']!
     const releaseOptions = await source.getFieldOptions('release', {}, {})
     if (releaseOptions.length === 0) return { ok: false, message: 'No releases available.' }
     const latestRelease = releaseOptions[0]!
