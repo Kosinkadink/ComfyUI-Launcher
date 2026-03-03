@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { PostHog } from 'posthog-node'
 import {
   DEFAULT_POSTHOG_HOST,
+  DEFAULT_POSTHOG_PROJECT_TOKEN,
   POSTHOG_DISTINCT_ID_SETTING_KEY,
   normalizePosthogHost,
   parsePosthogTimeoutMs,
@@ -123,7 +124,7 @@ function getOrCreateDistinctId(): string {
 
 export function resolveUpdaterCanaryConfig(env: NodeJS.ProcessEnv = process.env): UpdaterCanaryConfig {
   const flagKey = (env['COMFY_UPDATER_CANARY_FLAG_KEY'] ?? '').trim()
-  const projectToken = (env['COMFY_POSTHOG_PROJECT_TOKEN'] ?? '').trim()
+  const projectToken = (env['COMFY_POSTHOG_PROJECT_TOKEN'] ?? DEFAULT_POSTHOG_PROJECT_TOKEN).trim()
   const host = normalizePosthogHost((env['COMFY_POSTHOG_HOST'] ?? DEFAULT_POSTHOG_HOST).trim() || DEFAULT_POSTHOG_HOST)
   const distinctId = (env['COMFY_POSTHOG_DISTINCT_ID'] ?? env['COMFY_UPDATER_DISTINCT_ID'] ?? '').trim() || getOrCreateDistinctId()
 

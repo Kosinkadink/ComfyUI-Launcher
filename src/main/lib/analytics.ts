@@ -5,6 +5,7 @@ import * as settings from '../settings'
 import type { RendererErrorReport } from '../../types/ipc'
 import {
   DEFAULT_POSTHOG_HOST,
+  DEFAULT_POSTHOG_PROJECT_TOKEN,
   POSTHOG_DISTINCT_ID_SETTING_KEY,
   normalizePosthogHost,
   parsePosthogTimeoutMs,
@@ -95,7 +96,7 @@ function isErrorReportingEnabled(): boolean {
 }
 
 function getPosthogConfig(): PosthogConfig | null {
-  const projectToken = (process.env['COMFY_POSTHOG_PROJECT_TOKEN'] ?? '').trim()
+  const projectToken = (process.env['COMFY_POSTHOG_PROJECT_TOKEN'] ?? DEFAULT_POSTHOG_PROJECT_TOKEN).trim()
   if (!projectToken) return null
 
   const host = normalizePosthogHost((process.env['COMFY_POSTHOG_HOST'] ?? DEFAULT_POSTHOG_HOST).trim() || DEFAULT_POSTHOG_HOST)

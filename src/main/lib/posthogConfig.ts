@@ -1,4 +1,5 @@
 export const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com'
+export const DEFAULT_POSTHOG_PROJECT_TOKEN = 'phc_azkaTV2tXMCmUfdLZEDno7kMc2thiHnbKpXArz4qLiK'
 export const DEFAULT_POSTHOG_TIMEOUT_MS = 5000
 export const MIN_POSTHOG_TIMEOUT_MS = 1000
 export const MAX_POSTHOG_TIMEOUT_MS = 30000
