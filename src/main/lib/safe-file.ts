@@ -28,24 +28,11 @@ export function writeFileSafe(filePath: string, data: string, backup: boolean = 
   if (backup) {
     try { fs.copyFileSync(filePath, bakPath) } catch {}
   }
-  // On Windows, antivirus or indexer may briefly lock the file after a write,
-  // causing EPERM on rename. Retry a few times with a short delay.
-  const RENAME_RETRIES = 3
-  const RENAME_DELAY_MS = 100
-  for (let attempt = 0; ; attempt++) {
-    try {
-      fs.renameSync(tmpPath, filePath)
-      return
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code
-      if ((code === 'EPERM' || code === 'EACCES') && attempt < RENAME_RETRIES) {
-        const until = Date.now() + RENAME_DELAY_MS * (attempt + 1)
-        while (Date.now() < until) { /* busy-wait */ }
-        continue
-      }
-      try { fs.unlinkSync(tmpPath) } catch {}
-      throw err
-    }
+  try {
+    fs.renameSync(tmpPath, filePath)
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath) } catch {}
+    throw err
   }
 }
 
