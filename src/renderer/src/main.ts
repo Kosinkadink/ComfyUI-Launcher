@@ -1,18 +1,10 @@
 import './assets/main.css'
 
+import { datadogRum } from '@datadog/browser-rum'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
-
-interface DatadogRumApi {
-  init(config: Record<string, unknown>): void
-  addError(error: unknown, context?: Record<string, unknown>): void
-}
-
-function getDatadogRum(): DatadogRumApi | null {
-  return ((window as Window & { DD_RUM?: DatadogRumApi }).DD_RUM || null)
-}
 
 function serializeUnknownError(error: unknown): { message: string; stack?: string } {
   if (error instanceof Error) {
@@ -55,12 +47,7 @@ const isDatadogEnabled = !isFlagDisabled(import.meta.env.VITE_DATADOG_RUM_ENABLE
   && datadogClientToken.length > 0
   && datadogApplicationId.length > 0
 
-let datadogRum: DatadogRumApi | null = null
 if (isDatadogEnabled) {
-  datadogRum = getDatadogRum()
-}
-
-if (isDatadogEnabled && datadogRum) {
   datadogRum.init({
     applicationId: datadogApplicationId,
     clientToken: datadogClientToken,
@@ -81,7 +68,7 @@ function reportRendererError(payload: {
   stack?: string
   context?: Record<string, unknown>
 }): void {
-  if (!isDatadogEnabled || !datadogRum) return
+  if (!isDatadogEnabled) return
   const error = new Error(payload.message || 'Unknown error')
   if (payload.stack) {
     error.stack = payload.stack
