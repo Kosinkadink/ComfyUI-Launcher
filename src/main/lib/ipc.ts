@@ -1894,6 +1894,11 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             writePortLock(launchCmd.port!, { pid: proc.pid!, installationName: inst.name })
             attachExitHandler(proc)
             if (_onComfyRestarted) _onComfyRestarted({ installationId, process: proc })
+            // Sync custom-node model directories after Manager-triggered restart
+            if ((inst.useSharedPaths as boolean | undefined) !== false) {
+              const restartModelsDirs = settings.get('modelsDirs') as string[] | undefined
+              syncCustomModelFolders(inst.installPath, restartModelsDirs)
+            }
             // Capture snapshot after Manager-triggered restart
             if (inst.sourceId === 'standalone') {
               installations.get(installationId).then((currentInst) => {
