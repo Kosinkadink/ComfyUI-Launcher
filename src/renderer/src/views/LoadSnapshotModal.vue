@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, toRaw, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useModal } from '../composables/useModal'
 import type { SnapshotFilePreview, FieldOption, GPUInfo } from '../types/ipc'
@@ -146,7 +146,8 @@ async function loadVariantOptions(): Promise<void> {
   variantOptions.value = []
   selectedVariant.value = null
   try {
-    const options = await window.api.getFieldOptions('standalone', 'variant', { release: selectedRelease.value })
+    const rawRelease = JSON.parse(JSON.stringify(toRaw(selectedRelease.value))) as FieldOption
+    const options = await window.api.getFieldOptions('standalone', 'variant', { release: rawRelease })
     if (gen !== optionsGeneration) return
     variantOptions.value = options
 
