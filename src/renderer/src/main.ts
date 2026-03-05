@@ -101,6 +101,7 @@ function handleTelemetryActionBridgeEvent(event: Event): void {
   trackTelemetryAction(detail.actionName, context)
 }
 
+
 async function initializeDatadog(): Promise<void> {
   if (!isDatadogConfigured) return
   const telemetryEnabled = await getTelemetryEnabledSetting()
