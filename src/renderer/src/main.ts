@@ -5,6 +5,11 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
+import {
+  TELEMETRY_ACTION_EVENT_NAME,
+  type TelemetryActionEventDetail,
+  type TelemetryContext,
+} from './lib/telemetry'
 
 function serializeUnknownError(error: unknown): { message: string; stack?: string } {
   if (error instanceof Error) {
@@ -61,12 +66,6 @@ const isDatadogConfigured = !isFlagDisabled(import.meta.env.VITE_DATADOG_RUM_ENA
   && datadogApplicationId.length > 0
 
 let isDatadogInitialized = false
-
-type TelemetryContext = Record<string, boolean | number | string | null | undefined>
-type TelemetryActionEventDetail = {
-  actionName: string
-  context?: TelemetryContext
-}
 
 function toDatadogTrackingConsent(enabled: boolean | undefined): DatadogTrackingConsent {
   return enabled === false ? 'not-granted' : 'granted'
@@ -135,7 +134,7 @@ window.api.onTelemetrySettingChanged((enabled) => {
   setDatadogTrackingConsent(toDatadogTrackingConsent(enabled))
 })
 
-window.addEventListener('launcher-telemetry-action', handleTelemetryActionBridgeEvent)
+window.addEventListener(TELEMETRY_ACTION_EVENT_NAME, handleTelemetryActionBridgeEvent)
 
 void initializeDatadog()
 

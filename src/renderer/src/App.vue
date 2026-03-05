@@ -10,6 +10,7 @@ import { useTheme } from './composables/useTheme'
 import { useLauncherPrefs } from './composables/useLauncherPrefs'
 import type { Installation, ActionResult, QuitActiveItem } from './types/ipc'
 import type { ModalDetailGroup } from './composables/useModal'
+import { emitTelemetryAction } from './lib/telemetry'
 
 import ModalDialog from './components/ModalDialog.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
@@ -43,14 +44,6 @@ useTheme()
 // --- View state ---
 type TabView = 'dashboard' | 'list' | 'running' | 'models' | 'media' | 'settings'
 const activeView = ref<TabView>('dashboard')
-
-type TelemetryContext = Record<string, boolean | number | string | null | undefined>
-
-function emitTelemetryAction(actionName: string, context: TelemetryContext): void {
-  window.dispatchEvent(new CustomEvent('launcher-telemetry-action', {
-    detail: { actionName, context },
-  }))
-}
 
 // --- Modal views ---
 const detailInstallation = ref<Installation | null>(null)
@@ -115,6 +108,10 @@ function closeConsole(): void {
 }
 
 async function openNewInstall(): Promise<void> {
+  emitTelemetryAction('launcher.install.flow.opened', {
+    flow: 'new_install',
+    entrypoint: activeView.value,
+  })
   showNewInstall.value = true
   await nextTick()
   newInstallRef.value?.open()
@@ -125,6 +122,10 @@ function closeNewInstall(): void {
 }
 
 async function openQuickInstall(): Promise<void> {
+  emitTelemetryAction('launcher.install.flow.opened', {
+    flow: 'quick_install',
+    entrypoint: activeView.value,
+  })
   showQuickInstall.value = true
   await nextTick()
   quickInstallRef.value?.open()
@@ -135,6 +136,10 @@ function closeQuickInstall(): void {
 }
 
 async function openTrack(): Promise<void> {
+  emitTelemetryAction('launcher.install.flow.opened', {
+    flow: 'track_existing',
+    entrypoint: activeView.value,
+  })
   showTrack.value = true
   await nextTick()
   trackRef.value?.open()
@@ -145,6 +150,10 @@ function closeTrack(): void {
 }
 
 async function openLoadSnapshot(): Promise<void> {
+  emitTelemetryAction('launcher.install.flow.opened', {
+    flow: 'load_snapshot',
+    entrypoint: activeView.value,
+  })
   showLoadSnapshot.value = true
   await nextTick()
   loadSnapshotRef.value?.open()
