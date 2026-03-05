@@ -62,6 +62,8 @@ const isDatadogConfigured = !isFlagDisabled(import.meta.env.VITE_DATADOG_RUM_ENA
 
 let isDatadogInitialized = false
 
+type TelemetryContext = Record<string, boolean | number | string | null | undefined>
+
 function toDatadogTrackingConsent(enabled: boolean | undefined): DatadogTrackingConsent {
   return enabled === false ? 'not-granted' : 'granted'
 }
@@ -78,6 +80,13 @@ function setDatadogTrackingConsent(consent: DatadogTrackingConsent): void {
   if (!isDatadogInitialized) return
   try {
     datadogRum.setTrackingConsent(consent)
+  } catch {}
+}
+
+function trackTelemetryAction(actionName: string, context: TelemetryContext): void {
+  if (!isDatadogInitialized) return
+  try {
+    datadogRum.addAction(actionName, context)
   } catch {}
 }
 
@@ -100,6 +109,12 @@ async function initializeDatadog(): Promise<void> {
       trackUserInteractions: true,
     })
     isDatadogInitialized = true
+    trackTelemetryAction('launcher.session.started', {
+      app_env: datadogEnv,
+      app_version: datadogVersion || 'unknown',
+      is_packaged: !import.meta.env.DEV,
+      telemetry_effective_enabled: telemetryEnabled !== false,
+    })
   } catch {}
 }
 
