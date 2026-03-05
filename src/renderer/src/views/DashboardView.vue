@@ -7,6 +7,7 @@ import { useModal } from '../composables/useModal'
 import { useLocalInstanceGuard } from '../composables/useLocalInstanceGuard'
 import { useLauncherPrefs } from '../composables/useLauncherPrefs'
 import { useInstallContextMenu } from '../composables/useInstallContextMenu'
+import { emitTelemetryAction, toErrorBucket } from '../lib/telemetry'
 import { Download, Star, Clock, Cloud, Pin } from 'lucide-vue-next'
 import DashboardCard from '../components/DashboardCard.vue'
 import ContextMenu from '../components/ContextMenu.vue'
@@ -216,6 +217,10 @@ function timeAgo(timestamp: number): string {
 async function handleLaunch(inst: Installation, actions: ListAction[]): Promise<void> {
   const action = actions.find((a) => a.style === 'primary') ?? actions[0] ?? null
   if (!inst || !action) return
+  const telemetryContext = {
+    source_category: inst.sourceCategory || 'unknown',
+    ui_surface: 'dashboard',
+  }
 
   if (action.enabled === false && action.disabledMessage) {
     await modal.alert({ title: action.label, message: action.disabledMessage })
@@ -229,14 +234,21 @@ async function handleLaunch(inst: Installation, actions: ListAction[]): Promise<
       confirmLabel: action.label,
       confirmStyle: action.style || 'danger',
     })
-    if (!confirmed) return
+    if (!confirmed) {
+      emitTelemetryAction('launcher.action.result', { action_id: action.id, result: 'cancelled', ...telemetryContext })
+      return
+    }
   }
 
   if (action.id === 'launch') {
     const canLaunch = await localInstanceGuard.checkBeforeLaunch(inst.id)
-    if (!canLaunch) return
+    if (!canLaunch) {
+      emitTelemetryAction('launcher.action.result', { action_id: action.id, result: 'cancelled', ...telemetryContext })
+      return
+    }
   }
 
+  emitTelemetryAction('launcher.action.invoked', { action_id: action.id, ...telemetryContext })
   if (action.showProgress) {
     emit('show-progress', {
       installationId: inst.id,
@@ -247,9 +259,21 @@ async function handleLaunch(inst: Installation, actions: ListAction[]): Promise<
     return
   }
 
-  const result = await window.api.runAction(inst.id, action.id)
-  if (result.message) {
-    await modal.alert({ title: action.label, message: result.message })
+  try {
+    const result = await window.api.runAction(inst.id, action.id)
+    const resultValue = result.cancelled ? 'cancelled' : (result.ok === false ? 'failed' : 'ok')
+    emitTelemetryAction('launcher.action.result', { action_id: action.id, result: resultValue, ...telemetryContext })
+    if (result.message) {
+      await modal.alert({ title: action.label, message: result.message })
+    }
+  } catch (error: unknown) {
+    emitTelemetryAction('launcher.action.result', {
+      action_id: action.id,
+      result: 'failed',
+      error_bucket: toErrorBucket(error),
+      ...telemetryContext,
+    })
+    throw error
   }
 }
 

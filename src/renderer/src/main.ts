@@ -5,6 +5,11 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
+import {
+  TELEMETRY_ACTION_EVENT_NAME,
+  type TelemetryActionEventDetail,
+  type TelemetryContext,
+} from './lib/telemetry'
 
 function serializeUnknownError(error: unknown): { message: string; stack?: string } {
   if (error instanceof Error) {
@@ -81,6 +86,22 @@ function setDatadogTrackingConsent(consent: DatadogTrackingConsent): void {
   } catch {}
 }
 
+function trackTelemetryAction(actionName: string, context: TelemetryContext): void {
+  if (!isDatadogInitialized) return
+  try {
+    datadogRum.addAction(actionName, context)
+  } catch {}
+}
+
+function handleTelemetryActionBridgeEvent(event: Event): void {
+  const detail = (event as CustomEvent<unknown>).detail as TelemetryActionEventDetail | undefined
+  if (!detail || typeof detail !== 'object') return
+  if (typeof detail.actionName !== 'string' || detail.actionName.length === 0) return
+  const context = detail.context && typeof detail.context === 'object' ? detail.context : {}
+  trackTelemetryAction(detail.actionName, context)
+}
+
+
 async function initializeDatadog(): Promise<void> {
   if (!isDatadogConfigured) return
   const telemetryEnabled = await getTelemetryEnabledSetting()
@@ -100,6 +121,12 @@ async function initializeDatadog(): Promise<void> {
       trackUserInteractions: true,
     })
     isDatadogInitialized = true
+    trackTelemetryAction('launcher.session.started', {
+      app_env: datadogEnv,
+      app_version: datadogVersion || 'unknown',
+      is_packaged: !import.meta.env.DEV,
+      telemetry_effective_enabled: telemetryEnabled !== false,
+    })
   } catch {}
 }
 
@@ -107,6 +134,8 @@ window.api.onTelemetrySettingChanged((enabled) => {
   if (!isDatadogConfigured) return
   setDatadogTrackingConsent(toDatadogTrackingConsent(enabled))
 })
+
+window.addEventListener(TELEMETRY_ACTION_EVENT_NAME, handleTelemetryActionBridgeEvent)
 
 void initializeDatadog()
 
