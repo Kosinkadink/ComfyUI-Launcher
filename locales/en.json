@@ -19,7 +19,7 @@
     "pinnedInQuickLaunch": "Pinned installations are already shown in Quick Launch above.",
     "pinToDashboard": "Pin to Dashboard",
     "unpinFromDashboard": "Unpin from Dashboard",
-    "telemetryNotice": "Usage telemetry is collected to improve ComfyUI Launcher.",
+    "telemetryNotice": "Anonymous telemetry is collected to improve ComfyUI Launcher.",
     "telemetrySettings": "Manage in Settings"
   },
 
