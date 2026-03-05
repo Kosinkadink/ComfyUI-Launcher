@@ -1633,6 +1633,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       // Inject shared paths if this installation uses them
       if ((inst.useSharedPaths as boolean | undefined) !== false && launchCmd.args) {
         const modelsDirs = settings.get('modelsDirs') as string[] | undefined
+        // Sync any custom-node model dirs from the install into the shared root
+        // BEFORE generating the YAML, so they're included when ComfyUI loads it.
+        syncCustomModelFolders(inst.installPath, modelsDirs)
         const modelPathsConfig = ensureModelPathsConfig(modelsDirs)
         if (modelPathsConfig) {
           launchCmd.args.push('--extra-model-paths-config', modelPathsConfig)
