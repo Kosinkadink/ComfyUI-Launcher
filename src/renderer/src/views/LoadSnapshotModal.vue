@@ -391,6 +391,9 @@ defineExpose({ open })
                 </select>
                 <span v-else-if="releaseLoading" class="ls-value">{{ $t('newInstall.loading') }}</span>
                 <span v-else class="ls-value">{{ $t('newInstall.noOptions') }}</span>
+                <span v-if="preview.newestSnapshot.comfyui.releaseTag" class="ls-release-hint">
+                  {{ $t('list.snapshotOriginalRelease', { tag: preview.newestSnapshot.comfyui.releaseTag }) }}
+                </span>
               </div>
             </div>
 
@@ -659,6 +662,12 @@ defineExpose({ open })
 .ls-name-hint {
   font-size: 11px;
   color: var(--warning);
+  margin-top: 2px;
+}
+
+.ls-release-hint {
+  font-size: 12px;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 

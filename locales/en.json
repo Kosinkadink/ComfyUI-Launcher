@@ -122,6 +122,7 @@
     "snapshotDropHint": "Drop a snapshot .json file here",
     "snapshotNameHint": "Characters like < > : \" / \\ | ? * will be removed",
     "snapshotRelease": "Release",
+    "snapshotOriginalRelease": "Snapshot version: {tag}",
     "snapshotDevice": "Device",
     "snapshotHardwareMismatch": "The snapshot was created with {snapshotDevice}. Your detected hardware is {detectedDevice}. The recommended variant for your hardware has been pre-selected.",
     "newInstall": "New Install",
