@@ -1731,7 +1731,8 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         sendProgress('migrate', { percent: 90, status: i18n.t('desktop.addingModels') })
         const desktopModelsDir = path.resolve(path.join(desktopInfo.basePath, 'models'))
         const currentModelsDirs = (settings.get('modelsDirs') as string[] | undefined) || [...settings.defaults.modelsDirs]
-        if (fs.existsSync(desktopModelsDir) && !currentModelsDirs.includes(desktopModelsDir)) {
+        const normalizedCurrent = currentModelsDirs.map((d) => path.resolve(d))
+        if (fs.existsSync(desktopModelsDir) && !normalizedCurrent.includes(desktopModelsDir)) {
           currentModelsDirs.push(desktopModelsDir)
           settings.set('modelsDirs', currentModelsDirs)
         }
