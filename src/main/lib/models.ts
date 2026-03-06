@@ -60,7 +60,13 @@ function extraFoldersIn(dir: string): string[] {
 function discoverExtraFoldersFromSharedDirs(modelsDirs: string[]): string[] {
   const seen = new Set<string>()
   for (const dir of modelsDirs) {
-    for (const name of extraFoldersIn(dir)) {
+    const extras = extraFoldersIn(dir)
+    if (extras.length > 0) {
+      console.log('[models] discoverExtraFoldersFromSharedDirs: found', extras, 'in', dir)
+    } else {
+      console.log('[models] discoverExtraFoldersFromSharedDirs: no extras in', dir, '(exists:', fs.existsSync(dir), ')')
+    }
+    for (const name of extras) {
       seen.add(name)
     }
   }
@@ -97,11 +103,15 @@ function buildYaml(modelsDirs: string[], extraFolders: string[] = []): string {
  * shared model directories (previously discovered from custom nodes).
  * Returns the path to the YAML file, or null if no directories are configured.
  */
-export function ensureModelPathsConfig(modelsDirs: string[] | null | undefined): string | null {
-  if (!modelsDirs || !Array.isArray(modelsDirs) || modelsDirs.length === 0) return null
+export function ensureModelPathsConfig(modelsDirs: string[] | null | undefined, caller?: string): string | null {
+  const tag = caller ? `ensureModelPathsConfig(${caller})` : 'ensureModelPathsConfig'
+  if (!modelsDirs || !Array.isArray(modelsDirs) || modelsDirs.length === 0) {
+    console.log(`[models] ${tag}: no modelsDirs, returning null`)
+    return null
+  }
   const resolved = modelsDirs.map((d) => path.resolve(d))
   const extraFolders = discoverExtraFoldersFromSharedDirs(resolved)
-  console.log('[models] ensureModelPathsConfig: shared dirs =', resolved, 'extras =', extraFolders)
+  console.log(`[models] ${tag}: shared dirs =`, resolved, 'extras =', extraFolders)
   const yaml = buildYaml(resolved, extraFolders)
 
   let existing: string | null = null
@@ -110,8 +120,11 @@ export function ensureModelPathsConfig(modelsDirs: string[] | null | undefined):
   } catch {}
 
   if (existing !== yaml) {
-    console.log('[models] ensureModelPathsConfig: writing updated YAML')
+    console.log(`[models] ${tag}: writing updated YAML to`, YAML_PATH)
+    console.log(`[models] ${tag}: YAML content (last 500 chars):`, yaml.slice(-500))
     writeFileSafe(YAML_PATH, yaml)
+  } else {
+    console.log(`[models] ${tag}: YAML unchanged, skipping write`)
   }
 
   return YAML_PATH
@@ -130,7 +143,13 @@ export function discoverExtraModelFolders(installPath: string): string[] {
   ]
   const seen = new Set<string>()
   for (const dir of candidates) {
-    for (const name of extraFoldersIn(dir)) {
+    const extras = extraFoldersIn(dir)
+    if (extras.length > 0) {
+      console.log('[models] discoverExtraModelFolders: found', extras, 'in', dir)
+    } else {
+      console.log('[models] discoverExtraModelFolders: no extras in', dir, '(exists:', fs.existsSync(dir), ')')
+    }
+    for (const name of extras) {
       seen.add(name)
     }
   }
@@ -147,10 +166,16 @@ export function syncCustomModelFolders(
   installPath: string,
   modelsDirs: string[] | null | undefined,
 ): void {
-  if (!modelsDirs || !Array.isArray(modelsDirs) || modelsDirs.length === 0) return
+  if (!modelsDirs || !Array.isArray(modelsDirs) || modelsDirs.length === 0) {
+    console.log('[models] syncCustomModelFolders: no modelsDirs, skipping')
+    return
+  }
   const extraFolders = discoverExtraModelFolders(installPath)
   console.log('[models] syncCustomModelFolders: installPath =', installPath, 'extras from install =', extraFolders)
-  if (extraFolders.length === 0) return
+  if (extraFolders.length === 0) {
+    console.log('[models] syncCustomModelFolders: no extras found in install, skipping')
+    return
+  }
 
   // Create matching subdirectories in each shared models root
   for (const dir of modelsDirs) {
@@ -158,11 +183,13 @@ export function syncCustomModelFolders(
       const target = path.join(dir, folder)
       try {
         fs.mkdirSync(target, { recursive: true })
-        console.log('[models] syncCustomModelFolders: created', target)
-      } catch {}
+        console.log('[models] syncCustomModelFolders: ensured dir', target)
+      } catch (err) {
+        console.log('[models] syncCustomModelFolders: failed to create', target, (err as Error).message)
+      }
     }
   }
 
   // Rewrite the YAML (ensureModelPathsConfig will pick up the new dirs)
-  ensureModelPathsConfig(modelsDirs)
+  ensureModelPathsConfig(modelsDirs, 'syncCustomModelFolders')
 }
