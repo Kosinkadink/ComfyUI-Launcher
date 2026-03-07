@@ -718,11 +718,12 @@ export function register(callbacks: RegisterCallbacks = {}): void {
                 sendOutput, abort.signal)
             }
 
-            // Restore update channel (always) and version/lastRollback state
-            // (only if ComfyUI version restore succeeded).
+            // Restore update channel and version/lastRollback state so the
+            // release cache sees accurate state for the restored channel.
             const restoreState = buildPostRestoreState(
               targetSnapshot, comfyResult,
-              freshInst.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined
+              freshInst.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
+              freshInst.version as string | undefined
             )
             await update(restoreState)
 

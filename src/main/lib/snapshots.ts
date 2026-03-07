@@ -826,32 +826,38 @@ export async function restoreComfyUIVersion(
 
 /**
  * Build the installation state update to apply after a snapshot restore.
- * Only updates version/lastRollback/updateInfoByChannel if the ComfyUI
- * version was actually restored successfully; always updates updateChannel.
+ * Always updates updateChannel and lastRollback so the release cache sees
+ * accurate channel state. When the ComfyUI version was successfully restored,
+ * also updates version and updateInfoByChannel to match the snapshot.
+ * When the version restore failed, uses the current installed state so that
+ * the next update check correctly detects a version mismatch.
  */
 export function buildPostRestoreState(
   targetSnapshot: Snapshot,
   comfyResult: { changed: boolean; commit: string | null; error?: string },
-  existingUpdateInfo: Record<string, Record<string, unknown>> | undefined
+  existingUpdateInfo: Record<string, Record<string, unknown>> | undefined,
+  currentVersion?: string
 ): Record<string, unknown> {
   const targetChannel = targetSnapshot.updateChannel || 'stable'
-  const state: Record<string, unknown> = { updateChannel: targetChannel }
+  const displayVersion = comfyResult.error
+    ? (currentVersion || 'unknown')
+    : (targetSnapshot.comfyui.displayVersion || targetSnapshot.comfyui.releaseTag || 'unknown')
+  const headCommit = comfyResult.commit || targetSnapshot.comfyui.commit
 
-  if (!comfyResult.error) {
-    const displayVersion = targetSnapshot.comfyui.displayVersion || targetSnapshot.comfyui.releaseTag || 'unknown'
-    const restoredHead = comfyResult.commit || targetSnapshot.comfyui.commit
-    state.version = displayVersion
-    state.lastRollback = {
+  const state: Record<string, unknown> = {
+    updateChannel: targetChannel,
+    version: displayVersion,
+    lastRollback: {
       preUpdateHead: null,
-      postUpdateHead: restoredHead,
+      postUpdateHead: headCommit,
       backupBranch: null,
       channel: targetChannel,
       updatedAt: Date.now(),
-    }
-    state.updateInfoByChannel = {
+    },
+    updateInfoByChannel: {
       ...(existingUpdateInfo || {}),
       [targetChannel]: { installedTag: displayVersion },
-    }
+    },
   }
 
   return state

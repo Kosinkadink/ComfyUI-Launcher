@@ -716,12 +716,12 @@ export const standalone: SourcePlugin = {
         return { ok: false, message: t('standalone.snapshotRestoreReverted') }
       }
 
-      // Restore update channel (always) and version/lastRollback state
-      // (only if ComfyUI version restore succeeded) so the release cache
-      // sees accurate state for the restored channel.
+      // Restore update channel and version/lastRollback state so the
+      // release cache sees accurate state for the restored channel.
       const restoreState = snapshots.buildPostRestoreState(
         targetSnapshot, comfyResult,
-        installation.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined
+        installation.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
+        installation.version as string | undefined
       )
       await update(restoreState)
 
