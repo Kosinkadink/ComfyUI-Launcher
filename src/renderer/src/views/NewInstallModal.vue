@@ -61,7 +61,7 @@ const estimatedInstallSize = computed(() => {
       downloadBytes += files.reduce((sum, f) => sum + f.size, 0)
     }
   }
-  return downloadBytes > 0 ? downloadBytes * 2 : 0
+  return downloadBytes > 0 ? Math.ceil(downloadBytes * 2.25) : 0
 })
 
 function toPathGuardrail(issue: PathIssue): string {
@@ -590,7 +590,7 @@ async function handleSave(): Promise<void> {
         ? downloadFiles.reduce((sum, f) => sum + f.size, 0)
         : 0
       // Estimate extracted size as ~2x compressed download size
-      const estimatedRequired = downloadBytes > 0 ? downloadBytes * 2 : 0
+      const estimatedRequired = downloadBytes > 0 ? Math.ceil(downloadBytes * 2.25) : 0
 
       if (estimatedRequired > 0 && space.free < estimatedRequired) {
         const ok = await modal.confirm({
