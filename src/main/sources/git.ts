@@ -219,7 +219,33 @@ export const gitSource: SourcePlugin = {
     try {
       const head = fs.readFileSync(path.join(dirPath, '.git', 'HEAD'), 'utf-8').trim()
       const branchMatch = head.match(/^ref: refs\/heads\/(.+)$/)
-      if (branchMatch && branchMatch[1]) info.branch = branchMatch[1]
+      if (branchMatch && branchMatch[1]) {
+        info.branch = branchMatch[1]
+        // Resolve the ref to a commit SHA
+        try {
+          const refPath = path.join(dirPath, '.git', 'refs', 'heads', branchMatch[1])
+          const sha = fs.readFileSync(refPath, 'utf-8').trim()
+          if (sha) {
+            info.commit = sha
+            info.version = sha.slice(0, 8)
+          }
+        } catch {
+          // ref may be packed — try packed-refs
+          try {
+            const packed = fs.readFileSync(path.join(dirPath, '.git', 'packed-refs'), 'utf-8')
+            const refLine = packed.split('\n').find((l) => l.endsWith(` refs/heads/${branchMatch[1]}`))
+            if (refLine) {
+              const sha = refLine.split(' ')[0]!
+              info.commit = sha
+              info.version = sha.slice(0, 8)
+            }
+          } catch {}
+        }
+      } else if (/^[0-9a-f]{40}$/i.test(head)) {
+        // Detached HEAD
+        info.commit = head
+        info.version = head.slice(0, 8)
+      }
       const configRaw = fs.readFileSync(path.join(dirPath, '.git', 'config'), 'utf-8')
       const urlMatch = configRaw.match(/url\s*=\s*(.+)/)
       if (urlMatch) info.repo = urlMatch[1]!.trim()
