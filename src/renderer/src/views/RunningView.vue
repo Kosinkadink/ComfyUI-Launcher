@@ -154,6 +154,7 @@ const emit = defineEmits<{
               v-for="[installationId] in sessionStore.runningInstances"
               :key="installationId"
               :name="getRunningName(installationId)"
+              :running="true"
             >
               <template #meta>
                 <template v-for="(part, i) in getRunningMetaParts(installationId)" :key="i">
@@ -247,6 +248,7 @@ const emit = defineEmits<{
               v-for="installationId in inProgressIds"
               :key="installationId"
               :name="getInProgressName(installationId)"
+              :in-progress="true"
             >
               <template #meta>
                 <template v-for="(part, i) in getInProgressMetaParts(installationId)" :key="i">

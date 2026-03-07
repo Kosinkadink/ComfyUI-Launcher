@@ -75,6 +75,10 @@ interface MetaPart {
   wrapClass?: string
 }
 
+function isInProgress(id: string): boolean {
+  return sessionStore.activeSessions.has(id) && !sessionStore.isRunning(id)
+}
+
 function getMetaParts(inst: Installation): MetaPart[] {
   const parts: MetaPart[] = [{ text: inst.sourceLabel }]
   if (inst.version) parts.push({ text: inst.version })
@@ -312,6 +316,8 @@ defineExpose({ refresh })
           :name="inst.name"
           :source-category="inst.sourceCategory"
           :draggable="true"
+          :running="sessionStore.isRunning(inst.id)"
+          :in-progress="isInProgress(inst.id)"
           @mousedown="markSeen(inst)"
           @contextmenu.prevent="openCardMenu($event, inst)"
         >
