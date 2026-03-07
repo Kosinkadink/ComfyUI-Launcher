@@ -27,7 +27,7 @@ const prefs = useLauncherPrefs()
 const emit = defineEmits<{
   'show-quick-install': []
   'show-settings': []
-  'show-detail': [inst: Installation]
+  'show-detail': [inst: Installation, tab?: string]
   'show-console': [installationId: string]
   'show-progress': [opts: {
     installationId: string
@@ -333,6 +333,7 @@ async function changePrimary(): Promise<void> {
               :actions="latestActions"
               @launch="handleLaunch"
               @show-detail="(inst) => emit('show-detail', inst)"
+              @show-update="(inst) => emit('show-detail', inst, 'update')"
               @show-console="(id) => emit('show-console', id)"
               @show-progress="(opts) => emit('show-progress', opts)"
             >
@@ -356,6 +357,7 @@ async function changePrimary(): Promise<void> {
               :actions="primaryActions"
               @launch="handleLaunch"
               @show-detail="(inst) => emit('show-detail', inst)"
+              @show-update="(inst) => emit('show-detail', inst, 'update')"
               @show-console="(id) => emit('show-console', id)"
               @show-progress="(opts) => emit('show-progress', opts)"
             >
@@ -391,6 +393,7 @@ async function changePrimary(): Promise<void> {
               :actions="pinnedActionsById[pinned.id] ?? []"
               @launch="handleLaunch"
               @show-detail="(inst) => emit('show-detail', inst)"
+              @show-update="(inst) => emit('show-detail', inst, 'update')"
               @show-console="(id) => emit('show-console', id)"
               @show-progress="(opts) => emit('show-progress', opts)"
             >
@@ -419,6 +422,7 @@ async function changePrimary(): Promise<void> {
             :actions="cloudActions"
             @launch="handleLaunch"
             @show-detail="(inst) => emit('show-detail', inst)"
+            @show-update="(inst) => emit('show-detail', inst, 'update')"
             @show-console="(id) => emit('show-console', id)"
             @show-progress="(opts) => emit('show-progress', opts)"
           />
