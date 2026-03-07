@@ -357,6 +357,8 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
 }
 .update-pill:hover { background: var(--warning); color: #1a1a1a; }
 .status-in-progress { color: var(--accent); font-weight: 600; }
+.instance-card.card-running { border-color: var(--accent); }
+.instance-card.card-in-progress { border-color: var(--accent); animation: card-breathe 2s ease-in-out infinite; }
 .instance-actions { display: flex; gap: 8px; }
 
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
@@ -490,6 +492,7 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   background-size: 200% 100%;
 }
 @keyframes indeterminate { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes card-breathe { 0%, 100% { border-color: var(--accent); } 50% { border-color: color-mix(in srgb, var(--accent) 40%, transparent); } }
 
 .progress-steps { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
 .progress-step { display: flex; flex-direction: column; padding: 8px 12px; border-radius: 6px; opacity: 0.4; }
@@ -767,6 +770,8 @@ input[type="checkbox"]:checked::after { transform: translateX(16px); }
   border-radius: 8px; padding: 16px 20px;
   display: flex; flex-direction: column; gap: 12px;
 }
+.dashboard-card.card-running, .dashboard-cloud-card.card-running { border-color: var(--accent); }
+.dashboard-card.card-in-progress, .dashboard-cloud-card.card-in-progress { border-color: var(--accent); animation: card-breathe 2s ease-in-out infinite; }
 .dashboard-card-badge {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; text-transform: uppercase;

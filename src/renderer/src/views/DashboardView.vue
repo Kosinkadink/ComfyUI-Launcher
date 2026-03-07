@@ -100,6 +100,10 @@ const allPinsInQuickLaunch = computed(() => {
   return prefs.pinnedInstallIds.value.some((id) => quickLaunchIds.has(id))
 })
 
+function isInProgress(id: string): boolean {
+  return sessionStore.activeSessions.has(id) && !sessionStore.isRunning(id)
+}
+
 // --- Actions for cards (separate generation counters) ---
 const primaryActions = ref<ListAction[]>([])
 const latestActions = ref<ListAction[]>([])
@@ -338,7 +342,7 @@ async function changePrimary(): Promise<void> {
         <div class="dashboard-section-label">{{ $t('dashboard.quickLaunch') }}</div>
         <div class="dashboard-quick-launch">
           <!-- Latest card -->
-          <div v-if="showLatestCard && latestInstall" class="dashboard-card" @contextmenu.prevent="openCardMenu($event, latestInstall!)">
+          <div v-if="showLatestCard && latestInstall" class="dashboard-card" :class="{ 'card-running': sessionStore.isRunning(latestInstall.id), 'card-in-progress': isInProgress(latestInstall.id) }" @contextmenu.prevent="openCardMenu($event, latestInstall!)">
             <div class="dashboard-card-badge">
               <Clock :size="14" />
               {{ $t('dashboard.recent') }}
@@ -361,7 +365,7 @@ async function changePrimary(): Promise<void> {
           </div>
 
           <!-- Primary card -->
-          <div class="dashboard-card" @contextmenu.prevent="openCardMenu($event, primaryInstall!)">
+          <div class="dashboard-card" :class="{ 'card-running': sessionStore.isRunning(primaryInstall.id), 'card-in-progress': isInProgress(primaryInstall.id) }" @contextmenu.prevent="openCardMenu($event, primaryInstall!)">
             <div class="dashboard-card-badge dashboard-card-badge-primary">
               <Star :size="14" />
               {{ $t('dashboard.primary') }}
@@ -401,6 +405,7 @@ async function changePrimary(): Promise<void> {
             v-for="pinned in pinnedInstalls"
             :key="pinned.id"
             class="dashboard-card"
+            :class="{ 'card-running': sessionStore.isRunning(pinned.id), 'card-in-progress': isInProgress(pinned.id) }"
             @contextmenu.prevent="openCardMenu($event, pinned)"
           >
             <DashboardCard
@@ -431,7 +436,7 @@ async function changePrimary(): Promise<void> {
           <Cloud :size="14" />
           {{ $t('dashboard.cloudSection') }}
         </div>
-        <div class="dashboard-cloud-card" @contextmenu.prevent="openCardMenu($event, cloudInstall!)">
+        <div class="dashboard-cloud-card" :class="{ 'card-running': sessionStore.isRunning(cloudInstall.id), 'card-in-progress': isInProgress(cloudInstall.id) }" @contextmenu.prevent="openCardMenu($event, cloudInstall!)">
           <DashboardCard
             :installation="cloudInstall"
             :actions="cloudActions"
