@@ -20,6 +20,20 @@ export function formatTime(secs: number): string {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+export function extractPort(args: string[], defaultPort = 8188): number {
+  let port = defaultPort
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--port' && args[i + 1]) {
+      port = parseInt(args[i + 1]!, 10) || defaultPort
+      i++
+    } else {
+      const m = args[i]!.match(/^--port=(\d+)$/)
+      if (m) port = parseInt(m[1]!, 10) || defaultPort
+    }
+  }
+  return port
+}
+
 export function parseArgs(str: string): string[] {
   const args: string[] = [];
   let current = "";
