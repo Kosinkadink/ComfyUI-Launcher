@@ -561,7 +561,7 @@ export interface ElectronApi {
   resetZoom(): Promise<void>
 
   // Updates
-  checkForUpdate(): Promise<void>
+  checkForUpdate(): Promise<{ available: boolean; version?: string; error?: string }>
   downloadUpdate(): Promise<void>
   installUpdate(): Promise<void>
   getPendingUpdate(): Promise<UpdateInfo | null>

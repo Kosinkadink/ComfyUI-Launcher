@@ -322,7 +322,9 @@
     "checkFailed": "Update check failed",
     "details": "Details",
     "retry": "Retry",
-    "updateError": "Update Error"
+    "updateCheck": "Update Check",
+    "updateError": "Update Error",
+    "upToDate": "You are running the latest version."
   },
 
   "modal": {
