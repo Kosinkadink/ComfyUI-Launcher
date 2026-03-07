@@ -47,6 +47,7 @@ const activeView = ref<TabView>('dashboard')
 
 // --- Modal views ---
 const detailInstallation = ref<Installation | null>(null)
+const detailInitialTab = ref<string>('status')
 const consoleInstallationId = ref<string | null>(null)
 const progressInstallationId = ref<string | null>(null)
 const showNewInstall = ref(false)
@@ -91,7 +92,8 @@ function switchView(view: TabView): void {
 }
 
 // --- Modal handlers ---
-function openDetail(inst: Installation): void {
+function openDetail(inst: Installation, tab?: string): void {
+  detailInitialTab.value = tab ?? 'status'
   detailInstallation.value = inst
 }
 
@@ -298,7 +300,7 @@ onMounted(async () => {
         :visible="activeView === 'dashboard'"
         @show-quick-install="openQuickInstall"
         @show-settings="switchView('settings')"
-        @show-detail="openDetail"
+        @show-detail="(inst, tab) => openDetail(inst, tab)"
         @show-console="openConsole"
         @show-progress="showProgress"
       />
@@ -306,7 +308,7 @@ onMounted(async () => {
       <InstallationList
         v-show="activeView === 'list'"
         ref="listRef"
-        @show-detail="openDetail"
+        @show-detail="(inst, tab) => openDetail(inst, tab)"
         @show-console="openConsole"
         @show-progress="showProgress"
         @show-new-install="openNewInstall"
@@ -341,6 +343,7 @@ onMounted(async () => {
   <!-- Modal views -->
   <DetailModal
     :installation="detailInstallation"
+    :initial-tab="detailInitialTab"
     @close="closeDetail"
     @show-progress="showProgress"
     @navigate-list="handleNavigateList"

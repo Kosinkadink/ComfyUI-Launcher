@@ -91,7 +91,7 @@ function getMetaParts(inst: Installation): MetaPart[] {
   if (!sessionStore.isRunning(inst.id) && activeSession) {
     parts.push({ text: activeSession.label, class: 'status-in-progress' })
   }
-  if (inst.statusTag) {
+  if (inst.statusTag && inst.statusTag.style !== 'update') {
     parts.push({ text: inst.statusTag.label, class: `status-${inst.statusTag.style}` })
   }
   if (inst.seen === false) {
@@ -245,7 +245,7 @@ const filterStats = computed(() => {
 })
 
 const emit = defineEmits<{
-  'show-detail': [inst: Installation]
+  'show-detail': [inst: Installation, tab?: string]
   'show-console': [installationId: string]
   'show-progress': [opts: {
     installationId: string
@@ -327,6 +327,10 @@ defineExpose({ refresh })
               <span v-if="part.wrapClass" :class="part.wrapClass"><span :class="part.class">{{ part.text }}</span></span>
               <span v-else-if="part.class" :class="part.class">{{ part.text }}</span>
               <template v-else>{{ part.text }}</template>
+            </template>
+            <template v-if="inst.statusTag?.style === 'update'">
+              <template v-if="getMetaParts(inst).length > 0"> · </template>
+              <span class="update-pill" role="button" tabindex="0" @click.stop="emit('show-detail', inst, 'update')" @keydown.enter.stop="emit('show-detail', inst, 'update')" @keydown.space.prevent.stop="emit('show-detail', inst, 'update')">{{ inst.statusTag.label }}</span>
             </template>
           </template>
 

@@ -19,9 +19,12 @@ import type {
 
 interface Props {
   installation: Installation | null
+  initialTab?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  initialTab: 'status',
+})
 
 const emit = defineEmits<{
   close: []
@@ -97,7 +100,8 @@ watch(
     previousInstId.value = inst.id
     sections.value = await window.api.getDetailSections(inst.id)
     if (isNewInstallation) {
-      activeTab.value = 'status'
+      const tabExists = sections.value.some((s) => s.tab === props.initialTab)
+      activeTab.value = tabExists ? props.initialTab : 'status'
       await nextTick()
       if (scrollRef.value) scrollRef.value.scrollTop = 0
     }
