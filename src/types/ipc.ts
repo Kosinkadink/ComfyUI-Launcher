@@ -217,6 +217,7 @@ export interface SettingsSection {
 export interface SettingsAction {
   label: string
   url?: string
+  action?: string
 }
 
 export interface SettingsField {
@@ -340,6 +341,15 @@ export interface ModelDownloadProgress {
   etaSeconds?: number
   status: ModelDownloadStatus
   error?: string
+}
+
+// --- Model file browser types ---
+export interface ModelFileInfo {
+  name: string
+  directory: string
+  fullPath: string
+  sizeBytes: number
+  modifiedAt: number
 }
 
 // --- Track types ---
@@ -552,7 +562,7 @@ export interface ElectronApi {
   resetZoom(): Promise<void>
 
   // Updates
-  checkForUpdate(): Promise<void>
+  checkForUpdate(): Promise<{ available: boolean; version?: string; error?: string }>
   downloadUpdate(): Promise<void>
   installUpdate(): Promise<void>
   getPendingUpdate(): Promise<UpdateInfo | null>
@@ -563,6 +573,11 @@ export interface ElectronApi {
   resumeModelDownload(url: string): Promise<boolean>
   cancelModelDownload(url: string): Promise<boolean>
   showDownloadInFolder(savePath: string): Promise<void>
+  startModelDownload(url: string, filename: string, directory: string): Promise<boolean>
+
+  // Model file browser
+  getModelFolders(): Promise<string[]>
+  getModelFiles(directory: string): Promise<ModelFileInfo[]>
 
   // Event listeners (return unsubscribe functions)
   onInstallProgress(callback: (data: ProgressData) => void): Unsubscribe
