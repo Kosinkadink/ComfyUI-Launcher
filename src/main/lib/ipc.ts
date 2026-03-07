@@ -20,22 +20,23 @@ import {
   findAvailablePort, writePortLock, readPortLock, removePortLock,
 } from './process'
 import { detectGPU, validateHardware, checkNvidiaDriver } from './gpu'
-import { detectDesktopInstall, syncSharedModelPaths, stageDesktopSnapshot } from './desktopDetect'
+import { detectDesktopInstall, stageDesktopSnapshot } from './desktopDetect'
 import { performDesktopMigration } from './desktopMigration'
-import { getDiskSpace, validateInstallPath } from './disk'
+import { getDiskSpace, getDirectorySize, validateInstallPath } from './disk'
 import type { GpuInfo } from './gpu'
 import { formatTime } from './util'
 import { getActiveDownloads } from './comfyDownloadManager'
 import * as releaseCache from './release-cache'
 import * as i18n from './i18n'
-import { ensureModelPathsConfig } from './models'
+import { ensureModelPathsConfig, MODEL_FOLDER_TYPES } from './models'
 import { copyDirWithProgress } from './copy'
 import { fetchJSON } from './fetch'
 import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
-import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot, listSnapshots, buildExportEnvelope, validateExportEnvelope, importSnapshots, saveSnapshot, restoreCustomNodes, restorePipPackages } from './snapshots'
+import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot, listSnapshots, buildExportEnvelope, validateExportEnvelope, importSnapshots, saveSnapshot, restoreCustomNodes, restorePipPackages, restoreComfyUIVersion, buildPostRestoreState } from './snapshots'
 import type { SnapshotExportEnvelope } from './snapshots'
 import { getVariantLabel } from '../sources/standalone'
 import type { FieldOption, SourcePlugin } from '../types/sources'
+import { REQUIRES_STOPPED } from '../../types/ipc'
 import type { Theme, ResolvedTheme, QuitActiveItem } from '../../types/ipc'
 import type { LaunchCmd } from './process'
 
@@ -43,6 +44,7 @@ const MARKER_FILE = '.comfyui-launcher'
 const COMFYUI_REPO = 'Comfy-Org/ComfyUI'
 const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000
 const IGNORE_FILES = new Set([MARKER_FILE, '.DS_Store', 'Thumbs.db', 'desktop.ini'])
+
 
 function isEffectivelyEmptyInstallDir(dirPath: string): boolean {
   if (!dirPath) return true
@@ -406,14 +408,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         desktopExePath: desktopInfo.executablePath || undefined,
         status: 'installed',
       })
-
-      // Sync Launcher's shared model directories into Desktop's config
-      const modelsDirs = settings.get('modelsDirs') as string[] | undefined
-      if (modelsDirs && modelsDirs.length > 0) {
-        try {
-          syncSharedModelPaths(desktopInfo.configDir, modelsDirs)
-        } catch {}
-      }
     }
   }
 
@@ -551,6 +545,12 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   })
   ipcMain.handle('get-disk-space', (_event, targetPath: string) => getDiskSpace(targetPath))
   ipcMain.handle('validate-install-path', (_event, targetPath: string) => validateInstallPath(targetPath))
+  ipcMain.handle('get-installation-size', async (_event, installationId: string) => {
+    const inst = await installations.get(installationId)
+    if (!inst?.installPath) return { sizeBytes: 0 }
+    const sizeBytes = await getDirectorySize(inst.installPath)
+    return { sizeBytes }
+  })
 
   // Installations
   ipcMain.handle('get-installations', async () => {
@@ -702,25 +702,32 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             await importSnapshots(freshInst.installPath, envelope)
             const targetSnapshot = envelope.snapshots[0]!
 
+            // Restore ComfyUI version
+            sendOutput('\n── Restore ComfyUI Version ──\n')
+            const comfyResult = await restoreComfyUIVersion(freshInst.installPath, targetSnapshot, sendOutput)
+
             sendOutput('\n── Restore Nodes ──\n')
-            await restoreCustomNodes(freshInst.installPath, freshInst, targetSnapshot, sendProgress, sendOutput, abort.signal)
+            await restoreCustomNodes(freshInst.installPath, freshInst, targetSnapshot, sendProgress, sendOutput, abort.signal, settings.get('pypiMirror'))
 
             if (!abort.signal.aborted && !targetSnapshot.skipPipSync) {
               sendOutput('\n── Restore Packages ──\n')
               await restorePipPackages(freshInst.installPath, freshInst, targetSnapshot,
                 (phase, data) => sendProgress(phase === 'restore' ? 'restore-pip' : phase, data),
-                sendOutput, abort.signal)
+                sendOutput, abort.signal, settings.get('pypiMirror'))
             }
 
-            // Restore update channel from the snapshot
-            const targetChannel = targetSnapshot.updateChannel || 'stable'
-            if (targetChannel !== (freshInst.updateChannel as string | undefined)) {
-              await update({ updateChannel: targetChannel })
-            }
+            // Restore update channel and version/lastRollback state so the
+            // release cache sees accurate state for the restored channel.
+            const restoreState = buildPostRestoreState(
+              targetSnapshot, comfyResult,
+              freshInst.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
+              freshInst.version as string | undefined
+            )
+            await update(restoreState)
 
             // Save post-restore snapshot
             try {
-              const updatedInst = { ...freshInst, updateChannel: targetChannel }
+              const updatedInst = { ...freshInst, ...restoreState }
               const filename = await saveSnapshot(freshInst.installPath, updatedInst, 'post-restore')
               const snapshotCount = await getSnapshotCount(freshInst.installPath)
               await update({ pendingSnapshotRestore: undefined, lastSnapshot: filename, snapshotCount })
@@ -1188,6 +1195,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
               { value: 'tray', label: i18n.t('settings.closeTray') },
             ] },
         ],
+        actions: [
+          { label: i18n.t('settings.checkForUpdates'), action: 'check-for-update' },
+        ],
       },
       {
         title: i18n.t('settings.telemetry'),
@@ -1200,6 +1210,13 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         fields: [
           { id: 'cacheDir', label: i18n.t('settings.cacheDir'), type: 'path', value: s.cacheDir, openable: true },
           { id: 'maxCachedFiles', label: i18n.t('settings.maxCachedFiles'), type: 'number', value: s.maxCachedFiles, min: 1, max: 50 },
+        ],
+      },
+      {
+        title: i18n.t('settings.advanced'),
+        fields: [
+          { id: 'pypiMirror', label: i18n.t('settings.pypiMirror'), type: 'text', value: s.pypiMirror || '',
+            placeholder: i18n.t('settings.pypiMirrorPlaceholder') },
         ],
       },
     ]
@@ -1245,6 +1262,43 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     }
   })
 
+  ipcMain.handle('get-model-folders', () => {
+    return [...MODEL_FOLDER_TYPES]
+  })
+
+  ipcMain.handle('get-model-files', (_event, directory: string) => {
+    const modelsDirs = (settings.get('modelsDirs') as string[]) || settings.defaults.modelsDirs
+    const files: Array<{ name: string; directory: string; fullPath: string; sizeBytes: number; modifiedAt: number }> = []
+    const ALLOWED_EXTS = new Set(['.safetensors', '.sft', '.ckpt', '.pth', '.pt', '.bin', '.onnx'])
+
+    for (const baseDir of modelsDirs) {
+      const dirPath = path.join(baseDir, directory)
+      try {
+        if (!fs.existsSync(dirPath)) continue
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+        for (const entry of entries) {
+          if (!entry.isFile()) continue
+          const ext = path.extname(entry.name).toLowerCase()
+          if (!ALLOWED_EXTS.has(ext)) continue
+          try {
+            const filePath = path.join(dirPath, entry.name)
+            const stat = fs.statSync(filePath)
+            files.push({
+              name: entry.name,
+              directory,
+              fullPath: filePath,
+              sizeBytes: stat.size,
+              modifiedAt: stat.mtimeMs,
+            })
+          } catch {}
+        }
+      } catch {}
+    }
+
+    files.sort((a, b) => b.modifiedAt - a.modifiedAt)
+    return files
+  })
+
   ipcMain.handle('get-media-sections', () => {
     const s = settings.getAll()
     return [
@@ -1273,15 +1327,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         if (!win.isDestroyed()) win.webContents.send('locale-changed', msgs)
       })
       if (_onLocaleChanged) _onLocaleChanged()
-    }
-    if (key === 'modelsDirs') {
-      // Re-sync shared model paths into Desktop's config if Desktop is tracked
-      const desktopInfo = detectDesktopInstall()
-      if (desktopInfo) {
-        try {
-          syncSharedModelPaths(desktopInfo.configDir, value as string[])
-        } catch {}
-      }
     }
     if (key === 'telemetryEnabled') {
       BrowserWindow.getAllWindows().forEach((win) => {
@@ -1345,6 +1390,12 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     const maybeInst = await installations.get(installationId)
     if (!maybeInst) return { ok: false, message: 'Installation not found.' }
     const inst = maybeInst
+    if (REQUIRES_STOPPED.has(actionId) && _runningSessions.has(installationId)) {
+      return { ok: false, message: i18n.t('errors.stopRequired'), running: true }
+    }
+    if (REQUIRES_STOPPED.has(actionId) && _operationAborts.has(installationId)) {
+      return { ok: false, message: i18n.t('errors.operationInProgress') }
+    }
     if (actionId === 'remove') {
       await installations.remove(installationId)
       await autoAssignPrimary(installationId)
@@ -2102,10 +2153,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       }
       return { ok: true, mode, port: launchCmd.port }
     }
-    // Actions that modify the pip environment require ComfyUI to be stopped
-    if (actionId === 'snapshot-restore' && _runningSessions.has(installationId)) {
-      return { ok: false, message: i18n.t('standalone.snapshotRestoreStopRequired') }
-    }
     // Delegate to source plugin's handleAction
     const abort = new AbortController()
     _operationAborts.set(installationId, abort)
@@ -2140,16 +2187,18 @@ export async function stopRunning(installationId?: string): Promise<void> {
     if (!session) return
     _removeSession(installationId)
     if (session.proc && !session.proc.killed) {
-      killProcessTree(session.proc)
+      await killProcessTree(session.proc)
     }
   } else {
+    const kills: Promise<void>[] = []
     for (const [_id, session] of _runningSessions) {
       if (session.proc && !session.proc.killed) {
-        killProcessTree(session.proc)
+        kills.push(killProcessTree(session.proc))
       }
       if (session.port) removePortLock(session.port)
     }
     _runningSessions.clear()
+    await Promise.all(kills)
   }
 }
 

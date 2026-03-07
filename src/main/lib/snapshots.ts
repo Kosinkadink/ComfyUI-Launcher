@@ -3,7 +3,7 @@ import path from 'path'
 import { spawn } from 'child_process'
 import { readGitHead, isGitAvailable, gitClone, gitFetchAndCheckout } from './git'
 import { scanCustomNodes, nodeKey } from './nodes'
-import { pipFreeze, runUvPip as sharedRunUvPip, installFilteredRequirements } from './pip'
+import { pipFreeze, runUvPip as sharedRunUvPip, installFilteredRequirements, getPipIndexArgs } from './pip'
 import { installCnrNode, switchCnrVersion, isSafePathComponent } from './cnr'
 import type { ScannedNode } from './nodes'
 import type { InstallationRecord } from '../installations'
@@ -753,6 +753,88 @@ export interface RestoreResult {
 }
 
 /**
+ * Restore the ComfyUI version to match a target snapshot.
+ * Compares the current HEAD against the snapshot's commit and checks out
+ * the target commit if they differ.
+ */
+export async function restoreComfyUIVersion(
+  installPath: string,
+  targetSnapshot: Snapshot,
+  sendOutput: (text: string) => void
+): Promise<{ changed: boolean; commit: string | null; error?: string }> {
+  const comfyuiDir = path.join(installPath, 'ComfyUI')
+  const targetCommit = targetSnapshot.comfyui.commit
+  if (!targetCommit) {
+    return { changed: false, commit: null }
+  }
+  if (!/^[a-f0-9]{7,40}$/.test(targetCommit)) {
+    return { changed: false, commit: null, error: 'Invalid commit hash in snapshot' }
+  }
+
+  const currentHead = readGitHead(comfyuiDir)
+  if (currentHead && (currentHead.startsWith(targetCommit) || targetCommit.startsWith(currentHead))) {
+    return { changed: false, commit: currentHead }
+  }
+
+  const gitDir = path.join(comfyuiDir, '.git')
+  if (!fs.existsSync(gitDir)) {
+    const msg = 'ComfyUI .git directory not found — cannot restore version'
+    sendOutput(`⚠ ${msg}\n`)
+    return { changed: false, commit: currentHead, error: msg }
+  }
+
+  sendOutput(`Checking out ComfyUI commit ${targetCommit.slice(0, 7)}…\n`)
+  const exitCode = await gitFetchAndCheckout(comfyuiDir, targetCommit, sendOutput)
+  if (exitCode !== 0) {
+    const msg = `git checkout failed with exit code ${exitCode}`
+    sendOutput(`⚠ ${msg}\n`)
+    return { changed: false, commit: currentHead, error: msg }
+  }
+
+  const newHead = readGitHead(comfyuiDir)
+  return { changed: true, commit: newHead }
+}
+
+/**
+ * Build the installation state update to apply after a snapshot restore.
+ * Always updates updateChannel and lastRollback so the release cache sees
+ * accurate channel state. When the ComfyUI version was successfully restored,
+ * also updates version and updateInfoByChannel to match the snapshot.
+ * When the version restore failed, uses the current installed state so that
+ * the next update check correctly detects a version mismatch.
+ */
+export function buildPostRestoreState(
+  targetSnapshot: Snapshot,
+  comfyResult: { changed: boolean; commit: string | null; error?: string },
+  existingUpdateInfo: Record<string, Record<string, unknown>> | undefined,
+  currentVersion?: string
+): Record<string, unknown> {
+  const targetChannel = targetSnapshot.updateChannel || 'stable'
+  const displayVersion = comfyResult.error
+    ? (currentVersion || 'unknown')
+    : (targetSnapshot.comfyui.displayVersion || targetSnapshot.comfyui.releaseTag || 'unknown')
+  const headCommit = comfyResult.commit || targetSnapshot.comfyui.commit
+
+  const state: Record<string, unknown> = {
+    updateChannel: targetChannel,
+    version: displayVersion,
+    lastRollback: {
+      preUpdateHead: null,
+      postUpdateHead: headCommit,
+      backupBranch: null,
+      channel: targetChannel,
+      updatedAt: Date.now(),
+    },
+    updateInfoByChannel: {
+      ...(existingUpdateInfo || {}),
+      [targetChannel]: { installedTag: displayVersion },
+    },
+  }
+
+  return state
+}
+
+/**
  * Restore pip packages to match a target snapshot.
  * Creates a targeted backup of affected packages before making changes.
  * On failure, reverts from backup.
@@ -763,7 +845,8 @@ export async function restorePipPackages(
   targetSnapshot: Snapshot,
   sendProgress: (phase: string, data: Record<string, unknown>) => void,
   sendOutput: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  pypiMirror?: string
 ): Promise<RestoreResult> {
   const result: RestoreResult = {
     installed: [], removed: [], changed: [],
@@ -860,10 +943,11 @@ export async function restorePipPackages(
       sendProgress('restore', { percent: 20, status: `Installing ${toInstall.length} package(s)…` })
 
       const specs = toInstall.map((p) => `${p.name}==${p.version}`)
+      const indexArgs = getPipIndexArgs(pypiMirror)
 
       // Try bulk install first
       sendOutput(`\nInstalling ${specs.length} package(s)…\n`)
-      const bulkResult = await runUvPip(uvPath, ['pip', 'install', ...specs, '--python', pythonPath], installPath, sendOutput, signal)
+      const bulkResult = await runUvPip(uvPath, ['pip', 'install', ...specs, '--python', pythonPath, ...indexArgs], installPath, sendOutput, signal)
 
       if (bulkResult !== 0) {
         sendOutput('\n⚠ Bulk install failed, falling back to one-by-one with --no-deps\n\n')
@@ -876,7 +960,7 @@ export async function restorePipPackages(
           sendProgress('restore', { percent, status: `Installing ${name}…` })
 
           const singleResult = await runUvPip(
-            uvPath, ['pip', 'install', spec, '--no-deps', '--python', pythonPath], installPath, sendOutput, signal
+            uvPath, ['pip', 'install', spec, '--no-deps', '--python', pythonPath, ...indexArgs], installPath, sendOutput, signal
           )
 
           if (singleResult !== 0) {
@@ -995,12 +1079,13 @@ async function runPostInstallScripts(
   pythonPath: string,
   installPath: string,
   sendOutput: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  pypiMirror?: string
 ): Promise<void> {
   const reqPath = path.join(nodePath, 'requirements.txt')
   if (fs.existsSync(reqPath)) {
     try {
-      await installFilteredRequirements(reqPath, uvPath, pythonPath, installPath, `.restore-reqs-${path.basename(nodePath)}.txt`, sendOutput, signal)
+      await installFilteredRequirements(reqPath, uvPath, pythonPath, installPath, `.restore-reqs-${path.basename(nodePath)}.txt`, sendOutput, signal, pypiMirror)
     } catch (err) {
       sendOutput(`⚠ requirements.txt failed for ${path.basename(nodePath)}: ${(err as Error).message}\n`)
     }
@@ -1045,7 +1130,8 @@ export async function restoreCustomNodes(
   targetSnapshot: Snapshot,
   sendProgress: (phase: string, data: Record<string, unknown>) => void,
   sendOutput: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  pypiMirror?: string
 ): Promise<NodeRestoreResult> {
   const result: NodeRestoreResult = {
     installed: [], switched: [], enabled: [], disabled: [],
@@ -1272,7 +1358,7 @@ export async function restoreCustomNodes(
       sendProgress('restore-nodes', { percent: 92, status: 'Installing node dependencies…' })
       for (const nodePath of nodesNeedingPostInstall) {
         sendOutput(`\nRunning post-install for ${path.basename(nodePath)}…\n`)
-        await runPostInstallScripts(nodePath, uvPath, pythonPath, installPath, sendOutput, signal)
+        await runPostInstallScripts(nodePath, uvPath, pythonPath, installPath, sendOutput, signal, pypiMirror)
       }
     } else {
       sendOutput('⚠ Cannot run post-install scripts: uv or Python environment not found\n')
@@ -1289,7 +1375,7 @@ export async function restoreCustomNodes(
       if (pythonPath && fs.existsSync(uvPath)) {
         sendOutput('\nInstalling manager requirements…\n')
         try {
-          const mgrResult = await installFilteredRequirements(mgrReqPath, uvPath, pythonPath, installPath, '.restore-mgr-reqs.txt', sendOutput, signal)
+          const mgrResult = await installFilteredRequirements(mgrReqPath, uvPath, pythonPath, installPath, '.restore-mgr-reqs.txt', sendOutput, signal, pypiMirror)
           if (mgrResult !== 0) {
             sendOutput(`⚠ manager requirements install exited with code ${mgrResult}\n`)
           }

@@ -20,6 +20,7 @@ const api: ElectronApi = {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getDiskSpace: (targetPath) => ipcRenderer.invoke('get-disk-space', targetPath),
   validateInstallPath: (targetPath) => ipcRenderer.invoke('validate-install-path', targetPath),
+  getInstallationSize: (installationId) => ipcRenderer.invoke('get-installation-size', installationId),
 
   // Locale
   getLocaleMessages: () => ipcRenderer.invoke('get-locale-messages'),
@@ -98,6 +99,12 @@ const api: ElectronApi = {
   resumeModelDownload: (url) => ipcRenderer.invoke('model-download-resume', { url }),
   cancelModelDownload: (url) => ipcRenderer.invoke('model-download-cancel', { url }),
   showDownloadInFolder: (savePath) => ipcRenderer.invoke('show-download-in-folder', { savePath }),
+  startModelDownload: (url, filename, directory) =>
+    ipcRenderer.invoke('launcher-start-download', { url, filename, directory }),
+
+  // Model file browser
+  getModelFolders: () => ipcRenderer.invoke('get-model-folders'),
+  getModelFiles: (directory: string) => ipcRenderer.invoke('get-model-files', directory),
 
   // Updates
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),

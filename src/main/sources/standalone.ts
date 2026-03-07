@@ -10,8 +10,8 @@ import type { ChannelDef } from '../lib/channel-cards'
 import { deleteAction, untrackAction } from '../lib/actions'
 import { downloadAndExtract, downloadAndExtractMulti } from '../lib/installer'
 import { copyDirWithProgress } from '../lib/copy'
-import { parseArgs, formatTime } from '../lib/util'
-import { PYTORCH_RE, installFilteredRequirements } from '../lib/pip'
+import { parseArgs, extractPort, formatTime } from '../lib/util'
+import { PYTORCH_RE, installFilteredRequirements, getPipIndexArgs } from '../lib/pip'
 import { t } from '../lib/i18n'
 import * as installations from '../installations'
 import { listCustomNodes, findComfyUIDir, backupDir, mergeDirFlat } from '../lib/migrate'
@@ -298,8 +298,7 @@ export const standalone: SourcePlugin = {
     if (!fs.existsSync(mainPy)) return null
     const userArgs = ((installation.launchArgs as string | undefined) ?? DEFAULT_LAUNCH_ARGS).trim()
     const parsed = userArgs.length > 0 ? parseArgs(userArgs) : []
-    const portIdx = parsed.indexOf('--port')
-    const port = portIdx >= 0 && parsed[portIdx + 1] ? parseInt(parsed[portIdx + 1]!, 10) || 8188 : 8188
+    const port = extractPort(parsed)
     return {
       cmd: pythonPath,
       args: ['-s', path.join('ComfyUI', 'main.py'), ...parsed],
@@ -637,32 +636,49 @@ export const standalone: SourcePlugin = {
       if (!file) return { ok: false, message: t('standalone.snapshotNoFile') }
 
       sendProgress('steps', { steps: [
+        { phase: 'restore-comfyui', label: t('standalone.snapshotRestoreComfyUIPhase', { defaultValue: 'Restore ComfyUI version' }) },
         { phase: 'restore-nodes', label: t('standalone.snapshotRestoreNodesPhase') },
         { phase: 'restore-pip', label: t('standalone.snapshotRestorePipPhase') },
       ] })
-      sendProgress('restore-nodes', { percent: 0, status: 'Loading snapshot…' })
+      sendProgress('restore-comfyui', { percent: 0, status: 'Loading snapshot…' })
       sendOutput('Loading snapshot…\n')
 
       const targetSnapshot = await snapshots.loadSnapshot(installation.installPath, file)
 
-      // Phase 3: Restore custom nodes first (node installs may add pip dependencies)
+      // Phase 1: Restore ComfyUI version (checkout target commit)
+      sendOutput('\n── Restore ComfyUI Version ──\n')
+      const comfyResult = await snapshots.restoreComfyUIVersion(
+        installation.installPath, targetSnapshot, sendOutput
+      )
+      sendProgress('restore-comfyui', { percent: 100, status: comfyResult.changed ? 'Restored' : 'Up to date' })
+
+      if (signal?.aborted) return { ok: false, message: 'Cancelled' }
+
+      // Phase 2: Restore custom nodes first (node installs may add pip dependencies)
       sendOutput('\n── Restore Nodes ──\n')
       const nodeResult = await snapshots.restoreCustomNodes(
-        installation.installPath, installation, targetSnapshot, sendProgress, sendOutput, signal
+        installation.installPath, installation, targetSnapshot, sendProgress, sendOutput, signal,
+        settings.get('pypiMirror')
       )
 
       if (signal?.aborted) return { ok: false, message: 'Cancelled' }
 
-      // Phase 2: Restore pip packages (syncs to exact target state)
+      // Phase 3: Restore pip packages (syncs to exact target state)
       sendOutput('\n── Restore Packages ──\n')
       const pipResult = await snapshots.restorePipPackages(
         installation.installPath, installation, targetSnapshot,
         (phase, data) => sendProgress(phase === 'restore' ? 'restore-pip' : phase, data),
-        sendOutput, signal
+        sendOutput, signal, settings.get('pypiMirror')
       )
 
       // Build combined summary
       const summary: string[] = []
+
+      if (comfyResult.changed) {
+        summary.push(`ComfyUI: checked out ${(comfyResult.commit || targetSnapshot.comfyui.commit || '').slice(0, 7)}`)
+      }
+      if (comfyResult.error) summary.push(`ComfyUI restore failed: ${comfyResult.error}`)
+
       const nodeActions = nodeResult.installed.length + nodeResult.switched.length +
         nodeResult.enabled.length + nodeResult.disabled.length + nodeResult.removed.length
       if (nodeActions > 0) {
@@ -687,7 +703,7 @@ export const standalone: SourcePlugin = {
       if (pipResult.protectedSkipped.length > 0) summary.push(`${pipResult.protectedSkipped.length} protected (skipped)`)
       if (pipResult.failed.length > 0) summary.push(`${pipResult.failed.length} package(s) failed`)
 
-      const totalFailures = nodeResult.failed.length + pipResult.failed.length
+      const totalFailures = nodeResult.failed.length + pipResult.failed.length + (comfyResult.error ? 1 : 0)
 
       if (summary.length === 0) {
         sendOutput(`\n✓ ${t('standalone.snapshotRestoreNothingToDo')}\n`)
@@ -701,15 +717,21 @@ export const standalone: SourcePlugin = {
         return { ok: false, message: t('standalone.snapshotRestoreReverted') }
       }
 
-      // Restore update channel from the snapshot (default to stable if not set)
-      const targetChannel = targetSnapshot.updateChannel || 'stable'
-      if (targetChannel !== (installation.updateChannel as string | undefined)) {
-        await update({ updateChannel: targetChannel })
-      }
+      // Restore update channel and version/lastRollback state so the
+      // release cache sees accurate state for the restored channel.
+      const restoreState = snapshots.buildPostRestoreState(
+        targetSnapshot, comfyResult,
+        installation.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
+        installation.version as string | undefined
+      )
+      await update(restoreState)
 
       // Capture a new snapshot reflecting the restored state
       try {
-        const updatedInstallation = { ...installation, updateChannel: targetChannel }
+        const updatedInstallation = {
+          ...installation,
+          ...restoreState,
+        }
         const filename = await snapshots.saveSnapshot(installation.installPath, updatedInstallation, 'post-restore')
         const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
         await update({ lastSnapshot: filename, snapshotCount })
@@ -932,10 +954,11 @@ export const standalone: SourcePlugin = {
           await fs.promises.writeFile(filteredReqPath, filteredReqs, 'utf-8')
 
           try {
+            const indexArgs = getPipIndexArgs(settings.get('pypiMirror'))
             sendProgress('deps', { percent: -1, status: t('standalone.updateDepsDryRun') })
             if (signal?.aborted) return { ok: false, message: 'Cancelled' }
             const dryRunResult = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-              const proc = spawn(uvPath, ['pip', 'install', '--dry-run', '-r', filteredReqPath, '--python', activeEnvPython], {
+              const proc = spawn(uvPath, ['pip', 'install', '--dry-run', '-r', filteredReqPath, '--python', activeEnvPython, ...indexArgs], {
                 cwd: installPath,
                 stdio: ['ignore', 'pipe', 'pipe'],
                 windowsHide: true,
@@ -963,7 +986,7 @@ export const standalone: SourcePlugin = {
             if (signal?.aborted) return { ok: false, message: 'Cancelled' }
             sendProgress('deps', { percent: -1, status: t('standalone.updateDepsInstalling') })
             const installResult = await new Promise<number>((resolve) => {
-              const proc = spawn(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', activeEnvPython], {
+              const proc = spawn(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', activeEnvPython, ...indexArgs], {
                 cwd: installPath,
                 stdio: ['ignore', 'pipe', 'pipe'],
                 windowsHide: true,
@@ -1004,7 +1027,7 @@ export const standalone: SourcePlugin = {
         if (fs.existsSync(uvPath) && activeEnvPython) {
           sendProgress('deps', { percent: -1, status: t('standalone.updateDepsInstalling') })
           sendOutput('\nInstalling manager requirements…\n')
-          const mgrResult = await installFilteredRequirements(mgrReqPath, uvPath, activeEnvPython, installPath, '.manager-reqs-filtered.txt', sendOutput, signal)
+          const mgrResult = await installFilteredRequirements(mgrReqPath, uvPath, activeEnvPython, installPath, '.manager-reqs-filtered.txt', sendOutput, signal, settings.get('pypiMirror'))
           if (mgrResult !== 0) {
             sendOutput(`\nWarning: manager requirements install exited with code ${mgrResult}\n`)
           }
@@ -1243,6 +1266,7 @@ export const standalone: SourcePlugin = {
             sendOutput(t('migrate.noUvOrPython') + '\n')
             sendProgress('deps', { percent: 100, status: t('migrate.depsSkipped') })
           } else {
+            const migrateMirror = settings.get('pypiMirror')
             let depsInstalled = 0
 
             for (const node of nodesWithReqs) {
@@ -1253,7 +1277,7 @@ export const standalone: SourcePlugin = {
               })
 
               try {
-                const procResult = await installFilteredRequirements(nodReqPath, uvPath, activePython, installation.installPath, `.migrate-reqs-${node.name}.txt`, sendOutput)
+                const procResult = await installFilteredRequirements(nodReqPath, uvPath, activePython, installation.installPath, `.migrate-reqs-${node.name}.txt`, sendOutput, undefined, migrateMirror)
                 if (procResult !== 0) {
                   sendOutput(`\n⚠ ${node.name}: dependency install exited with code ${procResult}\n`)
                 }
@@ -1280,7 +1304,7 @@ export const standalone: SourcePlugin = {
 
           if (fs.existsSync(uvPath) && activePython) {
             sendOutput('\nInstalling manager requirements…\n')
-            const procResult = await installFilteredRequirements(mgrReqPath, uvPath, activePython, installation.installPath, '.migrate-mgr-reqs.txt', sendOutput)
+            const procResult = await installFilteredRequirements(mgrReqPath, uvPath, activePython, installation.installPath, '.migrate-mgr-reqs.txt', sendOutput, undefined, settings.get('pypiMirror'))
             if (procResult !== 0) {
               sendOutput(`\n⚠ manager requirements install exited with code ${procResult}\n`)
             }

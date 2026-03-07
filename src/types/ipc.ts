@@ -97,7 +97,7 @@ export interface DetailField {
   label: string
   value: string | boolean | number | null
   editable?: boolean
-  editType?: 'select' | 'boolean' | 'text' | 'channel-cards'
+  editType?: 'select' | 'boolean' | 'text' | 'path' | 'channel-cards'
   options?: DetailFieldOption[]
   refreshSection?: boolean
   onChangeAction?: string
@@ -182,6 +182,7 @@ export interface ActionResult {
   mode?: 'console' | 'window'
   portConflict?: PortConflictInfo
   cancelled?: boolean
+  running?: boolean
 }
 
 export interface PortConflictInfo {
@@ -216,6 +217,7 @@ export interface SettingsSection {
 export interface SettingsAction {
   label: string
   url?: string
+  action?: string
 }
 
 export interface SettingsField {
@@ -226,6 +228,7 @@ export interface SettingsField {
   readonly?: boolean
   options?: { value: string; label: string }[]
   openable?: boolean
+  placeholder?: string
   min?: number
   max?: number
 }
@@ -339,6 +342,15 @@ export interface ModelDownloadProgress {
   etaSeconds?: number
   status: ModelDownloadStatus
   error?: string
+}
+
+// --- Model file browser types ---
+export interface ModelFileInfo {
+  name: string
+  directory: string
+  fullPath: string
+  sizeBytes: number
+  modifiedAt: number
 }
 
 // --- Track types ---
@@ -488,6 +500,7 @@ export interface ElectronApi {
   openExternal(url: string): Promise<void>
   getDiskSpace(targetPath: string): Promise<DiskSpaceInfo>
   validateInstallPath(targetPath: string): Promise<PathIssue[]>
+  getInstallationSize(installationId: string): Promise<{ sizeBytes: number }>
 
   // Locale
   getLocaleMessages(): Promise<Record<string, unknown>>
@@ -551,7 +564,7 @@ export interface ElectronApi {
   resetZoom(): Promise<void>
 
   // Updates
-  checkForUpdate(): Promise<void>
+  checkForUpdate(): Promise<{ available: boolean; version?: string; error?: string }>
   downloadUpdate(): Promise<void>
   installUpdate(): Promise<void>
   getPendingUpdate(): Promise<UpdateInfo | null>
@@ -562,6 +575,11 @@ export interface ElectronApi {
   resumeModelDownload(url: string): Promise<boolean>
   cancelModelDownload(url: string): Promise<boolean>
   showDownloadInFolder(savePath: string): Promise<void>
+  startModelDownload(url: string, filename: string, directory: string): Promise<boolean>
+
+  // Model file browser
+  getModelFolders(): Promise<string[]>
+  getModelFiles(directory: string): Promise<ModelFileInfo[]>
 
   // Event listeners (return unsubscribe functions)
   onInstallProgress(callback: (data: ProgressData) => void): Unsubscribe
@@ -584,3 +602,16 @@ export interface ElectronApi {
   onTelemetrySettingChanged(callback: (enabled: boolean | undefined) => void): Unsubscribe
   onDatadogError(callback: (payload: DatadogForwardedError) => void): Unsubscribe
 }
+
+/** Action IDs that require the installation to be stopped before running.
+ *  Shared between main and renderer processes. */
+export const REQUIRES_STOPPED = new Set([
+  'delete',
+  'copy',
+  'copy-update',
+  'release-update',
+  'migrate-to-standalone',
+  'snapshot-restore',
+  'update-comfyui',
+  'migrate-from',
+])
