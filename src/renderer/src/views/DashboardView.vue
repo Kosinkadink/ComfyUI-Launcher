@@ -239,6 +239,11 @@ async function handleLaunch(inst: Installation, actions: ListAction[]): Promise<
     return
   }
 
+  // Pre-flight: block if an operation (launch/install) is already in progress
+  if (REQUIRES_STOPPED.has(action.id) && sessionStore.isLaunching(inst.id)) {
+    await modal.alert({ title: action.label, message: t('errors.operationInProgress') })
+    return
+  }
   // Pre-flight: if the action requires the install to be stopped, offer to stop it
   if (REQUIRES_STOPPED.has(action.id) && sessionStore.isRunning(inst.id)) {
     const confirmed = await modal.confirm({

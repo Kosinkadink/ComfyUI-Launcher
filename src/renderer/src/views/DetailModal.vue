@@ -180,6 +180,12 @@ async function runAction(action: ActionDef, btn: HTMLButtonElement | null): Prom
     ui_surface: 'detail',
   }
 
+  // Pre-flight: block if an operation (launch/install) is already in progress
+  if (REQUIRES_STOPPED.has(action.id) && sessionStore.isLaunching(props.installation.id)) {
+    await modal.alert({ title: action.label, message: t('errors.operationInProgress') })
+    return
+  }
+
   // Pre-flight: if the action requires the install to be stopped, offer to stop it
   if (REQUIRES_STOPPED.has(action.id) && sessionStore.isRunning(props.installation.id)) {
     if (!await stopAndRetry(props.installation.id)) return

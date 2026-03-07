@@ -1400,6 +1400,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     if (REQUIRES_STOPPED.has(actionId) && _runningSessions.has(installationId)) {
       return { ok: false, message: i18n.t('errors.stopRequired'), running: true }
     }
+    if (REQUIRES_STOPPED.has(actionId) && _operationAborts.has(installationId)) {
+      return { ok: false, message: i18n.t('errors.operationInProgress') }
+    }
     if (actionId === 'remove') {
       await installations.remove(installationId)
       await autoAssignPrimary(installationId)
