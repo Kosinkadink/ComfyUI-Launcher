@@ -5,6 +5,7 @@ import { readGitHead, isGitAvailable, gitClone, gitFetchAndCheckout } from './gi
 import { scanCustomNodes, nodeKey } from './nodes'
 import { pipFreeze, getPipIndexArgs } from './pip'
 import { installCnrNode, switchCnrVersion, isSafePathComponent } from './cnr'
+import { killProcTree } from './process'
 import type { ScannedNode } from './nodes'
 import type { InstallationRecord } from '../installations'
 
@@ -757,9 +758,10 @@ function runUvPip(
     })
 
     const onAbort = () => {
-      proc.kill()
+      killProcTree(proc)
     }
     signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) onAbort()
 
     proc.stdout.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
     proc.stderr.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
@@ -792,7 +794,8 @@ export interface RestoreResult {
 export async function restoreComfyUIVersion(
   installPath: string,
   targetSnapshot: Snapshot,
-  sendOutput: (text: string) => void
+  sendOutput: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<{ changed: boolean; commit: string | null; error?: string }> {
   const comfyuiDir = path.join(installPath, 'ComfyUI')
   const targetCommit = targetSnapshot.comfyui.commit
@@ -816,7 +819,7 @@ export async function restoreComfyUIVersion(
   }
 
   sendOutput(`Checking out ComfyUI commit ${targetCommit.slice(0, 7)}…\n`)
-  const exitCode = await gitFetchAndCheckout(comfyuiDir, targetCommit, sendOutput)
+  const exitCode = await gitFetchAndCheckout(comfyuiDir, targetCommit, sendOutput, signal)
   if (exitCode !== 0) {
     const msg = `git checkout failed with exit code ${exitCode}`
     sendOutput(`⚠ ${msg}\n`)
@@ -932,8 +935,15 @@ export async function restorePipPackages(
     }
   }
 
+  // Identify truly new packages (not in the current env) upfront so we can
+  // uninstall them on revert even if a bulk install was killed mid-way and
+  // result.installed was never populated.
+  const newPkgNames = toInstall
+    .filter((p) => !result.changed.some((c) => c.name === p.name))
+    .map((p) => p.name)
+
   // Print the plan
-  const newPkgs = toInstall.filter((p) => !result.changed.some((c) => c.name === p.name))
+  const newPkgs = newPkgNames
   const pipPlanParts: string[] = []
   if (newPkgs.length > 0) pipPlanParts.push(`install ${newPkgs.length}`)
   if (result.changed.length > 0) pipPlanParts.push(`change ${result.changed.length}`)
@@ -1037,24 +1047,30 @@ export async function restorePipPackages(
       }
     }
 
-    // 6. If there were failures, revert the entire operation
-    if (result.failed.length > 0 && backupDir) {
-      sendProgress('restore', { percent: 90, status: 'Reverting due to failures…' })
-      sendOutput('\n⚠ Some operations failed. Reverting from backup…\n')
-      await restoreFromBackup(backupDir, sitePackages)
+    // 6. If aborted or there were failures, revert the entire operation
+    if (signal?.aborted || result.failed.length > 0) {
+      const reason = signal?.aborted ? 'cancelled' : 'failures'
+      sendProgress('restore', { percent: 90, status: `Reverting due to ${reason}…` })
+      sendOutput(`\n⚠ Restore ${reason}. Reverting…\n`)
 
-      // Also uninstall any newly installed packages (weren't in current state)
-      const newlyInstalled = result.installed
-      if (newlyInstalled.length > 0) {
+      if (backupDir) {
+        await restoreFromBackup(backupDir, sitePackages)
+      }
+
+      // Uninstall any packages that were new (not in the pre-restore env).
+      // Use the pre-computed newPkgNames rather than result.installed, because
+      // a killed bulk install may have partially installed packages without
+      // populating result.installed.
+      if (newPkgNames.length > 0) {
         await runUvPip(
-          uvPath, ['pip', 'uninstall', ...newlyInstalled, '--python', pythonPath], installPath, sendOutput
+          uvPath, ['pip', 'uninstall', ...newPkgNames, '--python', pythonPath], installPath, sendOutput
         ).catch(() => {})
       }
 
       result.installed = []
       result.removed = []
       result.changed = []
-      result.errors.push('Restore reverted to pre-restore state due to failures')
+      result.errors.push(`Restore reverted to pre-restore state due to ${reason}`)
     }
   } catch (err) {
     // Catastrophic failure — revert
@@ -1126,7 +1142,7 @@ async function runPostInstallScripts(
 
       try {
         const indexArgs = getPipIndexArgs(pypiMirror)
-        await runUvPip(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', pythonPath, ...indexArgs], installPath, sendOutput)
+        await runUvPip(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', pythonPath, ...indexArgs], installPath, sendOutput, signal)
       } finally {
         try { await fs.promises.unlink(filteredReqPath) } catch {}
       }
@@ -1146,9 +1162,10 @@ async function runPostInstallScripts(
         })
 
         const onAbort = () => {
-          proc.kill()
+          killProcTree(proc)
         }
         signal?.addEventListener('abort', onAbort, { once: true })
+        if (signal?.aborted) onAbort()
 
         proc.stdout.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
         proc.stderr.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
@@ -1291,13 +1308,14 @@ export async function restoreCustomNodes(
           continue
         }
         try {
-          await installCnrNode(targetNode.id, targetNode.version, customNodesDir, sendOutput)
+          await installCnrNode(targetNode.id, targetNode.version, customNodesDir, sendOutput, signal)
           result.installed.push(targetNode.id)
           nodesNeedingPostInstall.push(path.join(customNodesDir, targetNode.id))
           if (!targetNode.enabled) {
             await disableNode(customNodesDir, targetNode.id)
           }
         } catch (err) {
+          if (signal?.aborted) break
           result.failed.push({ id: targetNode.id, error: (err as Error).message })
         }
       } else if (targetNode.type === 'git') {
@@ -1315,13 +1333,19 @@ export async function restoreCustomNodes(
         }
         try {
           const dest = path.join(customNodesDir, targetNode.dirName)
-          const cloneResult = await gitClone(targetNode.url, dest, sendOutput)
+          const cloneResult = await gitClone(targetNode.url, dest, sendOutput, signal)
+          if (signal?.aborted) {
+            // Clean up partial clone
+            await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {})
+            break
+          }
           if (cloneResult !== 0) {
             result.failed.push({ id: targetNode.id, error: `git clone failed (exit ${cloneResult})` })
             continue
           }
           if (targetNode.commit) {
-            const checkoutResult = await gitFetchAndCheckout(dest, targetNode.commit, sendOutput)
+            const checkoutResult = await gitFetchAndCheckout(dest, targetNode.commit, sendOutput, signal)
+            if (signal?.aborted) break
             if (checkoutResult !== 0) {
               sendOutput(`⚠ git checkout to ${targetNode.commit} failed for ${targetNode.id}\n`)
             }
@@ -1332,6 +1356,12 @@ export async function restoreCustomNodes(
             await disableNode(customNodesDir, targetNode.dirName)
           }
         } catch (err) {
+          if (signal?.aborted) {
+            // Clean up partial clone on abort
+            const dest = path.join(customNodesDir, targetNode.dirName)
+            await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {})
+            break
+          }
           result.failed.push({ id: targetNode.id, error: (err as Error).message })
         }
       } else if (targetNode.type === 'file') {
@@ -1367,17 +1397,19 @@ export async function restoreCustomNodes(
 
       if (targetNode.type === 'cnr' && targetNode.version && currentNode.version !== targetNode.version) {
         try {
-          await switchCnrVersion(targetNode.id, targetNode.version, nodePath, sendOutput)
+          await switchCnrVersion(targetNode.id, targetNode.version, nodePath, sendOutput, signal)
           result.switched.push(targetNode.id)
           nodesNeedingPostInstall.push(nodePath)
         } catch (err) {
+          if (signal?.aborted) break
           result.failed.push({ id: targetNode.id, error: (err as Error).message })
         }
       } else if (targetNode.type === 'git' && targetNode.commit && currentNode.commit !== targetNode.commit) {
         if (!gitAvailable) {
           result.failed.push({ id: targetNode.id, error: 'git not available' })
         } else {
-          const checkoutResult = await gitFetchAndCheckout(nodePath, targetNode.commit, sendOutput)
+          const checkoutResult = await gitFetchAndCheckout(nodePath, targetNode.commit, sendOutput, signal)
+          if (signal?.aborted) break
           if (checkoutResult === 0) {
             result.switched.push(targetNode.id)
             nodesNeedingPostInstall.push(nodePath)
@@ -1394,13 +1426,14 @@ export async function restoreCustomNodes(
   }
 
   // 4. Run post-install scripts for installed/switched nodes
-  if (nodesNeedingPostInstall.length > 0) {
+  if (nodesNeedingPostInstall.length > 0 && !signal?.aborted) {
     const uvPath = getUvPath(installPath)
     const pythonPath = getActivePythonPath(installation)
 
     if (pythonPath && fs.existsSync(uvPath)) {
       sendProgress('restore-nodes', { percent: 92, status: 'Installing node dependencies…' })
       for (const nodePath of nodesNeedingPostInstall) {
+        if (signal?.aborted) break
         sendOutput(`\nRunning post-install for ${path.basename(nodePath)}…\n`)
         await runPostInstallScripts(nodePath, uvPath, pythonPath, installPath, sendOutput, signal, pypiMirror)
       }
