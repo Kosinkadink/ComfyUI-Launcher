@@ -2,6 +2,11 @@ import { execFile, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
+export interface ProcessResult {
+  exitCode: number
+  stderr: string
+}
+
 /**
  * Resolve the actual .git directory for a repository.
  * Handles worktrees/submodules where .git is a file containing "gitdir: <path>".
@@ -98,19 +103,24 @@ export function gitClone(
   url: string,
   dest: string,
   sendOutput: (text: string) => void
-): Promise<number> {
+): Promise<ProcessResult> {
   return new Promise((resolve) => {
+    const stderrChunks: string[] = []
     const proc = spawn('git', ['clone', url, dest], {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true
     })
     proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
-    proc.stderr.on('data', (data: Buffer) => sendOutput(data.toString()))
+    proc.stderr.on('data', (data: Buffer) => {
+      const text = data.toString()
+      stderrChunks.push(text)
+      sendOutput(text)
+    })
     proc.on('error', (err) => {
       sendOutput(err.message)
-      resolve(1)
+      resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message })
     })
-    proc.on('close', (code) => resolve(code ?? 1))
+    proc.on('close', (code) => resolve({ exitCode: code ?? 1, stderr: stderrChunks.join('') }))
   })
 }
 
@@ -118,21 +128,26 @@ export function gitFetchAndCheckout(
   repoPath: string,
   commit: string,
   sendOutput: (text: string) => void
-): Promise<number> {
-  const runGit = (args: string[]): Promise<number> =>
+): Promise<ProcessResult> {
+  const runGit = (args: string[]): Promise<ProcessResult> =>
     new Promise((resolve) => {
+      const stderrChunks: string[] = []
       const proc = spawn('git', args, {
         cwd: repoPath,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true
       })
       proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
-      proc.stderr.on('data', (data: Buffer) => sendOutput(data.toString()))
+      proc.stderr.on('data', (data: Buffer) => {
+        const text = data.toString()
+        stderrChunks.push(text)
+        sendOutput(text)
+      })
       proc.on('error', (err) => {
         sendOutput(err.message)
-        resolve(1)
+        resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message })
       })
-      proc.on('close', (code) => resolve(code ?? 1))
+      proc.on('close', (code) => resolve({ exitCode: code ?? 1, stderr: stderrChunks.join('') }))
     })
 
   // Fetch master explicitly — grafted/archive-based repos may have no
@@ -140,11 +155,11 @@ export function gitFetchAndCheckout(
   // tags. Use --unshallow to handle shallow clones; fall back to a
   // regular fetch if the repo is already complete.
   const refspec = '+refs/heads/master:refs/remotes/origin/master'
-  return runGit(['fetch', '--unshallow', 'origin', refspec]).then((code) => {
-    if (code !== 0) return runGit(['fetch', 'origin', refspec])
-    return code
-  }).then((code) => {
-    if (code !== 0) return code
+  return runGit(['fetch', '--unshallow', 'origin', refspec]).then((result) => {
+    if (result.exitCode !== 0) return runGit(['fetch', 'origin', refspec])
+    return result
+  }).then((result) => {
+    if (result.exitCode !== 0) return result
     // Ensure a local master branch exists (mirroring the pygit2 update
     // script) so future updates via update_comfyui.py work correctly.
     // Detach HEAD first so `branch -f` can't fail due to master being
@@ -153,8 +168,8 @@ export function gitFetchAndCheckout(
       // Detach may fail if HEAD is invalid (fresh archive with no commits
       // checked out); that's fine — branch -f will still succeed.
       return runGit(['branch', '-f', 'master', 'refs/remotes/origin/master'])
-    }).then((branchCode) => {
-      if (branchCode !== 0) return branchCode
+    }).then((branchResult) => {
+      if (branchResult.exitCode !== 0) return branchResult
       return runGit(['checkout', commit])
     })
   })

@@ -784,9 +784,12 @@ export async function restoreComfyUIVersion(
   }
 
   sendOutput(`Checking out ComfyUI commit ${targetCommit.slice(0, 7)}…\n`)
-  const exitCode = await gitFetchAndCheckout(comfyuiDir, targetCommit, sendOutput)
-  if (exitCode !== 0) {
-    const msg = `git checkout failed with exit code ${exitCode}`
+  const gitResult = await gitFetchAndCheckout(comfyuiDir, targetCommit, sendOutput)
+  if (gitResult.exitCode !== 0) {
+    const detail = gitResult.stderr.trim().split('\n').slice(-20).join('\n')
+    const msg = detail
+      ? `git checkout failed with exit code ${gitResult.exitCode}:\n${detail}`
+      : `git checkout failed with exit code ${gitResult.exitCode}`
     sendOutput(`⚠ ${msg}\n`)
     return { changed: false, commit: currentHead, error: msg }
   }
@@ -1272,13 +1275,14 @@ export async function restoreCustomNodes(
         try {
           const dest = path.join(customNodesDir, targetNode.dirName)
           const cloneResult = await gitClone(targetNode.url, dest, sendOutput)
-          if (cloneResult !== 0) {
-            result.failed.push({ id: targetNode.id, error: `git clone failed (exit ${cloneResult})` })
+          if (cloneResult.exitCode !== 0) {
+            const detail = cloneResult.stderr.trim().split('\n').slice(-20).join('\n')
+            result.failed.push({ id: targetNode.id, error: detail ? `git clone failed (exit ${cloneResult.exitCode}):\n${detail}` : `git clone failed (exit ${cloneResult.exitCode})` })
             continue
           }
           if (targetNode.commit) {
             const checkoutResult = await gitFetchAndCheckout(dest, targetNode.commit, sendOutput)
-            if (checkoutResult !== 0) {
+            if (checkoutResult.exitCode !== 0) {
               sendOutput(`⚠ git checkout to ${targetNode.commit} failed for ${targetNode.id}\n`)
             }
           }
@@ -1334,11 +1338,12 @@ export async function restoreCustomNodes(
           result.failed.push({ id: targetNode.id, error: 'git not available' })
         } else {
           const checkoutResult = await gitFetchAndCheckout(nodePath, targetNode.commit, sendOutput)
-          if (checkoutResult === 0) {
+          if (checkoutResult.exitCode === 0) {
             result.switched.push(targetNode.id)
             nodesNeedingPostInstall.push(nodePath)
           } else {
-            result.failed.push({ id: targetNode.id, error: `git checkout failed (exit ${checkoutResult})` })
+            const detail = checkoutResult.stderr.trim().split('\n').slice(-20).join('\n')
+            result.failed.push({ id: targetNode.id, error: detail ? `git checkout failed (exit ${checkoutResult.exitCode}):\n${detail}` : `git checkout failed (exit ${checkoutResult.exitCode})` })
           }
         }
       } else {
