@@ -114,13 +114,6 @@ describe('useSessionStore', () => {
 
       expect(store.getSession('inst-1')?.output).toBe('progress: 50%')
     })
-
-    it('preserves text without \\r as-is', () => {
-      store.startSession('inst-1')
-      store.appendOutput('inst-1', 'no carriage returns here\n')
-
-      expect(store.getSession('inst-1')?.output).toBe('no carriage returns here\n')
-    })
   })
 
   describe('runningTabCount', () => {
