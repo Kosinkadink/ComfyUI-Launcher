@@ -8,6 +8,7 @@ import { installCnrNode, switchCnrVersion, isSafePathComponent } from './cnr'
 import { killProcTree } from './process'
 import type { ScannedNode } from './nodes'
 import type { InstallationRecord } from '../installations'
+import type { ComfyVersion } from './version'
 
 // --- Types ---
 
@@ -21,7 +22,10 @@ export interface Snapshot {
     commit: string | null
     releaseTag: string
     variant: string
+    /** @deprecated Legacy display string for old snapshots. Use baseTag/commitsAhead instead. */
     displayVersion?: string
+    baseTag?: string
+    commitsAhead?: number
   }
   customNodes: ScannedNode[]
   pipPackages: Record<string, string>
@@ -49,8 +53,8 @@ export interface SnapshotExportEnvelope {
 export interface SnapshotDiff {
   comfyuiChanged: boolean
   comfyui?: {
-    from: { ref: string; commit: string | null; displayVersion?: string }
-    to: { ref: string; commit: string | null; displayVersion?: string }
+    from: { ref: string; commit: string | null; displayVersion?: string; baseTag?: string; commitsAhead?: number }
+    to: { ref: string; commit: string | null; displayVersion?: string; baseTag?: string; commitsAhead?: number }
   }
   updateChannelChanged: boolean
   updateChannel?: { from: string; to: string }
@@ -164,6 +168,7 @@ async function captureState(installPath: string, installation: InstallationRecor
     }
   }
 
+  const cv = installation.comfyVersion as ComfyVersion | undefined
   return {
     comfyui: {
       ref: manifest.comfyui_ref,
@@ -171,6 +176,8 @@ async function captureState(installPath: string, installation: InstallationRecor
       releaseTag: manifest.version,
       variant: manifest.id,
       displayVersion: (installation.version as string | undefined) || undefined,
+      baseTag: cv?.baseTag,
+      commitsAhead: cv?.commitsAhead,
     },
     customNodes,
     pipPackages,
@@ -476,8 +483,8 @@ export function diffSnapshots(a: Snapshot, b: Snapshot): SnapshotDiff {
   if (a.comfyui.ref !== b.comfyui.ref || a.comfyui.commit !== b.comfyui.commit) {
     diff.comfyuiChanged = true
     diff.comfyui = {
-      from: { ref: a.comfyui.ref, commit: a.comfyui.commit, displayVersion: a.comfyui.displayVersion },
-      to: { ref: b.comfyui.ref, commit: b.comfyui.commit, displayVersion: b.comfyui.displayVersion },
+      from: { ref: a.comfyui.ref, commit: a.comfyui.commit, displayVersion: a.comfyui.displayVersion, baseTag: a.comfyui.baseTag, commitsAhead: a.comfyui.commitsAhead },
+      to: { ref: b.comfyui.ref, commit: b.comfyui.commit, displayVersion: b.comfyui.displayVersion, baseTag: b.comfyui.baseTag, commitsAhead: b.comfyui.commitsAhead },
     }
   }
 
@@ -812,17 +819,31 @@ export function buildPostRestoreState(
   targetSnapshot: Snapshot,
   comfyResult: { changed: boolean; commit: string | null; error?: string },
   existingUpdateInfo: Record<string, Record<string, unknown>> | undefined,
-  currentVersion?: string
+  currentVersion?: string,
+  currentComfyVersion?: ComfyVersion
 ): Record<string, unknown> {
   const targetChannel = targetSnapshot.updateChannel || 'stable'
+  const headCommit = comfyResult.commit || targetSnapshot.comfyui.commit
+
+  let comfyVersion: ComfyVersion | undefined
+  if (comfyResult.error) {
+    comfyVersion = currentComfyVersion
+  } else if (headCommit) {
+    comfyVersion = {
+      commit: headCommit,
+      baseTag: targetSnapshot.comfyui.baseTag,
+      commitsAhead: targetSnapshot.comfyui.commitsAhead,
+    }
+  }
+
+  // Legacy displayVersion fallback for installedTag (used by release cache comparisons)
   const displayVersion = comfyResult.error
     ? (currentVersion || 'unknown')
     : (targetSnapshot.comfyui.displayVersion || targetSnapshot.comfyui.releaseTag || 'unknown')
-  const headCommit = comfyResult.commit || targetSnapshot.comfyui.commit
 
   const state: Record<string, unknown> = {
     updateChannel: targetChannel,
-    version: displayVersion,
+    ...(comfyVersion ? { comfyVersion } : {}),
     lastRollback: {
       preUpdateHead: null,
       postUpdateHead: headCommit,

@@ -7,6 +7,8 @@ import type { ChildProcess } from 'child_process'
 import sources from '../sources/index'
 import * as installations from '../installations'
 import type { InstallationRecord } from '../installations'
+import { formatComfyVersion } from './version'
+import type { ComfyVersion } from './version'
 import * as settings from '../settings'
 import { defaultInstallDir } from './paths'
 import { download } from './download'
@@ -588,8 +590,12 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         : inst.status === 'failed'
         ? { label: i18n.t('errors.installFailed'), style: 'danger' }
         : (source.getStatusTag ? source.getStatusTag(inst) : undefined)
+      // Derive version display string from comfyVersion ground truth, falling back to legacy string
+      const cv = inst.comfyVersion as ComfyVersion | undefined
+      const version = cv ? formatComfyVersion(cv, 'short') : inst.version
       return {
         ...inst,
+        ...(version != null ? { version } : {}),
         sourceLabel: source.label,
         sourceCategory: source.category,
         hasConsole: source.hasConsole !== false,
@@ -734,7 +740,8 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             const restoreState = buildPostRestoreState(
               targetSnapshot, comfyResult,
               freshInst.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
-              freshInst.version as string | undefined
+              freshInst.version as string | undefined,
+              freshInst.comfyVersion as ComfyVersion | undefined
             )
             await update(restoreState)
 
@@ -1000,7 +1007,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       createdAt: s.createdAt,
       trigger: s.trigger,
       label: s.label,
-      comfyuiVersion: s.comfyui.displayVersion || s.comfyui.ref,
+      comfyuiVersion: (s.comfyui.commit && (s.comfyui.baseTag || s.comfyui.commitsAhead != null))
+        ? formatComfyVersion({ commit: s.comfyui.commit, baseTag: s.comfyui.baseTag, commitsAhead: s.comfyui.commitsAhead }, 'short')
+        : (s.comfyui.displayVersion || s.comfyui.ref),
       nodeCount: s.customNodes.length,
       pipPackageCount: Object.keys(s.pipPackages).length,
     }))

@@ -14,6 +14,8 @@ import fs from 'fs'
 import { dataDir } from './paths'
 import { writeFileSafe } from './safe-file'
 import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
+import { formatComfyVersion } from './version'
+import type { ComfyVersion } from './version'
 
 export interface ReleaseCacheEntry {
   checkedAt?: number
@@ -23,6 +25,10 @@ export interface ReleaseCacheEntry {
   releaseUrl?: string
   publishedAt?: string
   installedTag?: string
+  /** Raw version data for the latest release (latest channel). */
+  commitSha?: string
+  baseTag?: string
+  commitsAhead?: number
   [key: string]: unknown
 }
 
@@ -146,8 +152,10 @@ export function getEffectiveInfo(
     | Record<string, Record<string, unknown>>
     | undefined
   const perInstall = updateInfoByChannel?.[channel]
+  const cv = installation.comfyVersion as ComfyVersion | undefined
   const installedTag =
     (perInstall?.installedTag as string | undefined) ??
+    (cv ? formatComfyVersion(cv, 'short') : undefined) ??
     (installation.version as string | undefined) ??
     'unknown'
   return { ...cached, installedTag }
@@ -169,10 +177,19 @@ export async function checkForUpdate(
     async () => {
       const release = await fetchLatestRelease(channel)
       if (!release) return null
+      const commitSha = release.commitSha as string | undefined
+      const baseTag = release.baseTag as string | undefined
+      const commitsAhead = release.commitsAhead as number | undefined
+      const cv: ComfyVersion | undefined = commitSha
+        ? { commit: commitSha, baseTag, commitsAhead }
+        : undefined
       return {
         checkedAt: Date.now(),
         latestTag: release.tag_name as string,
-        releaseName: (release.name as string) || (release.tag_name as string),
+        releaseName: cv ? formatComfyVersion(cv, 'short') : ((release.name as string) || (release.tag_name as string)),
+        commitSha,
+        baseTag,
+        commitsAhead,
         releaseNotes: truncateNotes(release.body as string, 4000),
         releaseUrl: release.html_url as string,
         publishedAt: release.published_at as string,
@@ -185,8 +202,10 @@ export async function checkForUpdate(
   }
   const existing = (installation.updateInfoByChannel as Record<string, Record<string, unknown>>) || {}
   const prevChannelInfo = existing[channel]
+  const cv = installation.comfyVersion as ComfyVersion | undefined
   const installedTag =
     (prevChannelInfo?.installedTag as string | undefined) ??
+    (cv ? formatComfyVersion(cv, 'short') : undefined) ??
     (installation.version as string | undefined) ??
     'unknown'
   await update({
@@ -208,9 +227,16 @@ export function isUpdateAvailable(
   info: ReleaseCacheEntry | null
 ): boolean {
   if (!info || !info.latestTag) return false
-  // Installed version string shows commits ahead of the stable tag (e.g. "v0.14.2 + 21 commits")
+
+  // Structural check: if we have comfyVersion and are viewing stable,
+  // any commits ahead means the installed version is newer than stable.
+  const cv = installation.comfyVersion as ComfyVersion | undefined
+  if (cv && channel === 'stable' && cv.commitsAhead && cv.commitsAhead > 0) return true
+
+  // Legacy string check for pre-migration installations
   const version = (installation.version as string) || ''
-  if (channel === 'stable' && version.includes(info.latestTag + ' +')) return true
+  if (!cv && channel === 'stable' && (version.includes(info.latestTag + '+') || version.includes(info.latestTag + ' +'))) return true
+
   // Cross-channel: last update was on a different channel, so this channel's installedTag is stale;
   // fall back to comparing the current display version against this channel's latest tag.
   const lastRollback = installation.lastRollback as
@@ -218,11 +244,12 @@ export function isUpdateAvailable(
     | undefined
   const lastUpdateChannel = lastRollback?.channel as string | undefined
   if (lastUpdateChannel && lastUpdateChannel !== channel) {
-    // Compare display version and post-update commit against the latest for this channel.
-    // For the "latest" channel, latestTag is a short SHA; releaseName may include it or be the stable tag.
+    // Structural: compare commit SHA against latest
+    if (cv && info.commitSha && cv.commit === info.commitSha) return false
     const postHead = (lastRollback?.postUpdateHead as string | undefined) || ''
     const shortHead = postHead.slice(0, 7)
-    if (version === info.latestTag || version === info.releaseName) return false
+    const displayVersion = cv ? formatComfyVersion(cv, 'short') : version
+    if (displayVersion === info.latestTag || displayVersion === info.releaseName) return false
     if (shortHead && (shortHead === info.latestTag || info.releaseName?.includes(shortHead))) return false
     return true
   }
