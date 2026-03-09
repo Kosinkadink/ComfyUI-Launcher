@@ -3,7 +3,7 @@ import path from 'path'
 import { spawn } from 'child_process'
 import { readGitHead, isGitAvailable, gitClone, gitFetchAndCheckout } from './git'
 import { scanCustomNodes, nodeKey } from './nodes'
-import { pipFreeze, getPipIndexArgs } from './pip'
+import { pipFreeze, runUvPip as sharedRunUvPip, installFilteredRequirements, getPipIndexArgs } from './pip'
 import { installCnrNode, switchCnrVersion, isSafePathComponent } from './cnr'
 import { killProcTree } from './process'
 import type { ScannedNode } from './nodes'
@@ -741,41 +741,8 @@ async function restoreFromBackup(backupDir: string, sitePackages: string): Promi
   }
 }
 
-/** Run a uv pip command and stream output. Returns the exit code. */
-function runUvPip(
-  uvPath: string,
-  args: string[],
-  cwd: string,
-  sendOutput: (text: string) => void,
-  signal?: AbortSignal
-): Promise<number> {
-  if (signal?.aborted) return Promise.resolve(1)
-  return new Promise<number>((resolve) => {
-    const proc = spawn(uvPath, args, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    })
-
-    const onAbort = () => {
-      killProcTree(proc)
-    }
-    signal?.addEventListener('abort', onAbort, { once: true })
-    if (signal?.aborted) onAbort()
-
-    proc.stdout.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
-    proc.stderr.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
-    proc.on('error', (err) => {
-      signal?.removeEventListener('abort', onAbort)
-      sendOutput(`Error: ${err.message}\n`)
-      resolve(1)
-    })
-    proc.on('exit', (code) => {
-      signal?.removeEventListener('abort', onAbort)
-      resolve(code ?? 1)
-    })
-  })
-}
+// Re-export shared runUvPip under local name for existing call sites
+const runUvPip = sharedRunUvPip
 
 export interface RestoreResult {
   installed: string[]
@@ -1101,8 +1068,6 @@ export interface NodeRestoreResult {
   unreportable: string[]
 }
 
-const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;[#]|$)/i
-
 function isManagerNode(node: ScannedNode): boolean {
   return node.id.toLowerCase().includes('comfyui-manager')
 }
@@ -1135,17 +1100,7 @@ async function runPostInstallScripts(
   const reqPath = path.join(nodePath, 'requirements.txt')
   if (fs.existsSync(reqPath)) {
     try {
-      const reqContent = await fs.promises.readFile(reqPath, 'utf-8')
-      const filtered = reqContent.split('\n').filter((l) => !PYTORCH_RE.test(l.trim())).join('\n')
-      const filteredReqPath = path.join(installPath, `.restore-reqs-${path.basename(nodePath)}.txt`)
-      await fs.promises.writeFile(filteredReqPath, filtered, 'utf-8')
-
-      try {
-        const indexArgs = getPipIndexArgs(pypiMirror)
-        await runUvPip(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', pythonPath, ...indexArgs], installPath, sendOutput, signal)
-      } finally {
-        try { await fs.promises.unlink(filteredReqPath) } catch {}
-      }
+      await installFilteredRequirements(reqPath, uvPath, pythonPath, installPath, `.restore-reqs-${path.basename(nodePath)}.txt`, sendOutput, signal, pypiMirror)
     } catch (err) {
       sendOutput(`⚠ requirements.txt failed for ${path.basename(nodePath)}: ${(err as Error).message}\n`)
     }
@@ -1308,7 +1263,7 @@ export async function restoreCustomNodes(
           continue
         }
         try {
-          await installCnrNode(targetNode.id, targetNode.version, customNodesDir, sendOutput, signal)
+          await installCnrNode(targetNode.id, targetNode.version, customNodesDir, sendOutput)
           result.installed.push(targetNode.id)
           nodesNeedingPostInstall.push(path.join(customNodesDir, targetNode.id))
           if (!targetNode.enabled) {
@@ -1397,7 +1352,7 @@ export async function restoreCustomNodes(
 
       if (targetNode.type === 'cnr' && targetNode.version && currentNode.version !== targetNode.version) {
         try {
-          await switchCnrVersion(targetNode.id, targetNode.version, nodePath, sendOutput, signal)
+          await switchCnrVersion(targetNode.id, targetNode.version, nodePath, sendOutput)
           result.switched.push(targetNode.id)
           nodesNeedingPostInstall.push(nodePath)
         } catch (err) {
@@ -1439,6 +1394,27 @@ export async function restoreCustomNodes(
       }
     } else {
       sendOutput('⚠ Cannot run post-install scripts: uv or Python environment not found\n')
+    }
+  }
+
+  // 5. Install manager_requirements.txt from ComfyUI root if present
+  {
+    const mgrReqPath = path.join(comfyuiDir, 'manager_requirements.txt')
+    if (fs.existsSync(mgrReqPath)) {
+      const uvPath = getUvPath(installPath)
+      const pythonPath = getActivePythonPath(installation)
+
+      if (pythonPath && fs.existsSync(uvPath)) {
+        sendOutput('\nInstalling manager requirements…\n')
+        try {
+          const mgrResult = await installFilteredRequirements(mgrReqPath, uvPath, pythonPath, installPath, '.restore-mgr-reqs.txt', sendOutput, signal, pypiMirror)
+          if (mgrResult !== 0) {
+            sendOutput(`⚠ manager requirements install exited with code ${mgrResult}\n`)
+          }
+        } catch (err) {
+          sendOutput(`⚠ manager_requirements.txt failed: ${(err as Error).message}\n`)
+        }
+      }
     }
   }
 

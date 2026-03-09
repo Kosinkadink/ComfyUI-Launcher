@@ -1,4 +1,72 @@
-import { execFile } from 'child_process'
+import fs from 'fs'
+import path from 'path'
+import { execFile, spawn } from 'child_process'
+
+/** Regex matching PyTorch-family packages that must never be overwritten by pip. */
+export const PYTORCH_RE = /^(torch|torchvision|torchaudio|torchsde)(\s*[<>=!~;[#]|$)/i
+
+/** Run a uv pip command and stream output. Returns the exit code. */
+export function runUvPip(
+  uvPath: string,
+  args: string[],
+  cwd: string,
+  sendOutput: (text: string) => void,
+  signal?: AbortSignal
+): Promise<number> {
+  if (signal?.aborted) return Promise.resolve(1)
+  return new Promise<number>((resolve) => {
+    const proc = spawn(uvPath, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+
+    const onAbort = (): void => {
+      proc.kill()
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+
+    proc.stdout.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
+    proc.stderr.on('data', (chunk: Buffer) => sendOutput(chunk.toString('utf-8')))
+    proc.on('error', (err) => {
+      signal?.removeEventListener('abort', onAbort)
+      sendOutput(`Error: ${err.message}\n`)
+      resolve(1)
+    })
+    proc.on('exit', (code) => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve(code ?? 1)
+    })
+  })
+}
+
+/**
+ * Read a requirements file, filter out PyTorch packages, write a temp file,
+ * and install via `uv pip install -r`. Cleans up the temp file afterward.
+ * Returns the exit code (0 = success).
+ */
+export async function installFilteredRequirements(
+  reqPath: string,
+  uvPath: string,
+  pythonPath: string,
+  installPath: string,
+  tempName: string,
+  sendOutput: (text: string) => void,
+  signal?: AbortSignal,
+  pypiMirror?: string
+): Promise<number> {
+  const content = await fs.promises.readFile(reqPath, 'utf-8')
+  const filtered = content.split('\n').filter((l) => !PYTORCH_RE.test(l.trim())).join('\n')
+  const filteredPath = path.join(installPath, tempName)
+  await fs.promises.writeFile(filteredPath, filtered, 'utf-8')
+
+  try {
+    const indexArgs = getPipIndexArgs(pypiMirror)
+    return await runUvPip(uvPath, ['pip', 'install', '-r', filteredPath, '--python', pythonPath, ...indexArgs], installPath, sendOutput, signal)
+  } finally {
+    try { await fs.promises.unlink(filteredPath) } catch {}
+  }
+}
 
 /**
  * PyPI fallback index URLs for users in regions with restricted access
