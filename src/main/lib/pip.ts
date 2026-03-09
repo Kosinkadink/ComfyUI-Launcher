@@ -20,6 +20,7 @@ export function runUvPip(
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      detached: process.platform !== 'win32',
     })
 
     const onAbort = (): void => {

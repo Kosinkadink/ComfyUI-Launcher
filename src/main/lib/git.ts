@@ -105,7 +105,8 @@ export function gitClone(
   return new Promise((resolve) => {
     const proc = spawn('git', ['clone', url, dest], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true
+      windowsHide: true,
+      detached: process.platform !== 'win32'
     })
     const onAbort = (): void => { killProcTree(proc) }
     signal?.addEventListener('abort', onAbort, { once: true })
@@ -137,7 +138,8 @@ export function gitFetchAndCheckout(
       const proc = spawn('git', args, {
         cwd: repoPath,
         stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true
+        windowsHide: true,
+        detached: process.platform !== 'win32'
       })
       const onAbort = (): void => { killProcTree(proc) }
       signal?.addEventListener('abort', onAbort, { once: true })

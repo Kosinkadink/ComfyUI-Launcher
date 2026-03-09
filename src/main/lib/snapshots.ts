@@ -1300,7 +1300,10 @@ export async function restoreCustomNodes(
           }
           if (targetNode.commit) {
             const checkoutResult = await gitFetchAndCheckout(dest, targetNode.commit, sendOutput, signal)
-            if (signal?.aborted) break
+            if (signal?.aborted) {
+              await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {})
+              break
+            }
             if (checkoutResult !== 0) {
               sendOutput(`⚠ git checkout to ${targetNode.commit} failed for ${targetNode.id}\n`)
             }
