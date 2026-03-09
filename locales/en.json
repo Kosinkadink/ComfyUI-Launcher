@@ -29,7 +29,8 @@
 
   "sidebar": {
     "installations": "Installs",
-    "running": "Running"
+    "running": "Running",
+    "giveFeedback": "Give Feedback"
   },
 
   "running": {
@@ -268,6 +269,7 @@
     "title": "ComfyUI Console",
     "openInBrowser": "Open in Browser",
     "stop": "Stop",
+    "stopping": "Stopping…",
     "disconnect": "Disconnect",
     "connectedTo": "Connected to {url}",
     "processExited": "Process exited",
