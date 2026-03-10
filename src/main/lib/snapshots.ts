@@ -12,10 +12,10 @@ import { formatComfyVersion } from './version'
 import type { ComfyVersion } from './version'
 
 export function formatSnapshotVersion(comfyui: Snapshot['comfyui'], style: 'short' | 'detail'): string {
-  if (comfyui.commit && (comfyui.baseTag || comfyui.commitsAhead != null)) {
-    return formatComfyVersion({ commit: comfyui.commit, baseTag: comfyui.baseTag, commitsAhead: comfyui.commitsAhead }, style, comfyui.displayVersion)
+  if (comfyui.commit) {
+    return formatComfyVersion({ commit: comfyui.commit, baseTag: comfyui.baseTag, commitsAhead: comfyui.commitsAhead }, style)
   }
-  return comfyui.displayVersion || comfyui.ref
+  return comfyui.ref
 }
 
 // --- Types ---
@@ -30,8 +30,6 @@ export interface Snapshot {
     commit: string | null
     releaseTag: string
     variant: string
-    /** @deprecated Legacy display string for old snapshots. Use baseTag/commitsAhead instead. */
-    displayVersion?: string
     baseTag?: string
     commitsAhead?: number
   }
@@ -61,8 +59,8 @@ export interface SnapshotExportEnvelope {
 export interface SnapshotDiff {
   comfyuiChanged: boolean
   comfyui?: {
-    from: { ref: string; commit: string | null; displayVersion?: string; baseTag?: string; commitsAhead?: number; formattedVersion: string }
-    to: { ref: string; commit: string | null; displayVersion?: string; baseTag?: string; commitsAhead?: number; formattedVersion: string }
+    from: { ref: string; commit: string | null; baseTag?: string; commitsAhead?: number; formattedVersion: string }
+    to: { ref: string; commit: string | null; baseTag?: string; commitsAhead?: number; formattedVersion: string }
   }
   updateChannelChanged: boolean
   updateChannel?: { from: string; to: string }
@@ -183,7 +181,6 @@ async function captureState(installPath: string, installation: InstallationRecor
       commit,
       releaseTag: manifest.version,
       variant: manifest.id,
-      displayVersion: (installation.version as string | undefined) || undefined,
       baseTag: cv?.baseTag,
       commitsAhead: cv?.commitsAhead,
     },
@@ -491,8 +488,8 @@ export function diffSnapshots(a: Snapshot, b: Snapshot): SnapshotDiff {
   if (a.comfyui.ref !== b.comfyui.ref || a.comfyui.commit !== b.comfyui.commit) {
     diff.comfyuiChanged = true
     diff.comfyui = {
-      from: { ref: a.comfyui.ref, commit: a.comfyui.commit, displayVersion: a.comfyui.displayVersion, baseTag: a.comfyui.baseTag, commitsAhead: a.comfyui.commitsAhead, formattedVersion: formatSnapshotVersion(a.comfyui, 'detail') },
-      to: { ref: b.comfyui.ref, commit: b.comfyui.commit, displayVersion: b.comfyui.displayVersion, baseTag: b.comfyui.baseTag, commitsAhead: b.comfyui.commitsAhead, formattedVersion: formatSnapshotVersion(b.comfyui, 'detail') },
+      from: { ref: a.comfyui.ref, commit: a.comfyui.commit, baseTag: a.comfyui.baseTag, commitsAhead: a.comfyui.commitsAhead, formattedVersion: formatSnapshotVersion(a.comfyui, 'detail') },
+      to: { ref: b.comfyui.ref, commit: b.comfyui.commit, baseTag: b.comfyui.baseTag, commitsAhead: b.comfyui.commitsAhead, formattedVersion: formatSnapshotVersion(b.comfyui, 'detail') },
     }
   }
 
@@ -827,31 +824,31 @@ export function buildPostRestoreState(
   targetSnapshot: Snapshot,
   comfyResult: { changed: boolean; commit: string | null; error?: string },
   existingUpdateInfo: Record<string, Record<string, unknown>> | undefined,
-  currentVersion?: string,
   currentComfyVersion?: ComfyVersion
 ): Record<string, unknown> {
   const targetChannel = targetSnapshot.updateChannel || 'stable'
   const headCommit = comfyResult.commit || targetSnapshot.comfyui.commit
 
-  let comfyVersion: ComfyVersion | undefined
+  let restoredComfyVersion: ComfyVersion | undefined
   if (comfyResult.error) {
-    comfyVersion = currentComfyVersion
+    restoredComfyVersion = currentComfyVersion
   } else if (headCommit) {
-    comfyVersion = {
+    restoredComfyVersion = {
       commit: headCommit,
       baseTag: targetSnapshot.comfyui.baseTag,
       commitsAhead: targetSnapshot.comfyui.commitsAhead,
     }
+  } else {
+    restoredComfyVersion = currentComfyVersion
   }
 
-  // Legacy displayVersion fallback for installedTag (used by release cache comparisons)
-  const displayVersion = comfyResult.error
-    ? (currentVersion || 'unknown')
-    : (targetSnapshot.comfyui.displayVersion || targetSnapshot.comfyui.releaseTag || 'unknown')
+  const installedTag = restoredComfyVersion
+    ? formatComfyVersion(restoredComfyVersion, 'short')
+    : 'unknown'
 
   const state: Record<string, unknown> = {
     updateChannel: targetChannel,
-    ...(comfyVersion ? { comfyVersion } : {}),
+    ...(restoredComfyVersion ? { comfyVersion: restoredComfyVersion } : {}),
     lastRollback: {
       preUpdateHead: null,
       postUpdateHead: headCommit,
@@ -861,7 +858,7 @@ export function buildPostRestoreState(
     },
     updateInfoByChannel: {
       ...(existingUpdateInfo || {}),
-      [targetChannel]: { installedTag: displayVersion },
+      [targetChannel]: { installedTag },
     },
   }
 
@@ -1492,7 +1489,6 @@ export interface SnapshotDetailData {
     commit: string | null
     releaseTag: string
     variant: string
-    displayVersion?: string
   }
   pythonVersion?: string
   updateChannel?: string

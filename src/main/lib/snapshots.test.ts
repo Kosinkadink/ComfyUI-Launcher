@@ -625,14 +625,14 @@ describe('buildPostRestoreState', () => {
     const snapshot = makeSnapshot({ updateChannel: 'latest', comfyui: { ref: 'v0.3.10', commit: 'abc1234', releaseTag: 'v0.2.1', variant: 'win-nvidia-cu128' } })
     const comfyResult = { changed: false, commit: null, error: 'git checkout failed' }
     const currentCv = { commit: 'old1234', baseTag: 'v0.1.0', commitsAhead: 5 }
-    const state = buildPostRestoreState(snapshot, comfyResult, undefined, 'v0.1.0', currentCv)
+    const state = buildPostRestoreState(snapshot, comfyResult, undefined, currentCv)
     expect(state.updateChannel).toBe('latest')
     expect(state.comfyVersion).toEqual(currentCv)
     expect(state.lastRollback).toBeDefined()
     expect((state.lastRollback as Record<string, unknown>).channel).toBe('latest')
     expect(state.updateInfoByChannel).toBeDefined()
     const info = state.updateInfoByChannel as Record<string, Record<string, unknown>>
-    expect(info.latest!.installedTag).toBe('v0.1.0')
+    expect(info.latest!.installedTag).toBe('v0.1.0+5')
   })
 
   it('builds comfyVersion with baseTag and commitsAhead from snapshot', () => {

@@ -421,7 +421,6 @@ export interface SnapshotDetailData {
     commit: string | null
     releaseTag: string
     variant: string
-    displayVersion?: string
   }
   pythonVersion?: string
   updateChannel?: string
@@ -440,8 +439,8 @@ export interface SnapshotDiffNodeChange {
 export interface SnapshotDiffResult {
   comfyuiChanged: boolean
   comfyui?: {
-    from: { ref: string; commit: string | null; displayVersion?: string; formattedVersion: string }
-    to: { ref: string; commit: string | null; displayVersion?: string; formattedVersion: string }
+    from: { ref: string; commit: string | null; formattedVersion: string }
+    to: { ref: string; commit: string | null; formattedVersion: string }
   }
   updateChannelChanged: boolean
   updateChannel?: { from: string; to: string }

@@ -159,7 +159,7 @@ export const portable: SourcePlugin = {
           ? t('channelCards.switchChannelPrefix', { from: channelLabelMap[channel] || channel, to: card.label })
           : ''
         const confirmMessage = t(msgKey, {
-          installed: channelInfo.installedTag || installation.version || '',
+          installed: channelInfo.installedTag || (installation.releaseTag as string | undefined) || '',
           latest: channelInfo.latestTag || '',
           commit: notes || '',
           notes: notes || '(none)',

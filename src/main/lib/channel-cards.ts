@@ -32,7 +32,6 @@ export function buildChannelCards(
   installation: InstallationRecord,
 ): ChannelCard[] {
   const cv = installation.comfyVersion as ComfyVersion | undefined
-  const legacyVersion = installation.version as string | undefined
   return channelDefs.map((def) => {
     const info = releaseCache.getEffectiveInfo(repo, def.value, installation)
     const latestCv = info?.commitSha
@@ -41,7 +40,7 @@ export function buildChannelCards(
     return {
       ...def,
       data: info ? {
-        installedVersion: formatComfyVersion(cv, 'detail', legacyVersion),
+        installedVersion: formatComfyVersion(cv, 'detail'),
         latestVersion: latestCv ? formatComfyVersion(latestCv, 'detail') : (info.releaseName || info.latestTag || '—'),
         lastChecked: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : '—',
         updateAvailable: releaseCache.isUpdateAvailable(installation, def.value, info),

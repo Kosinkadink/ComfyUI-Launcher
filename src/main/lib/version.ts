@@ -19,20 +19,17 @@ export interface ComfyVersion {
  * @param v  Structured version data (may be undefined for legacy installs).
  * @param style  `'short'` for cards (`v0.14.2+21`), `'detail'` for the
  *               Manage view (`v0.14.2 + 21 commits (a1b2c3d)`).
- * @param legacyVersion  Fallback string from `installation.version` for
- *                       pre-migration installations that lack `comfyVersion`.
  */
 export function formatComfyVersion(
   v: ComfyVersion | undefined,
   style: 'short' | 'detail',
-  legacyVersion?: string
 ): string {
-  if (!v) return legacyVersion || 'unknown'
+  if (!v) return 'unknown'
 
   const { commit, baseTag, commitsAhead } = v
   const shortSha = commit.slice(0, 7)
 
-  if (!baseTag) return legacyVersion || shortSha
+  if (!baseTag) return shortSha
 
   // undefined (API comparison failed) and 0 (exactly on tag) both display as the tag.
   // This is intentional: if we don't know how far ahead, we conservatively show the tag.

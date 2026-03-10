@@ -392,7 +392,7 @@ export const standalone: SourcePlugin = {
 
     const infoFields: Record<string, unknown>[] = [
       { label: t('common.installMethod'), value: installation.sourceLabel as string },
-      { label: t('standalone.comfyui'), value: formatComfyVersion(installation.comfyVersion as ComfyVersion | undefined, 'detail', installation.version as string | undefined) },
+      { label: t('standalone.comfyui'), value: formatComfyVersion(installation.comfyVersion as ComfyVersion | undefined, 'detail') },
       { label: t('common.release'), value: (installation.releaseTag as string | undefined) || '—' },
       { label: t('standalone.variant'), value: (installation.variant as string | undefined) ? getVariantLabel(installation.variant as string) : '—' },
       { label: t('standalone.python'), value: (installation.pythonVersion as string | undefined) || '—' },
@@ -451,7 +451,7 @@ export const standalone: SourcePlugin = {
       if (card.data?.updateAvailable && hasGit) {
         const channelInfo = releaseCache.getEffectiveInfo(COMFYUI_REPO, card.value, installation)!
         const cv = installation.comfyVersion as ComfyVersion | undefined
-        const installedDisplay = formatComfyVersion(cv, 'detail', installation.version as string | undefined)
+        const installedDisplay = formatComfyVersion(cv, 'detail')
         const latestCv = channelInfo.commitSha
           ? { commit: channelInfo.commitSha, baseTag: channelInfo.baseTag, commitsAhead: channelInfo.commitsAhead } as ComfyVersion
           : undefined
@@ -799,7 +799,6 @@ export const standalone: SourcePlugin = {
       const restoreState = snapshots.buildPostRestoreState(
         targetSnapshot, comfyResult,
         installation.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
-        installation.version as string | undefined,
         installation.comfyVersion as ComfyVersion | undefined
       )
       await update(restoreState)
@@ -843,15 +842,8 @@ export const standalone: SourcePlugin = {
 
       // ComfyUI version
       if (diff.comfyuiChanged && diff.comfyui) {
-        const fmtSnapVersion = (v: { ref: string; commit: string | null; displayVersion?: string; baseTag?: string; commitsAhead?: number }): string => {
-          if (v.commit && (v.baseTag || v.commitsAhead != null)) {
-            return formatComfyVersion({ commit: v.commit, baseTag: v.baseTag, commitsAhead: v.commitsAhead }, 'detail')
-          }
-          if (v.displayVersion) return v.displayVersion
-          return v.commit ? `${v.ref} (${v.commit.slice(0, 7)})` : v.ref
-        }
         lines.push(`${t('standalone.snapshotDiffComfyUI')}`)
-        lines.push(`  ${fmtSnapVersion(diff.comfyui.from)} → ${fmtSnapVersion(diff.comfyui.to)}`)
+        lines.push(`  ${diff.comfyui.from.formattedVersion} → ${diff.comfyui.to.formattedVersion}`)
         lines.push('')
       }
 
@@ -1138,9 +1130,7 @@ export const standalone: SourcePlugin = {
       }
 
       const cachedRelease = releaseCache.get(COMFYUI_REPO, channel) || {}
-      const postHead = markers.POST_UPDATE_HEAD ? markers.POST_UPDATE_HEAD.slice(0, 7) : null
       const fullPostHead = markers.POST_UPDATE_HEAD || null
-      const installedTag = markers.CHECKED_OUT_TAG || postHead || cachedRelease.latestTag || (installation.version as string | undefined) || 'unknown'
 
       // Build structured comfyVersion from raw data
       const comfyVersion: ComfyVersion | undefined = fullPostHead
@@ -1150,6 +1140,9 @@ export const standalone: SourcePlugin = {
           commitsAhead: cachedRelease.commitsAhead as number | undefined,
         }
         : undefined
+      const installedTag = comfyVersion
+        ? formatComfyVersion(comfyVersion, 'short')
+        : (markers.CHECKED_OUT_TAG || cachedRelease.latestTag || 'unknown')
 
       const rollback = {
         preUpdateHead: markers.PRE_UPDATE_HEAD || null,

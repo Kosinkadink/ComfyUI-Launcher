@@ -156,7 +156,6 @@ export function getEffectiveInfo(
   const installedTag =
     (perInstall?.installedTag as string | undefined) ??
     (cv ? formatComfyVersion(cv, 'short') : undefined) ??
-    (installation.version as string | undefined) ??
     'unknown'
   return { ...cached, installedTag }
 }
@@ -214,7 +213,6 @@ export async function checkForUpdate(
   const installedTag =
     (prevChannelInfo?.installedTag as string | undefined) ??
     (cv ? formatComfyVersion(cv, 'short') : undefined) ??
-    (installation.version as string | undefined) ??
     'unknown'
   await update({
     updateInfoByChannel: {
@@ -241,10 +239,6 @@ export function isUpdateAvailable(
   const cv = installation.comfyVersion as ComfyVersion | undefined
   if (cv && channel === 'stable' && cv.commitsAhead && cv.commitsAhead > 0) return true
 
-  // Legacy string check for pre-migration installations
-  const version = (installation.version as string) || ''
-  if (!cv && channel === 'stable' && (version.includes(info.latestTag + '+') || version.includes(info.latestTag + ' +'))) return true
-
   // Cross-channel: last update was on a different channel, so this channel's installedTag is stale;
   // fall back to comparing the current display version against this channel's latest tag.
   const lastRollback = installation.lastRollback as
@@ -256,7 +250,7 @@ export function isUpdateAvailable(
     if (cv && info.commitSha && cv.commit === info.commitSha) return false
     const postHead = (lastRollback?.postUpdateHead as string | undefined) || ''
     const shortHead = postHead.slice(0, 7)
-    const displayVersion = cv ? formatComfyVersion(cv, 'short') : version
+    const displayVersion = cv ? formatComfyVersion(cv, 'short') : ''
     if (displayVersion === info.latestTag || displayVersion === info.releaseName) return false
     if (shortHead && (shortHead === info.latestTag || info.releaseName?.includes(shortHead))) return false
     return true

@@ -11,8 +11,6 @@ export interface InstallationRecord {
   sourceId: string
   status?: string
   seen?: boolean
-  /** @deprecated Use `comfyVersion` for structured version data. Legacy string kept for backwards compat. */
-  version?: string
   comfyVersion?: ComfyVersion
   [key: string]: unknown
 }
