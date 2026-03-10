@@ -163,25 +163,26 @@ async function codesignBinaries(dir: string, log?: (text: string) => void): Prom
     const current = stack.pop()!
     let items: fs.Dirent[]
     try { items = await fs.promises.readdir(current, { withFileTypes: true }) } catch { continue }
-    const batch: string[] = []
+    const candidates: string[] = []
     for (const item of items) {
       const full = path.join(current, item.name)
       if (item.isDirectory()) {
         stack.push(full)
-      } else if (item.name.endsWith('.dylib') || item.name.endsWith('.so') || (!hasNonBinaryExtension(item.name) && await isMachO(full))) {
-        batch.push(full)
-        if (batch.length >= CONCURRENCY) {
-          await Promise.all(batch.splice(0).map((f) => signOne(f, log)))
-        }
+      } else if (item.name.endsWith('.dylib') || item.name.endsWith('.so')) {
+        candidates.push(full)
+      } else if (!hasNonBinaryExtension(item.name)) {
+        candidates.push(full)
       }
     }
-    if (batch.length > 0) {
-      await Promise.all(batch.map((f) => signOne(f, log)))
+    for (let i = 0; i < candidates.length; i += CONCURRENCY) {
+      await Promise.all(candidates.slice(i, i + CONCURRENCY).map((f) => checkAndSign(f, log)))
     }
   }
 }
 
-function signOne(filePath: string, log?: (text: string) => void): Promise<void> {
+async function checkAndSign(filePath: string, log?: (text: string) => void): Promise<void> {
+  const name = path.basename(filePath)
+  if (!name.endsWith('.dylib') && !name.endsWith('.so') && !await isMachO(filePath)) return
   return new Promise<void>((resolve) => {
     execFile('codesign', ['--force', '--sign', '-', filePath], (err) => {
       if (err && log) log(`⚠ codesign failed: ${filePath}: ${err.message}\n`)
