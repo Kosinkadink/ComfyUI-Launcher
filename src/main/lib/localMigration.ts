@@ -92,11 +92,10 @@ export async function captureLocalSnapshot(
     trigger: 'manual',
     label: `${sourceLabel} migration`,
     comfyui: {
-      ref: sourceId,
+      ref: sourceLabel,
       commit: null,
       releaseTag: '',
       variant: '',
-      displayVersion: sourceLabel,
     },
     customNodes,
     pipPackages,

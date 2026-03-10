@@ -30,8 +30,6 @@ describe('isUpdateAvailable', () => {
   })
 
   it('returns false after restore resets lastRollback to match target channel', () => {
-    // Simulates the state after a snapshot restore that resets lastRollback
-    // to the restored channel, preventing stale cross-channel comparisons.
     const installation = {
       version: 'v1.0.0',
       lastRollback: { channel: 'stable', postUpdateHead: 'def5678' },
@@ -53,5 +51,65 @@ describe('isUpdateAvailable', () => {
     }
     const info: ReleaseCacheEntry = { latestTag: 'v1.1.0', installedTag: 'v1.0.0' }
     expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
+  })
+
+  // Structural comfyVersion tests
+  it('detects stable update via comfyVersion.commitsAhead > 0', () => {
+    const installation = {
+      comfyVersion: { commit: 'abc1234def5678', baseTag: 'v0.14.2', commitsAhead: 21 },
+      updateInfoByChannel: { stable: { installedTag: 'abc1234' } },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'abc1234' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
+  })
+
+  it('returns false for stable when comfyVersion.commitsAhead is 0', () => {
+    const installation = {
+      comfyVersion: { commit: 'abc1234def5678', baseTag: 'v0.14.2', commitsAhead: 0 },
+      updateInfoByChannel: { stable: { installedTag: 'v0.14.2' } },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'v0.14.2' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(false)
+  })
+
+  it('returns false cross-channel when commit SHA matches', () => {
+    const installation = {
+      comfyVersion: { commit: 'abc1234def5678abc1234def5678abc1234def567', baseTag: 'v0.14.2', commitsAhead: 5 },
+      lastRollback: { channel: 'stable', postUpdateHead: 'abc1234def5678abc1234def5678abc1234def567' },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'abc1234', commitSha: 'abc1234def5678abc1234def5678abc1234def567' }
+    expect(isUpdateAvailable(installation, 'latest', info)).toBe(false)
+  })
+
+  it('returns true for stable when commitsAhead is undefined (API failure) and baseTag present', () => {
+    const installation = {
+      comfyVersion: { commit: 'abc1234def5678', baseTag: 'v0.14.2' },
+      updateInfoByChannel: { stable: { installedTag: 'v0.14.2 (abc1234)' } },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'v0.14.2 (abc1234)' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
+  })
+
+  // Installations without comfyVersion (e.g. brand-new install before first update)
+  it('detects update via installedTag mismatch when no comfyVersion', () => {
+    const installation = {
+      updateInfoByChannel: { stable: { installedTag: 'abc1234' } },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'abc1234' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
+  })
+
+  it('returns false when installedTag is unknown (new install before first update)', () => {
+    const installation = {}
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'unknown' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(false)
+  })
+
+  it('returns false via installedTag match when no comfyVersion', () => {
+    const installation = {
+      updateInfoByChannel: { stable: { installedTag: 'v0.14.2' } },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'v0.14.2' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(false)
   })
 })

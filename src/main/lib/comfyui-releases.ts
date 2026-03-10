@@ -30,27 +30,27 @@ export async function fetchLatestRelease(
         .catch(() => [] as GitHubRelease[]),
     ])
     if (!commit) return null
-    const sha = commit.sha.slice(0, 7)
     const date = commit.commit?.committer?.date
     const msg = commit.commit?.message?.split('\n')[0] ?? ''
     const stable = releases.find((r) => !r.draft && !r.prerelease)
-    let label = sha
+    let baseTag: string | undefined
+    let commitsAhead: number | undefined
     if (stable) {
+      baseTag = stable.tag_name
       try {
         const cmp = await fetchJSON(
           `https://api.github.com/repos/${REPO}/compare/${stable.tag_name}...master`
         ) as GitHubComparison
-        const ahead = cmp.ahead_by
-        label = ahead > 0
-          ? `${stable.tag_name} + ${ahead} commit${ahead !== 1 ? 's' : ''} (${sha})`
-          : stable.tag_name
+        commitsAhead = cmp.ahead_by
       } catch {
-        label = `${stable.tag_name}+ (${sha})`
+        // comparison failed — we know the base tag but not how far ahead
       }
     }
     return {
-      tag_name: sha,
-      name: label,
+      tag_name: commit.sha.slice(0, 7),
+      commitSha: commit.sha,
+      baseTag,
+      commitsAhead,
       body: msg,
       html_url: commit.html_url,
       published_at: date,

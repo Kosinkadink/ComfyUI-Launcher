@@ -1,4 +1,6 @@
 import * as releaseCache from './release-cache'
+import { formatComfyVersion } from './version'
+import type { ComfyVersion } from './version'
 import type { InstallationRecord } from '../installations'
 
 export interface ChannelDef {
@@ -29,13 +31,17 @@ export function buildChannelCards(
   channelDefs: ChannelDef[],
   installation: InstallationRecord,
 ): ChannelCard[] {
+  const cv = installation.comfyVersion as ComfyVersion | undefined
   return channelDefs.map((def) => {
     const info = releaseCache.getEffectiveInfo(repo, def.value, installation)
+    const latestCv = info?.commitSha
+      ? { commit: info.commitSha, baseTag: info.baseTag, commitsAhead: info.commitsAhead } as ComfyVersion
+      : undefined
     return {
       ...def,
       data: info ? {
-        installedVersion: (installation.version as string | undefined) || info.installedTag || 'unknown',
-        latestVersion: info.releaseName || info.latestTag || '—',
+        installedVersion: cv ? formatComfyVersion(cv, 'detail') : (info.installedTag || 'unknown'),
+        latestVersion: latestCv ? formatComfyVersion(latestCv, 'detail') : (info.releaseName || info.latestTag || '—'),
         lastChecked: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : '—',
         updateAvailable: releaseCache.isUpdateAvailable(installation, def.value, info),
       } : undefined,

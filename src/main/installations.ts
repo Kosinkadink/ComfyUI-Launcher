@@ -1,6 +1,7 @@
 import path from 'path'
 import { dataDir } from './lib/paths'
 import { readFileSafeAsync, writeFileSafeAsync } from './lib/safe-file'
+import type { ComfyVersion } from './lib/version'
 
 export interface InstallationRecord {
   id: string
@@ -10,7 +11,7 @@ export interface InstallationRecord {
   sourceId: string
   status?: string
   seen?: boolean
-  version?: string
+  comfyVersion?: ComfyVersion
   [key: string]: unknown
 }
 

@@ -7,6 +7,8 @@ import type { ChildProcess } from 'child_process'
 import sources from '../sources/index'
 import * as installations from '../installations'
 import type { InstallationRecord } from '../installations'
+import { formatComfyVersion } from './version'
+import type { ComfyVersion } from './version'
 import * as settings from '../settings'
 import { defaultInstallDir } from './paths'
 import { download } from './download'
@@ -32,8 +34,8 @@ import * as i18n from './i18n'
 import { ensureModelPathsConfig } from './models'
 import { copyDirWithProgress } from './copy'
 import { fetchJSON } from './fetch'
-import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
-import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot, listSnapshots, buildExportEnvelope, validateExportEnvelope, importSnapshots, saveSnapshot, restoreCustomNodes, restorePipPackages, restoreComfyUIVersion, buildPostRestoreState } from './snapshots'
+import { fetchLatestRelease } from './comfyui-releases'
+import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot, listSnapshots, buildExportEnvelope, validateExportEnvelope, importSnapshots, saveSnapshot, restoreCustomNodes, restorePipPackages, restoreComfyUIVersion, buildPostRestoreState, formatSnapshotVersion } from './snapshots'
 import type { SnapshotExportEnvelope } from './snapshots'
 import { getVariantLabel } from '../sources/standalone'
 import type { FieldOption, SourcePlugin } from '../types/sources'
@@ -364,14 +366,7 @@ async function checkInstallationUpdates(): Promise<void> {
         releaseCache.getOrFetch(COMFYUI_REPO, channel, async () => {
           const release = await fetchLatestRelease(channel)
           if (!release) return null
-          return {
-            checkedAt: Date.now(),
-            latestTag: release.tag_name as string,
-            releaseName: (release.name as string) || (release.tag_name as string),
-            releaseNotes: truncateNotes(release.body as string, 4000),
-            releaseUrl: release.html_url as string,
-            publishedAt: release.published_at as string,
-          }
+          return releaseCache.buildCacheEntry(release)
         }, true)
       )
     )
@@ -592,8 +587,12 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         : inst.status === 'failed'
         ? { label: i18n.t('errors.installFailed'), style: 'danger' }
         : (source.getStatusTag ? source.getStatusTag(inst) : undefined)
+      // Derive version display string from comfyVersion ground truth, falling back to legacy string
+      const cv = inst.comfyVersion as ComfyVersion | undefined
+      const version = cv ? formatComfyVersion(cv, 'short') : (inst.version as string | undefined)
       return {
         ...inst,
+        ...(version != null ? { version } : {}),
         sourceLabel: source.label,
         sourceCategory: source.category,
         hasConsole: source.hasConsole !== false,
@@ -632,11 +631,11 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     await installations.reorder(orderedIds)
   })
 
-  ipcMain.handle('probe-installation', (_event, dirPath: string) => {
+  ipcMain.handle('probe-installation', async (_event, dirPath: string) => {
     const results: Record<string, unknown>[] = []
     for (const source of sources) {
       if (source.probeInstallation) {
-        const data = source.probeInstallation(dirPath)
+        const data = await source.probeInstallation(dirPath)
         if (data) {
           results.push({ sourceId: source.id, sourceLabel: source.label, ...data })
         }
@@ -738,7 +737,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             const restoreState = buildPostRestoreState(
               targetSnapshot, comfyResult,
               freshInst.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
-              freshInst.version as string | undefined
+              freshInst.comfyVersion as ComfyVersion | undefined
             )
             await update(restoreState)
 
@@ -1004,7 +1003,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       createdAt: s.createdAt,
       trigger: s.trigger,
       label: s.label,
-      comfyuiVersion: s.comfyui.displayVersion || s.comfyui.ref,
+      comfyuiVersion: formatSnapshotVersion(s.comfyui, 'short'),
       nodeCount: s.customNodes.length,
       pipPackageCount: Object.keys(s.pipPackages).length,
     }))
@@ -1018,6 +1017,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         createdAt: newest.createdAt,
         trigger: newest.trigger,
         label: newest.label,
+        comfyuiVersion: formatSnapshotVersion(newest.comfyui, 'detail'),
         comfyui: newest.comfyui,
         pythonVersion: newest.pythonVersion,
         updateChannel: newest.updateChannel,
