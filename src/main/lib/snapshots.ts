@@ -788,7 +788,7 @@ export async function restoreComfyUIVersion(
   sendOutput(`Checking out ComfyUI commit ${targetCommit.slice(0, 7)}…\n`)
   const gitResult = await gitFetchAndCheckout(comfyuiDir, targetCommit, sendOutput, signal)
   if (gitResult.exitCode !== 0) {
-    const detail = gitResult.stderr.trim().split('\n').slice(-20).join('\n')
+    const detail = (gitResult.stderr || gitResult.stdout).trim().split('\n').slice(-20).join('\n')
     const msg = detail
       ? `git checkout failed with exit code ${gitResult.exitCode}:\n${detail}`
       : `git checkout failed with exit code ${gitResult.exitCode}`
@@ -1297,7 +1297,7 @@ export async function restoreCustomNodes(
             break
           }
           if (cloneResult.exitCode !== 0) {
-            const detail = cloneResult.stderr.trim().split('\n').slice(-20).join('\n')
+            const detail = (cloneResult.stderr || cloneResult.stdout).trim().split('\n').slice(-20).join('\n')
             result.failed.push({ id: targetNode.id, error: detail ? `git clone failed (exit ${cloneResult.exitCode}):\n${detail}` : `git clone failed (exit ${cloneResult.exitCode})` })
             continue
           }
@@ -1375,7 +1375,7 @@ export async function restoreCustomNodes(
             result.switched.push(targetNode.id)
             nodesNeedingPostInstall.push(nodePath)
           } else {
-            const detail = checkoutResult.stderr.trim().split('\n').slice(-20).join('\n')
+            const detail = (checkoutResult.stderr || checkoutResult.stdout).trim().split('\n').slice(-20).join('\n')
             result.failed.push({ id: targetNode.id, error: detail ? `git checkout failed (exit ${checkoutResult.exitCode}):\n${detail}` : `git checkout failed (exit ${checkoutResult.exitCode})` })
           }
         }

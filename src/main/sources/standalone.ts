@@ -132,12 +132,12 @@ function hasNonBinaryExtension(name: string): boolean {
   return NON_BINARY_EXTENSIONS.has(name.slice(dot).toLowerCase())
 }
 
-function isMachO(filePath: string): boolean {
-  let fd: number | undefined
+async function isMachO(filePath: string): Promise<boolean> {
+  let fh: fs.promises.FileHandle | undefined
   try {
-    fd = fs.openSync(filePath, 'r')
+    fh = await fs.promises.open(filePath, 'r')
     const buf = Buffer.alloc(4)
-    fs.readSync(fd, buf, 0, 4, 0)
+    await fh.read(buf, 0, 4, 0)
     // Mach-O magic numbers: MH_MAGIC, MH_CIGAM, MH_MAGIC_64, MH_CIGAM_64, FAT_MAGIC, FAT_CIGAM
     const magic = buf.readUInt32BE(0)
     return (
@@ -148,31 +148,43 @@ function isMachO(filePath: string): boolean {
   } catch {
     return false
   } finally {
-    if (fd !== undefined) try { fs.closeSync(fd) } catch {}
+    await fh?.close()
   }
 }
 
 async function codesignBinaries(dir: string, log?: (text: string) => void): Promise<void> {
   if (process.platform !== 'darwin') return
+  const CONCURRENCY = 8
   const stack = [dir]
   while (stack.length > 0) {
     const current = stack.pop()!
     let items: fs.Dirent[]
     try { items = await fs.promises.readdir(current, { withFileTypes: true }) } catch { continue }
+    const batch: string[] = []
     for (const item of items) {
       const full = path.join(current, item.name)
       if (item.isDirectory()) {
         stack.push(full)
-      } else if (item.name.endsWith('.dylib') || item.name.endsWith('.so') || (!hasNonBinaryExtension(item.name) && isMachO(full))) {
-        await new Promise<void>((resolve) => {
-          execFile('codesign', ['--force', '--sign', '-', full], (err) => {
-            if (err && log) log(`⚠ codesign failed: ${full}: ${err.message}\n`)
-            resolve()
-          })
-        })
+      } else if (item.name.endsWith('.dylib') || item.name.endsWith('.so') || (!hasNonBinaryExtension(item.name) && await isMachO(full))) {
+        batch.push(full)
+        if (batch.length >= CONCURRENCY) {
+          await Promise.all(batch.splice(0).map((f) => signOne(f, log)))
+        }
       }
     }
+    if (batch.length > 0) {
+      await Promise.all(batch.map((f) => signOne(f, log)))
+    }
   }
+}
+
+function signOne(filePath: string, log?: (text: string) => void): Promise<void> {
+  return new Promise<void>((resolve) => {
+    execFile('codesign', ['--force', '--sign', '-', filePath], (err) => {
+      if (err && log) log(`⚠ codesign failed: ${filePath}: ${err.message}\n`)
+      resolve()
+    })
+  })
 }
 
 const BULKY_PREFIXES = ['torch', 'nvidia', 'triton', 'cuda']

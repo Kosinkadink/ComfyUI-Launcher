@@ -6,6 +6,7 @@ import { killProcTree } from './process'
 export interface ProcessResult {
   exitCode: number
   stderr: string
+  stdout: string
 }
 
 /**
@@ -106,8 +107,9 @@ export function gitClone(
   sendOutput: (text: string) => void,
   signal?: AbortSignal
 ): Promise<ProcessResult> {
-  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
+  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
   return new Promise((resolve) => {
+    const stdoutChunks: string[] = []
     const stderrChunks: string[] = []
     const proc = spawn('git', ['clone', url, dest], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -117,7 +119,11 @@ export function gitClone(
     const onAbort = (): void => { killProcTree(proc) }
     signal?.addEventListener('abort', onAbort, { once: true })
     if (signal?.aborted) onAbort()
-    proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
+    proc.stdout.on('data', (data: Buffer) => {
+      const text = data.toString()
+      stdoutChunks.push(text)
+      sendOutput(text)
+    })
     proc.stderr.on('data', (data: Buffer) => {
       const text = data.toString()
       stderrChunks.push(text)
@@ -126,11 +132,11 @@ export function gitClone(
     proc.on('error', (err) => {
       signal?.removeEventListener('abort', onAbort)
       sendOutput(err.message)
-      resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message })
+      resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message, stdout: stdoutChunks.join('') })
     })
     proc.on('close', (code) => {
       signal?.removeEventListener('abort', onAbort)
-      resolve({ exitCode: code ?? 1, stderr: stderrChunks.join('') })
+      resolve({ exitCode: code ?? 1, stderr: stderrChunks.join(''), stdout: stdoutChunks.join('') })
     })
   })
 }
@@ -141,8 +147,9 @@ function makeRunGit(
   signal?: AbortSignal,
 ): (args: string[]) => Promise<ProcessResult> {
   return (args: string[]): Promise<ProcessResult> => {
-    if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
+    if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
     return new Promise((resolve) => {
+      const stdoutChunks: string[] = []
       const stderrChunks: string[] = []
       const proc = spawn('git', args, {
         cwd: repoPath,
@@ -153,7 +160,11 @@ function makeRunGit(
       const onAbort = (): void => { killProcTree(proc) }
       signal?.addEventListener('abort', onAbort, { once: true })
       if (signal?.aborted) onAbort()
-      proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
+      proc.stdout.on('data', (data: Buffer) => {
+        const text = data.toString()
+        stdoutChunks.push(text)
+        sendOutput(text)
+      })
       proc.stderr.on('data', (data: Buffer) => {
         const text = data.toString()
         stderrChunks.push(text)
@@ -162,11 +173,11 @@ function makeRunGit(
       proc.on('error', (err) => {
         signal?.removeEventListener('abort', onAbort)
         sendOutput(err.message)
-        resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message })
+        resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message, stdout: stdoutChunks.join('') })
       })
       proc.on('close', (code) => {
         signal?.removeEventListener('abort', onAbort)
-        resolve({ exitCode: code ?? 1, stderr: stderrChunks.join('') })
+        resolve({ exitCode: code ?? 1, stderr: stderrChunks.join(''), stdout: stdoutChunks.join('') })
       })
     })
   }
@@ -184,7 +195,7 @@ export function gitCheckoutCommit(
   sendOutput: (text: string) => void,
   signal?: AbortSignal
 ): Promise<ProcessResult> {
-  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
+  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
   const runGit = makeRunGit(repoPath, sendOutput, signal)
 
   return runGit(['checkout', commit]).then((directResult) => {
@@ -210,7 +221,7 @@ export function gitFetchAndCheckout(
   sendOutput: (text: string) => void,
   signal?: AbortSignal
 ): Promise<ProcessResult> {
-  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
+  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
   const runGit = makeRunGit(repoPath, sendOutput, signal)
 
   // Fetch master explicitly — grafted/archive-based repos may have no
