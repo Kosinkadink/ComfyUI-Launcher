@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'child_process'
+import { execFile, execFileSync, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { killProcTree } from './process'
@@ -84,6 +84,26 @@ function redactUrl(url: string): string {
   } catch {
     // Non-standard URL (e.g. git@github.com:...) — strip user:pass@ if present
     return url.replace(/\/\/[^/@]+@/, '//')
+  }
+}
+
+/**
+ * Count how many commits HEAD is ahead of a tag.  Runs `git rev-list --count`
+ * synchronously (local operation, no network).  Returns undefined if git is
+ * unavailable, the tag doesn't exist, or any error occurs.
+ */
+export function countCommitsAhead(repoPath: string, tag: string): number | undefined {
+  try {
+    const out = execFileSync('git', ['rev-list', '--count', `${tag}..HEAD`], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 5000,
+    }).trim()
+    const n = parseInt(out, 10)
+    return Number.isFinite(n) ? n : undefined
+  } catch {
+    return undefined
   }
 }
 

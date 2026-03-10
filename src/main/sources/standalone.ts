@@ -12,6 +12,7 @@ import type { ComfyVersion } from '../lib/version'
 import { deleteAction, untrackAction } from '../lib/actions'
 import { downloadAndExtract, downloadAndExtractMulti } from '../lib/installer'
 import { copyDirWithProgress } from '../lib/copy'
+import { readGitHead, countCommitsAhead } from '../lib/git'
 import { parseArgs, extractPort, formatTime } from '../lib/util'
 import { PYTORCH_RE, installFilteredRequirements, getPipIndexArgs } from '../lib/pip'
 import { t } from '../lib/i18n'
@@ -392,7 +393,7 @@ export const standalone: SourcePlugin = {
 
     const infoFields: Record<string, unknown>[] = [
       { label: t('common.installMethod'), value: installation.sourceLabel as string },
-      { label: t('standalone.comfyui'), value: formatComfyVersion(installation.comfyVersion as ComfyVersion | undefined, 'detail') },
+      { label: t('standalone.comfyui'), value: installation.comfyVersion ? formatComfyVersion(installation.comfyVersion as ComfyVersion, 'detail') : (installation.version as string | undefined) || 'unknown' },
       { label: t('common.release'), value: (installation.releaseTag as string | undefined) || '—' },
       { label: t('standalone.variant'), value: (installation.variant as string | undefined) ? getVariantLabel(installation.variant as string) : '—' },
       { label: t('standalone.python'), value: (installation.pythonVersion as string | undefined) || '—' },
@@ -451,13 +452,13 @@ export const standalone: SourcePlugin = {
       if (card.data?.updateAvailable && hasGit) {
         const channelInfo = releaseCache.getEffectiveInfo(COMFYUI_REPO, card.value, installation)!
         const cv = installation.comfyVersion as ComfyVersion | undefined
-        const installedDisplay = formatComfyVersion(cv, 'detail')
+        const installedDisplay = cv ? formatComfyVersion(cv, 'detail') : (channelInfo.installedTag || 'unknown')
         const latestCv = channelInfo.commitSha
           ? { commit: channelInfo.commitSha, baseTag: channelInfo.baseTag, commitsAhead: channelInfo.commitsAhead } as ComfyVersion
           : undefined
         const latestDisplay = latestCv ? formatComfyVersion(latestCv, 'detail') : (channelInfo.releaseName || channelInfo.latestTag || '—')
         const isSwitching = card.value !== channel
-        const isDowngrade = card.value === 'stable' && cv ? !!(cv.commitsAhead && cv.commitsAhead > 0) : false
+        const isDowngrade = card.value === 'stable' && cv ? (cv.commitsAhead === undefined ? !!cv.baseTag : cv.commitsAhead > 0) : false
         const msgKey = isDowngrade ? 'standalone.updateConfirmMessageDowngrade'
           : card.value === 'latest' ? 'standalone.updateConfirmMessageLatest'
           : 'standalone.updateConfirmMessage'
@@ -655,6 +656,22 @@ export const standalone: SourcePlugin = {
     sendProgress('cleanup', { percent: -1, status: t('standalone.cleanupEnvStatus') })
     await stripMasterPackages(installation.installPath)
 
+    // Populate comfyVersion from the extracted git repo so version displays
+    // are correct immediately, without waiting for the first update.
+    const comfyuiDir = path.join(installation.installPath, 'ComfyUI')
+    const headCommit = readGitHead(comfyuiDir)
+    if (headCommit) {
+      const ref = installation.version as string | undefined
+      const comfyVersion: ComfyVersion = {
+        commit: headCommit,
+        baseTag: ref,
+        commitsAhead: 0,
+      }
+      await update({ comfyVersion })
+      // Use updated installation for snapshot so it captures the version
+      installation = { ...installation, comfyVersion } as InstallationRecord
+    }
+
     // Capture initial snapshot so the detail view shows "Current" immediately
     try {
       const filename = await snapshots.saveSnapshot(installation.installPath, installation, 'boot')
@@ -683,8 +700,20 @@ export const standalone: SourcePlugin = {
       pythonVersion = data.python_version || pythonVersion
     } catch {}
 
+    let comfyVersion: ComfyVersion | undefined
+    if (hasGit) {
+      const comfyuiDir = path.join(dirPath, 'ComfyUI')
+      const commit = readGitHead(comfyuiDir)
+      if (commit) {
+        const baseTag = version !== 'unknown' ? version : undefined
+        const commitsAhead = baseTag ? countCommitsAhead(comfyuiDir, baseTag) : undefined
+        comfyVersion = { commit, baseTag, commitsAhead }
+      }
+    }
+
     return {
       version,
+      ...(comfyVersion ? { comfyVersion } : {}),
       releaseTag,
       variant,
       pythonVersion,

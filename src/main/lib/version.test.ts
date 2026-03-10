@@ -20,10 +20,10 @@ describe('formatComfyVersion', () => {
     expect(formatComfyVersion(v, 'detail')).toBe('v0.14.2')
   })
 
-  it('returns baseTag when commitsAhead is undefined', () => {
+  it('returns baseTag + SHA when commitsAhead is undefined (API failure)', () => {
     const v: ComfyVersion = { commit: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', baseTag: 'v0.14.2' }
-    expect(formatComfyVersion(v, 'short')).toBe('v0.14.2')
-    expect(formatComfyVersion(v, 'detail')).toBe('v0.14.2')
+    expect(formatComfyVersion(v, 'short')).toBe('v0.14.2 (a1b2c3d)')
+    expect(formatComfyVersion(v, 'detail')).toBe('v0.14.2 (a1b2c3d)')
   })
 
   it('returns short format with commits ahead', () => {

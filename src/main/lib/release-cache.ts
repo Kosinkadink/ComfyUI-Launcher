@@ -156,6 +156,7 @@ export function getEffectiveInfo(
   const installedTag =
     (perInstall?.installedTag as string | undefined) ??
     (cv ? formatComfyVersion(cv, 'short') : undefined) ??
+    (installation.version as string | undefined) ??
     'unknown'
   return { ...cached, installedTag }
 }
@@ -213,6 +214,7 @@ export async function checkForUpdate(
   const installedTag =
     (prevChannelInfo?.installedTag as string | undefined) ??
     (cv ? formatComfyVersion(cv, 'short') : undefined) ??
+    (installation.version as string | undefined) ??
     'unknown'
   await update({
     updateInfoByChannel: {
@@ -236,8 +238,11 @@ export function isUpdateAvailable(
 
   // Structural check: if we have comfyVersion and are viewing stable,
   // any commits ahead means the installed version is newer than stable.
+  // When commitsAhead is undefined (API failure), we know the commit differs
+  // from the tag, so conservatively report an update is available.
   const cv = installation.comfyVersion as ComfyVersion | undefined
-  if (cv && channel === 'stable' && cv.commitsAhead && cv.commitsAhead > 0) return true
+  if (cv && channel === 'stable' && cv.commitsAhead !== undefined && cv.commitsAhead > 0) return true
+  if (cv && channel === 'stable' && cv.commitsAhead === undefined && cv.baseTag) return true
 
   // Cross-channel: last update was on a different channel, so this channel's installedTag is stale;
   // fall back to comparing the current display version against this channel's latest tag.
@@ -255,7 +260,8 @@ export function isUpdateAvailable(
     if (shortHead && (shortHead === info.latestTag || info.releaseName?.includes(shortHead))) return false
     return true
   }
-  // Raw tag/sha mismatch (also check releaseName since the latest channel uses a SHA as latestTag)
-  if (info.installedTag && info.installedTag !== info.latestTag && info.installedTag !== info.releaseName) return true
+  // Raw tag/sha mismatch (also check releaseName since the latest channel uses a SHA as latestTag).
+  // Skip if installedTag is 'unknown' (brand-new install before first update).
+  if (info.installedTag && info.installedTag !== 'unknown' && info.installedTag !== info.latestTag && info.installedTag !== info.releaseName) return true
   return false
 }

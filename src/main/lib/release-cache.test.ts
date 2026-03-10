@@ -81,22 +81,29 @@ describe('isUpdateAvailable', () => {
     expect(isUpdateAvailable(installation, 'latest', info)).toBe(false)
   })
 
-  // Legacy string format tests (pre-migration installations)
-  it('detects stable update with legacy short format version (v0.14.2+21)', () => {
+  it('returns true for stable when commitsAhead is undefined (API failure) and baseTag present', () => {
     const installation = {
-      version: 'v0.14.2+21',
+      comfyVersion: { commit: 'abc1234def5678', baseTag: 'v0.14.2' },
+      updateInfoByChannel: { stable: { installedTag: 'v0.14.2 (abc1234)' } },
+    }
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'v0.14.2 (abc1234)' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
+  })
+
+  // Installations without comfyVersion (e.g. brand-new install before first update)
+  it('detects update via installedTag mismatch when no comfyVersion', () => {
+    const installation = {
       updateInfoByChannel: { stable: { installedTag: 'abc1234' } },
     }
     const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'abc1234' }
     expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
   })
 
-  it('detects stable update with legacy verbose format version', () => {
+  it('returns false via installedTag match when no comfyVersion', () => {
     const installation = {
-      version: 'v0.14.2 + 21 commits (abc1234)',
-      updateInfoByChannel: { stable: { installedTag: 'abc1234' } },
+      updateInfoByChannel: { stable: { installedTag: 'v0.14.2' } },
     }
-    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'abc1234' }
-    expect(isUpdateAvailable(installation, 'stable', info)).toBe(true)
+    const info: ReleaseCacheEntry = { latestTag: 'v0.14.2', installedTag: 'v0.14.2' }
+    expect(isUpdateAvailable(installation, 'stable', info)).toBe(false)
   })
 })

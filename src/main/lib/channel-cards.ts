@@ -40,7 +40,7 @@ export function buildChannelCards(
     return {
       ...def,
       data: info ? {
-        installedVersion: formatComfyVersion(cv, 'detail'),
+        installedVersion: cv ? formatComfyVersion(cv, 'detail') : (info.installedTag || 'unknown'),
         latestVersion: latestCv ? formatComfyVersion(latestCv, 'detail') : (info.releaseName || info.latestTag || '—'),
         lastChecked: info.checkedAt ? new Date(info.checkedAt).toLocaleString() : '—',
         updateAvailable: releaseCache.isUpdateAvailable(installation, def.value, info),

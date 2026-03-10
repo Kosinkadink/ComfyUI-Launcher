@@ -31,9 +31,15 @@ export function formatComfyVersion(
 
   if (!baseTag) return shortSha
 
-  // undefined (API comparison failed) and 0 (exactly on tag) both display as the tag.
-  // This is intentional: if we don't know how far ahead, we conservatively show the tag.
-  if (!commitsAhead || commitsAhead === 0) return baseTag
+  // Exactly on the tag — display as the tag alone.
+  if (commitsAhead === 0) return baseTag
+
+  // commitsAhead is undefined when the GitHub comparison API failed.
+  // We know the baseTag but not how far ahead, so show the tag + SHA to
+  // indicate uncertainty rather than silently displaying the stable tag.
+  if (commitsAhead === undefined) {
+    return style === 'short' ? `${baseTag} (${shortSha})` : `${baseTag} (${shortSha})`
+  }
 
   if (style === 'short') {
     return `${baseTag}+${commitsAhead}`
