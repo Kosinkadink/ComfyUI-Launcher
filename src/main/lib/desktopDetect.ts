@@ -147,11 +147,10 @@ export async function captureDesktopSnapshot(info: DesktopInstallInfo): Promise<
     trigger: 'manual',
     label: 'Desktop migration',
     comfyui: {
-      ref: 'desktop',
+      ref: 'Desktop',
       commit: null,
       releaseTag: '',
       variant: '',
-      displayVersion: 'Desktop',
     },
     customNodes,
     pipPackages,

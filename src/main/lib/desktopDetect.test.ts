@@ -173,7 +173,7 @@ describe('captureDesktopSnapshot', () => {
     expect(snapshot.version).toBe(1)
     expect(snapshot.trigger).toBe('manual')
     expect(snapshot.label).toBe('Desktop migration')
-    expect(snapshot.comfyui.ref).toBe('desktop')
+    expect(snapshot.comfyui.ref).toBe('Desktop')
     expect(snapshot.customNodes).toEqual([])
     expect(snapshot.pipPackages).toEqual({})
   })
