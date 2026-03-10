@@ -21,13 +21,21 @@ export interface ModalDetailGroup {
   items: string[]
 }
 
+export interface ModalCheckbox {
+  id: string
+  label: string
+  checked: boolean
+}
+
 export interface ModalState {
   visible: boolean
   type: ModalType
+  loading: boolean
   title: string
   message: string
   messageDetails: ModalDetailGroup[]
   snapshotPreview: SnapshotDetailData | null
+  checkboxes: ModalCheckbox[]
   buttonLabel: string
   confirmLabel: string
   confirmStyle: string
@@ -42,10 +50,12 @@ export interface ModalState {
 const state = reactive<ModalState>({
   visible: false,
   type: 'alert',
+  loading: false,
   title: '',
   message: '',
   messageDetails: [],
   snapshotPreview: null,
+  checkboxes: [],
   buttonLabel: 'OK',
   confirmLabel: 'Confirm',
   confirmStyle: 'danger',
@@ -60,10 +70,12 @@ const state = reactive<ModalState>({
 function reset(): void {
   state.visible = false
   state.type = 'alert'
+  state.loading = false
   state.title = ''
   state.message = ''
   state.messageDetails = []
   state.snapshotPreview = null
+  state.checkboxes = []
   state.buttonLabel = 'OK'
   state.confirmLabel = 'Confirm'
   state.confirmStyle = 'danger'
@@ -75,10 +87,17 @@ function reset(): void {
   state.resolve = null
 }
 
+let _lastCheckboxValues: Record<string, boolean> = {}
+
 function close(value: unknown): void {
   const resolve = state.resolve
+  _lastCheckboxValues = Object.fromEntries(state.checkboxes.map((c) => [c.id, c.checked]))
   reset()
   if (resolve) resolve(value)
+}
+
+function getLastCheckboxValues(): Record<string, boolean> {
+  return _lastCheckboxValues
 }
 
 export function useModal() {
@@ -101,8 +120,10 @@ export function useModal() {
   function confirm(opts: {
     title: string
     message: string
+    loading?: boolean
     messageDetails?: ModalDetailGroup[]
     snapshotPreview?: SnapshotDetailData | null
+    checkboxes?: ModalCheckbox[]
     confirmLabel?: string
     confirmStyle?: string
   }): Promise<boolean> {
@@ -110,14 +131,31 @@ export function useModal() {
       reset()
       state.visible = true
       state.type = 'confirm'
+      state.loading = opts.loading ?? false
       state.title = opts.title
       state.message = opts.message
       state.messageDetails = opts.messageDetails ?? []
       state.snapshotPreview = opts.snapshotPreview ?? null
+      state.checkboxes = (opts.checkboxes ?? []).map((c) => ({ ...c }))
       state.confirmLabel = opts.confirmLabel ?? i18n.global.t('modal.confirm')
       state.confirmStyle = opts.confirmStyle ?? 'danger'
       state.resolve = resolve as (value: unknown) => void
     })
+  }
+
+  function updateConfirm(opts: {
+    loading?: boolean
+    message?: string
+    messageDetails?: ModalDetailGroup[]
+    snapshotPreview?: SnapshotDetailData | null
+    checkboxes?: ModalCheckbox[]
+  }): void {
+    if (!state.visible || state.type !== 'confirm') return
+    if (opts.loading !== undefined) state.loading = opts.loading
+    if (opts.message !== undefined) state.message = opts.message
+    if (opts.messageDetails !== undefined) state.messageDetails = opts.messageDetails
+    if (opts.snapshotPreview !== undefined) state.snapshotPreview = opts.snapshotPreview
+    if (opts.checkboxes !== undefined) state.checkboxes = opts.checkboxes.map((c) => ({ ...c }))
   }
 
   function confirmWithOptions(opts: {
@@ -184,9 +222,11 @@ export function useModal() {
     state: readonly(state) as ModalState,
     alert,
     confirm,
+    updateConfirm,
     confirmWithOptions,
     prompt,
     select,
     close,
+    getLastCheckboxValues,
   }
 }

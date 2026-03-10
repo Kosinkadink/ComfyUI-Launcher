@@ -22,13 +22,6 @@ function formatNodeVersion(node: { version?: string; commit?: string }): string 
   return '—'
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
 const confirmClass = computed(() =>
   state.confirmStyle === 'danger' ? 'danger-solid' : state.confirmStyle
 )
@@ -92,6 +85,18 @@ function handleOverlayClick(event: MouseEvent): void {
   mouseDownOnOverlay.value = false
 }
 
+function resetSnapshotExpansion(): void {
+  const sp = state.snapshotPreview
+  spNodesExpanded.value = sp ? sp.customNodes.length > 0 : true
+  spPipExpanded.value = false
+}
+
+watch(() => state.snapshotPreview, () => {
+  if (state.visible && state.type === 'confirm') {
+    resetSnapshotExpansion()
+  }
+})
+
 function handleKeydown(event: KeyboardEvent): void {
   if (!state.visible) return
   if (event.key === 'Escape') {
@@ -116,9 +121,8 @@ watch(
       inputRef.value?.select()
     }
 
-    if (state.type === 'confirm' && state.snapshotPreview) {
-      spNodesExpanded.value = true
-      spPipExpanded.value = false
+    if (state.type === 'confirm') {
+      resetSnapshotExpansion()
     }
 
     if (state.type === 'confirmWithOptions') {
@@ -162,7 +166,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Confirm -->
-      <div v-else-if="state.type === 'confirm'" class="modal-box" :class="{ 'modal-box-wide': state.snapshotPreview }">
+      <div v-else-if="state.type === 'confirm'" class="modal-box" :class="{ 'modal-box-wide': state.snapshotPreview || state.loading }">
         <div class="modal-title">{{ state.title }}</div>
         <div class="modal-body">
           <div
@@ -171,8 +175,14 @@ onUnmounted(() => {
             v-html="linkifiedMessage"
           ></div>
 
+          <!-- Loading -->
+          <div v-if="state.loading" class="modal-loading">
+            <div class="modal-loading-spinner" />
+            <span>{{ $t('common.loading') }}</span>
+          </div>
+
           <!-- Snapshot preview -->
-          <template v-if="state.snapshotPreview">
+          <template v-if="!state.loading && state.snapshotPreview">
             <div class="sp-grid">
               <div class="sp-field">
                 <span class="sp-label">{{ $t('snapshots.comfyuiVersion') }}</span>
@@ -186,10 +196,7 @@ onUnmounted(() => {
                 <span class="sp-label">{{ $t('snapshots.pythonVersion') }}</span>
                 <span class="sp-value">{{ state.snapshotPreview.pythonVersion }}</span>
               </div>
-              <div class="sp-field">
-                <span class="sp-label">{{ $t('snapshots.capturedAt') }}</span>
-                <span class="sp-value">{{ formatDate(state.snapshotPreview.createdAt) }}</span>
-              </div>
+
             </div>
 
             <div class="sp-subsection">
@@ -235,10 +242,16 @@ onUnmounted(() => {
               </ul>
             </div>
           </div>
+          <div v-if="state.checkboxes.length" class="modal-options">
+            <label v-for="cb in state.checkboxes" :key="cb.id" class="modal-option">
+              <input v-model="cb.checked" type="checkbox" />
+              <span>{{ cb.label }}</span>
+            </label>
+          </div>
         </div>
         <div class="modal-actions">
           <button @click="close(false)">{{ $t('common.cancel') }}</button>
-          <button :class="confirmClass" @click="close(true)">
+          <button :class="confirmClass" :disabled="state.loading" @click="close(true)">
             {{ state.confirmLabel }}
           </button>
         </div>
