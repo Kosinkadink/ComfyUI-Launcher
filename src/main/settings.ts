@@ -76,6 +76,7 @@ export const defaults: SettingsDefaults = {
 }
 
 const systemDefault = defaults.modelsDirs[0]!
+const shouldSanitizeCopiedUserDefaults = process.platform === 'win32'
 
 function resolveIfNonEmpty(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? path.resolve(value) : null
@@ -160,32 +161,34 @@ function load(): Settings {
   const result: Settings = { ...defaults, ...(parsed || {}) }
   let changed = false
 
-  const nextCacheDir = sanitizeUserDefaultPath(result.cacheDir, defaults.cacheDir)
-  if (nextCacheDir !== result.cacheDir) {
-    result.cacheDir = nextCacheDir
-    changed = true
-  }
+  if (shouldSanitizeCopiedUserDefaults) {
+    const nextCacheDir = sanitizeUserDefaultPath(result.cacheDir, defaults.cacheDir)
+    if (nextCacheDir !== result.cacheDir) {
+      result.cacheDir = nextCacheDir
+      changed = true
+    }
 
-  const nextModelsDirs = sanitizeModelsDirs(result.modelsDirs, systemDefault)
-  if (
-    !Array.isArray(result.modelsDirs)
-    || nextModelsDirs.length !== result.modelsDirs.length
-    || nextModelsDirs.some((dir, index) => dir !== result.modelsDirs[index])
-  ) {
-    result.modelsDirs = nextModelsDirs
-    changed = true
-  }
+    const nextModelsDirs = sanitizeModelsDirs(result.modelsDirs, systemDefault)
+    if (
+      !Array.isArray(result.modelsDirs)
+      || nextModelsDirs.length !== result.modelsDirs.length
+      || nextModelsDirs.some((dir, index) => dir !== result.modelsDirs[index])
+    ) {
+      result.modelsDirs = nextModelsDirs
+      changed = true
+    }
 
-  const nextInputDir = sanitizeUserDefaultPath(result.inputDir, defaults.inputDir)
-  if (nextInputDir !== result.inputDir) {
-    result.inputDir = nextInputDir
-    changed = true
-  }
+    const nextInputDir = sanitizeUserDefaultPath(result.inputDir, defaults.inputDir)
+    if (nextInputDir !== result.inputDir) {
+      result.inputDir = nextInputDir
+      changed = true
+    }
 
-  const nextOutputDir = sanitizeUserDefaultPath(result.outputDir, defaults.outputDir)
-  if (nextOutputDir !== result.outputDir) {
-    result.outputDir = nextOutputDir
-    changed = true
+    const nextOutputDir = sanitizeUserDefaultPath(result.outputDir, defaults.outputDir)
+    if (nextOutputDir !== result.outputDir) {
+      result.outputDir = nextOutputDir
+      changed = true
+    }
   }
 
   // Ensure system default directory is always present in modelsDirs

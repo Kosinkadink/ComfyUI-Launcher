@@ -38,6 +38,7 @@ const expectedCacheDir = process.platform === 'linux'
 const copiedAdminCacheDir = process.platform === 'linux'
   ? path.join(adminXdgCacheHome, 'comfyui-desktop-2', 'download-cache')
   : path.join(adminUserDataPath, 'download-cache')
+const shouldRewriteCopiedDefaults = process.platform === 'win32'
 
 function readPersistedSettings(): Record<string, unknown> {
   const raw = fs.readFileSync(settingsPath, 'utf-8')
@@ -119,15 +120,35 @@ describe('settings unset/default semantics', () => {
 })
 
 describe('settings path sanitization', () => {
-  it('rewrites copied foreign-user defaults to the current user defaults', () => {
+  it('rewrites copied foreign-user defaults on Windows only', () => {
     fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
+    const customModelsDir = path.join(tmpRoot, 'custom-models')
+    const expectedModelsDirs = shouldRewriteCopiedDefaults
+      ? [
+          path.join(homePath, 'ComfyUI-Shared', 'models'),
+          customModelsDir,
+        ]
+      : [
+          path.join(homePath, 'ComfyUI-Shared', 'models'),
+          path.join(adminHomePath, 'ComfyUI-Shared', 'models'),
+          customModelsDir,
+        ]
+    const expectedInputDir = shouldRewriteCopiedDefaults
+      ? path.join(homePath, 'ComfyUI-Shared', 'input')
+      : path.join(adminHomePath, 'ComfyUI-Shared', 'input')
+    const expectedOutputDir = shouldRewriteCopiedDefaults
+      ? path.join(homePath, 'ComfyUI-Shared', 'output')
+      : path.join(adminHomePath, 'ComfyUI-Shared', 'output')
+    const expectedPersistedCacheDir = shouldRewriteCopiedDefaults
+      ? expectedCacheDir
+      : copiedAdminCacheDir
     fs.writeFileSync(
       settingsPath,
       JSON.stringify({
         cacheDir: copiedAdminCacheDir,
         modelsDirs: [
           path.join(adminHomePath, 'ComfyUI-Shared', 'models'),
-          path.join(tmpRoot, 'custom-models'),
+          customModelsDir,
         ],
         inputDir: path.join(adminHomePath, 'ComfyUI-Shared', 'input'),
         outputDir: path.join(adminHomePath, 'ComfyUI-Shared', 'output'),
@@ -135,21 +156,15 @@ describe('settings path sanitization', () => {
       'utf-8'
     )
 
-    expect(settings.get('cacheDir')).toBe(expectedCacheDir)
-    expect(settings.get('modelsDirs')).toEqual([
-      path.join(homePath, 'ComfyUI-Shared', 'models'),
-      path.join(tmpRoot, 'custom-models'),
-    ])
-    expect(settings.get('inputDir')).toBe(path.join(homePath, 'ComfyUI-Shared', 'input'))
-    expect(settings.get('outputDir')).toBe(path.join(homePath, 'ComfyUI-Shared', 'output'))
+    expect(settings.get('cacheDir')).toBe(expectedPersistedCacheDir)
+    expect(settings.get('modelsDirs')).toEqual(expectedModelsDirs)
+    expect(settings.get('inputDir')).toBe(expectedInputDir)
+    expect(settings.get('outputDir')).toBe(expectedOutputDir)
 
     const persisted = readPersistedSettings()
-    expect(persisted['cacheDir']).toBe(expectedCacheDir)
-    expect(persisted['modelsDirs']).toEqual([
-      path.join(homePath, 'ComfyUI-Shared', 'models'),
-      path.join(tmpRoot, 'custom-models'),
-    ])
-    expect(persisted['inputDir']).toBe(path.join(homePath, 'ComfyUI-Shared', 'input'))
-    expect(persisted['outputDir']).toBe(path.join(homePath, 'ComfyUI-Shared', 'output'))
+    expect(persisted['cacheDir']).toBe(expectedPersistedCacheDir)
+    expect(persisted['modelsDirs']).toEqual(expectedModelsDirs)
+    expect(persisted['inputDir']).toBe(expectedInputDir)
+    expect(persisted['outputDir']).toBe(expectedOutputDir)
   })
 })
