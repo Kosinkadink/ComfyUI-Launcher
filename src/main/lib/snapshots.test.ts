@@ -63,7 +63,7 @@ function makeEntry(overrides?: Partial<Snapshot>): SnapshotEntry {
 
 function makeEnvelope(snapshots?: Snapshot[]): SnapshotExportEnvelope {
   return {
-    type: 'comfyui-launcher-snapshot',
+    type: 'comfyui-desktop-2-snapshot',
     version: 1,
     exportedAt: '2026-03-02T12:00:00.000Z',
     installationName: 'Test Install',
@@ -76,7 +76,7 @@ function makeEnvelope(snapshots?: Snapshot[]): SnapshotExportEnvelope {
 describe('validateExportEnvelope', () => {
   it('accepts a valid envelope', () => {
     const result = validateExportEnvelope(makeEnvelope())
-    expect(result.type).toBe('comfyui-launcher-snapshot')
+    expect(result.type).toBe('comfyui-desktop-2-snapshot')
     expect(result.snapshots).toHaveLength(1)
   })
 
@@ -97,13 +97,13 @@ describe('validateExportEnvelope', () => {
   })
 
   it('rejects wrong type field', () => {
-    expect(() => validateExportEnvelope({ ...makeEnvelope(), type: 'wrong' })).toThrow('not a ComfyUI Launcher snapshot export')
+    expect(() => validateExportEnvelope({ ...makeEnvelope(), type: 'wrong' })).toThrow('not a ComfyUI Desktop 2.0 snapshot export')
   })
 
   it('rejects missing type field', () => {
     const env = makeEnvelope()
     const { type: _, ...rest } = env
-    expect(() => validateExportEnvelope(rest)).toThrow('not a ComfyUI Launcher snapshot export')
+    expect(() => validateExportEnvelope(rest)).toThrow('not a ComfyUI Desktop 2.0 snapshot export')
   })
 
   it('rejects wrong version', () => {
@@ -257,7 +257,7 @@ describe('buildExportEnvelope', () => {
   it('wraps a single snapshot', () => {
     const entry = makeEntry()
     const result = buildExportEnvelope('My Install', [entry])
-    expect(result.type).toBe('comfyui-launcher-snapshot')
+    expect(result.type).toBe('comfyui-desktop-2-snapshot')
     expect(result.version).toBe(1)
     expect(result.installationName).toBe('My Install')
     expect(result.snapshots).toHaveLength(1)
@@ -609,36 +609,37 @@ describe('restoreComfyUIVersion', () => {
 // --- buildPostRestoreState ---
 
 describe('buildPostRestoreState', () => {
-  it('includes version and lastRollback when comfyResult has no error', () => {
+  it('includes comfyVersion and lastRollback when comfyResult has no error', () => {
     const snapshot = makeSnapshot({ updateChannel: 'stable', comfyui: { ref: 'v0.3.10', commit: 'abc1234', releaseTag: 'v0.2.1', variant: 'win-nvidia-cu128' } })
     const comfyResult = { changed: true, commit: 'abc1234' }
     const state = buildPostRestoreState(snapshot, comfyResult, undefined)
     expect(state.updateChannel).toBe('stable')
-    expect(state.version).toBe('v0.2.1')
+    expect(state.comfyVersion).toEqual({ commit: 'abc1234', baseTag: undefined, commitsAhead: undefined })
     expect(state.lastRollback).toBeDefined()
     expect((state.lastRollback as Record<string, unknown>).channel).toBe('stable')
     expect((state.lastRollback as Record<string, unknown>).postUpdateHead).toBe('abc1234')
     expect(state.updateInfoByChannel).toBeDefined()
   })
 
-  it('uses current version when comfyResult has an error', () => {
+  it('keeps current comfyVersion when comfyResult has an error', () => {
     const snapshot = makeSnapshot({ updateChannel: 'latest', comfyui: { ref: 'v0.3.10', commit: 'abc1234', releaseTag: 'v0.2.1', variant: 'win-nvidia-cu128' } })
     const comfyResult = { changed: false, commit: null, error: 'git checkout failed' }
-    const state = buildPostRestoreState(snapshot, comfyResult, undefined, 'v0.1.0')
+    const currentCv = { commit: 'old1234', baseTag: 'v0.1.0', commitsAhead: 5 }
+    const state = buildPostRestoreState(snapshot, comfyResult, undefined, currentCv)
     expect(state.updateChannel).toBe('latest')
-    expect(state.version).toBe('v0.1.0')
+    expect(state.comfyVersion).toEqual(currentCv)
     expect(state.lastRollback).toBeDefined()
     expect((state.lastRollback as Record<string, unknown>).channel).toBe('latest')
     expect(state.updateInfoByChannel).toBeDefined()
     const info = state.updateInfoByChannel as Record<string, Record<string, unknown>>
-    expect(info.latest!.installedTag).toBe('v0.1.0')
+    expect(info.latest!.installedTag).toBe('v0.1.0+5')
   })
 
-  it('uses displayVersion over releaseTag when available', () => {
-    const snapshot = makeSnapshot({ comfyui: { ref: 'v0.3.10', commit: 'abc1234', releaseTag: 'v0.2.1', variant: 'win-nvidia-cu128', displayVersion: 'v0.2.1-custom' } })
+  it('builds comfyVersion with baseTag and commitsAhead from snapshot', () => {
+    const snapshot = makeSnapshot({ comfyui: { ref: 'v0.3.10', commit: 'abc1234', releaseTag: 'v0.2.1', variant: 'win-nvidia-cu128', baseTag: 'v0.2.1', commitsAhead: 10 } })
     const comfyResult = { changed: true, commit: 'abc1234' }
     const state = buildPostRestoreState(snapshot, comfyResult, undefined)
-    expect(state.version).toBe('v0.2.1-custom')
+    expect(state.comfyVersion).toEqual({ commit: 'abc1234', baseTag: 'v0.2.1', commitsAhead: 10 })
   })
 
   it('merges with existing updateInfoByChannel', () => {

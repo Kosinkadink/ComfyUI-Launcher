@@ -415,12 +415,12 @@ export interface SnapshotDetailData {
   createdAt: string
   trigger: string
   label: string | null
+  comfyuiVersion: string
   comfyui: {
     ref: string
     commit: string | null
     releaseTag: string
     variant: string
-    displayVersion?: string
   }
   pythonVersion?: string
   updateChannel?: string
@@ -439,8 +439,8 @@ export interface SnapshotDiffNodeChange {
 export interface SnapshotDiffResult {
   comfyuiChanged: boolean
   comfyui?: {
-    from: { ref: string; commit: string | null; displayVersion?: string }
-    to: { ref: string; commit: string | null; displayVersion?: string }
+    from: { ref: string; commit: string | null; formattedVersion: string }
+    to: { ref: string; commit: string | null; formattedVersion: string }
   }
   updateChannelChanged: boolean
   updateChannel?: { from: string; to: string }
@@ -535,6 +535,7 @@ export interface ElectronApi {
   importSnapshots(installationId: string): Promise<{ ok: boolean; imported?: number; skipped?: number; message?: string }>
   previewSnapshotFile(): Promise<{ ok: boolean; preview?: SnapshotFilePreview; message?: string }>
   previewDesktopMigration(): Promise<{ ok: boolean; message?: string; preview?: SnapshotFilePreview; snapshotPath?: string }>
+  previewLocalMigration(installationId: string): Promise<{ ok: boolean; message?: string; preview?: SnapshotFilePreview; snapshotPath?: string }>
   previewSnapshotPath(filePath: string): Promise<{ ok: boolean; preview?: SnapshotFilePreview; message?: string }>
   createFromSnapshot(filePath: string, name?: string, releaseTag?: string, variantId?: string): Promise<{ ok: boolean; entry?: { id: string; name: string }; message?: string }>
   getPathForFile(file: File): string

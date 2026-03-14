@@ -8,6 +8,7 @@ import DetailSectionComponent from '../components/DetailSection.vue'
 import SnapshotTab from '../components/SnapshotTab.vue'
 import { useInstallationStore } from '../stores/installationStore'
 import { emitTelemetryAction, toErrorBucket } from '../lib/telemetry'
+import { useMigrateAction } from '../composables/useMigrateAction'
 import { REQUIRES_STOPPED } from '../types/ipc'
 import { Star, Pin } from 'lucide-vue-next'
 import type {
@@ -22,10 +23,12 @@ import type {
 interface Props {
   installation: Installation | null
   initialTab?: string
+  autoAction?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   initialTab: 'status',
+  autoAction: null,
 })
 
 const emit = defineEmits<{
@@ -48,6 +51,7 @@ const modal = useModal()
 const prefs = useLauncherPrefs()
 const installationStore = useInstallationStore()
 const actionGuard = useActionGuard()
+const { confirmMigration } = useMigrateAction()
 
 const isLocal = computed(() => props.installation?.sourceCategory === 'local')
 const isDesktop = computed(() => props.installation?.sourceId === 'desktop')
@@ -134,6 +138,19 @@ watch(
       await nextTick()
       if (scrollRef.value) scrollRef.value.scrollTop = 0
       if (inst.installPath) fetchInstallationSize(inst.id)
+
+      // Auto-trigger an action if requested (e.g. from migrate pill click)
+      if (props.autoAction) {
+        const actionId = props.autoAction
+        for (const section of sections.value) {
+          const action = section.actions?.find((a: ActionDef) => a.id === actionId)
+          if (action) {
+            await nextTick()
+            runAction(action, null)
+            break
+          }
+        }
+      }
     }
   },
   { immediate: true }
@@ -194,7 +211,8 @@ async function runAction(action: ActionDef, btn: HTMLButtonElement | null): Prom
   }
 
   // Pre-flight: check if the installation is busy or running
-  if (REQUIRES_STOPPED.has(action.id)) {
+  // Skip for migrate-to-standalone — the useMigrateAction composable handles its own guard
+  if (action.id !== 'migrate-to-standalone' && REQUIRES_STOPPED.has(action.id)) {
     if (!await actionGuard.checkBeforeAction(props.installation.id, action.label)) return
   }
 
@@ -294,44 +312,17 @@ async function runAction(action: ActionDef, btn: HTMLButtonElement | null): Prom
     }
   }
 
-  // Desktop migration preview — replaces the static confirm with a live snapshot preview
+  // Migration preview — delegates to useMigrateAction composable
   if (mutableAction.id === 'migrate-to-standalone') {
-    let previewResult: Awaited<ReturnType<typeof window.api.previewDesktopMigration>>
-    try {
-      previewResult = await window.api.previewDesktopMigration()
-    } catch (err) {
-      await modal.alert({
-        title: mutableAction.label,
-        message: (err as Error)?.message ?? String(err),
-      })
-      return
-    }
-    if (!previewResult.ok) {
-      if (previewResult.message) {
-        await modal.alert({ title: mutableAction.label, message: previewResult.message })
-      }
-      return
-    }
-    const confirmed = await modal.confirm({
-      title: mutableAction.confirm?.title || t('desktop.migrateConfirmTitle'),
-      message: mutableAction.confirm?.message || '',
-      snapshotPreview: previewResult.preview?.newestSnapshot,
-      messageDetails: [{
-        label: t('desktop.migrateConfirmTitle'),
-        items: [
-          t('desktop.copyingUserData'),
-          t('desktop.copyingInput'),
-          t('desktop.copyingOutput'),
-          t('desktop.addingModels'),
-        ],
-      }],
-      confirmLabel: mutableAction.confirm?.confirmLabel || t('desktop.migrateConfirm'),
-      confirmStyle: 'primary',
-    })
-    if (!confirmed) return
+    const migrateResult = await confirmMigration(props.installation, mutableAction.confirm)
+    if (!migrateResult) return
+
     mutableAction = {
       ...mutableAction,
-      data: { ...mutableAction.data, snapshotPath: previewResult.snapshotPath },
+      data: {
+        ...mutableAction.data,
+        ...migrateResult,
+      },
     }
   }
 

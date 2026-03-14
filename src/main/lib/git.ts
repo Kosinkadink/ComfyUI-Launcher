@@ -6,6 +6,7 @@ import { killProcTree } from './process'
 export interface ProcessResult {
   exitCode: number
   stderr: string
+  stdout: string
 }
 
 /**
@@ -87,6 +88,26 @@ function redactUrl(url: string): string {
   }
 }
 
+/**
+ * Count how many commits HEAD is ahead of a tag.  Runs `git rev-list --count`
+ * asynchronously (local operation, no network).  Returns undefined if git is
+ * unavailable, the tag doesn't exist, or any error occurs.
+ */
+export function countCommitsAhead(repoPath: string, tag: string): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    execFile('git', ['rev-list', '--count', `${tag}..HEAD`], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 1000,
+    }, (error, stdout) => {
+      if (error) { resolve(undefined); return }
+      const n = parseInt(stdout.trim(), 10)
+      resolve(Number.isFinite(n) ? n : undefined)
+    })
+  })
+}
+
 /** Check whether a path has a .git directory or file (worktree/submodule). */
 export function hasGitDir(nodePath: string): boolean {
   return resolveGitDir(nodePath) !== null
@@ -106,8 +127,9 @@ export function gitClone(
   sendOutput: (text: string) => void,
   signal?: AbortSignal
 ): Promise<ProcessResult> {
-  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
+  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
   return new Promise((resolve) => {
+    const stdoutChunks: string[] = []
     const stderrChunks: string[] = []
     const proc = spawn('git', ['clone', url, dest], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -117,7 +139,11 @@ export function gitClone(
     const onAbort = (): void => { killProcTree(proc) }
     signal?.addEventListener('abort', onAbort, { once: true })
     if (signal?.aborted) onAbort()
-    proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
+    proc.stdout.on('data', (data: Buffer) => {
+      const text = data.toString()
+      stdoutChunks.push(text)
+      sendOutput(text)
+    })
     proc.stderr.on('data', (data: Buffer) => {
       const text = data.toString()
       stderrChunks.push(text)
@@ -126,25 +152,24 @@ export function gitClone(
     proc.on('error', (err) => {
       signal?.removeEventListener('abort', onAbort)
       sendOutput(err.message)
-      resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message })
+      resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message, stdout: stdoutChunks.join('') })
     })
     proc.on('close', (code) => {
       signal?.removeEventListener('abort', onAbort)
-      resolve({ exitCode: code ?? 1, stderr: stderrChunks.join('') })
+      resolve({ exitCode: code ?? 1, stderr: stderrChunks.join(''), stdout: stdoutChunks.join('') })
     })
   })
 }
 
-export function gitFetchAndCheckout(
+function makeRunGit(
   repoPath: string,
-  commit: string,
   sendOutput: (text: string) => void,
-  signal?: AbortSignal
-): Promise<ProcessResult> {
-  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
-  const runGit = (args: string[]): Promise<ProcessResult> => {
-    if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '' })
+  signal?: AbortSignal,
+): (args: string[]) => Promise<ProcessResult> {
+  return (args: string[]): Promise<ProcessResult> => {
+    if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
     return new Promise((resolve) => {
+      const stdoutChunks: string[] = []
       const stderrChunks: string[] = []
       const proc = spawn('git', args, {
         cwd: repoPath,
@@ -155,7 +180,11 @@ export function gitFetchAndCheckout(
       const onAbort = (): void => { killProcTree(proc) }
       signal?.addEventListener('abort', onAbort, { once: true })
       if (signal?.aborted) onAbort()
-      proc.stdout.on('data', (data: Buffer) => sendOutput(data.toString()))
+      proc.stdout.on('data', (data: Buffer) => {
+        const text = data.toString()
+        stdoutChunks.push(text)
+        sendOutput(text)
+      })
       proc.stderr.on('data', (data: Buffer) => {
         const text = data.toString()
         stderrChunks.push(text)
@@ -164,14 +193,56 @@ export function gitFetchAndCheckout(
       proc.on('error', (err) => {
         signal?.removeEventListener('abort', onAbort)
         sendOutput(err.message)
-        resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message })
+        resolve({ exitCode: 1, stderr: stderrChunks.join('') + err.message, stdout: stdoutChunks.join('') })
       })
       proc.on('close', (code) => {
         signal?.removeEventListener('abort', onAbort)
-        resolve({ exitCode: code ?? 1, stderr: stderrChunks.join('') })
+        resolve({ exitCode: code ?? 1, stderr: stderrChunks.join(''), stdout: stdoutChunks.join('') })
       })
     })
   }
+}
+
+/**
+ * Check out a specific commit. Tries a direct checkout first (works for
+ * full clones where the commit is already local). If the commit isn't
+ * available, fetches all refs from origin (unshallowing if needed) and
+ * retries.
+ */
+export function gitCheckoutCommit(
+  repoPath: string,
+  commit: string,
+  sendOutput: (text: string) => void,
+  signal?: AbortSignal
+): Promise<ProcessResult> {
+  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
+  const runGit = makeRunGit(repoPath, sendOutput, signal)
+
+  return runGit(['checkout', commit]).then((directResult) => {
+    if (directResult.exitCode === 0) return directResult
+    return runGit(['fetch', '--unshallow', 'origin']).then((result) => {
+      if (result.exitCode !== 0) return runGit(['fetch', 'origin'])
+      return result
+    }).then((fetchResult) => {
+      if (fetchResult.exitCode !== 0) return fetchResult
+      return runGit(['checkout', commit])
+    })
+  })
+}
+
+/**
+ * Fetch the master branch from origin and check out a specific commit.
+ * Designed for the ComfyUI main repo where master must exist locally
+ * (mirroring update_comfyui.py behaviour).
+ */
+export function gitFetchAndCheckout(
+  repoPath: string,
+  commit: string,
+  sendOutput: (text: string) => void,
+  signal?: AbortSignal
+): Promise<ProcessResult> {
+  if (signal?.aborted) return Promise.resolve({ exitCode: 1, stderr: '', stdout: '' })
+  const runGit = makeRunGit(repoPath, sendOutput, signal)
 
   // Fetch master explicitly — grafted/archive-based repos may have no
   // branch tracking configured, so a bare `git fetch origin` only pulls

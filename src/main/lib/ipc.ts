@@ -7,6 +7,8 @@ import type { ChildProcess } from 'child_process'
 import sources from '../sources/index'
 import * as installations from '../installations'
 import type { InstallationRecord } from '../installations'
+import { formatComfyVersion } from './version'
+import type { ComfyVersion } from './version'
 import * as settings from '../settings'
 import { defaultInstallDir } from './paths'
 import { download } from './download'
@@ -22,6 +24,7 @@ import {
 import { detectGPU, validateHardware, checkNvidiaDriver } from './gpu'
 import { detectDesktopInstall, stageDesktopSnapshot } from './desktopDetect'
 import { performDesktopMigration } from './desktopMigration'
+import { performLocalMigration, stageLocalSnapshot } from './localMigration'
 import { getDiskSpace, getDirectorySize, validateInstallPath } from './disk'
 import type { GpuInfo } from './gpu'
 import { formatTime } from './util'
@@ -31,8 +34,8 @@ import * as i18n from './i18n'
 import { ensureModelPathsConfig } from './models'
 import { copyDirWithProgress } from './copy'
 import { fetchJSON } from './fetch'
-import { fetchLatestRelease, truncateNotes } from './comfyui-releases'
-import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot, listSnapshots, buildExportEnvelope, validateExportEnvelope, importSnapshots, saveSnapshot, restoreCustomNodes, restorePipPackages, restoreComfyUIVersion, buildPostRestoreState } from './snapshots'
+import { fetchLatestRelease } from './comfyui-releases'
+import { captureSnapshotIfChanged, getSnapshotCount, getSnapshotListData, getSnapshotDetailData, getSnapshotDiffVsPrevious, diffAgainstCurrent, loadSnapshot, listSnapshots, buildExportEnvelope, validateExportEnvelope, importSnapshots, saveSnapshot, restoreCustomNodes, restorePipPackages, restoreComfyUIVersion, buildPostRestoreState, formatSnapshotVersion } from './snapshots'
 import type { SnapshotExportEnvelope } from './snapshots'
 import { getVariantLabel } from '../sources/standalone'
 import type { FieldOption, SourcePlugin } from '../types/sources'
@@ -40,7 +43,7 @@ import { REQUIRES_STOPPED } from '../../types/ipc'
 import type { Theme, ResolvedTheme, QuitActiveItem } from '../../types/ipc'
 import type { LaunchCmd } from './process'
 
-const MARKER_FILE = '.comfyui-launcher'
+const MARKER_FILE = '.comfyui-desktop-2'
 const COMFYUI_REPO = 'Comfy-Org/ComfyUI'
 const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000
 const IGNORE_FILES = new Set([MARKER_FILE, '.DS_Store', 'Thumbs.db', 'desktop.ini'])
@@ -77,7 +80,7 @@ function openPath(targetPath: string): Promise<string> {
   return shell.openPath(targetPath)
 }
 
-export function getLauncherVersion(): string {
+export function getAppVersion(): string {
   let version = app.getVersion()
   if (!app.isPackaged) {
     try {
@@ -250,7 +253,7 @@ async function performCopy(
 }
 
 function createSessionPath(): string {
-  return path.join(os.tmpdir(), `comfyui-launcher-${Date.now()}`)
+  return path.join(os.tmpdir(), `comfyui-desktop-2-${Date.now()}`)
 }
 
 function checkRebootMarker(sessionPath: string): boolean {
@@ -363,14 +366,7 @@ async function checkInstallationUpdates(): Promise<void> {
         releaseCache.getOrFetch(COMFYUI_REPO, channel, async () => {
           const release = await fetchLatestRelease(channel)
           if (!release) return null
-          return {
-            checkedAt: Date.now(),
-            latestTag: release.tag_name as string,
-            releaseName: (release.name as string) || (release.tag_name as string),
-            releaseNotes: truncateNotes(release.body as string, 4000),
-            releaseUrl: release.html_url as string,
-            publishedAt: release.published_at as string,
-          }
+          return releaseCache.buildCacheEntry(release)
         }, true)
       )
     )
@@ -410,7 +406,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     const desktopInfo = detectDesktopInstall()
     if (desktopInfo) {
       installations.ensureExists('desktop', {
-        name: 'ComfyUI Desktop',
+        name: 'ComfyUI Legacy Desktop',
         sourceId: 'desktop',
         installPath: desktopInfo.basePath,
         version: 'desktop',
@@ -473,8 +469,8 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   void (async () => {
     try {
       await Promise.allSettled([
-        fetchJSON('https://api.github.com/repos/Comfy-Org/ComfyUI-Launcher-Environments/releases?per_page=30'),
-        fetchJSON('https://api.github.com/repos/Comfy-Org/ComfyUI-Launcher-Environments/releases/latest'),
+        fetchJSON('https://api.github.com/repos/Comfy-Org/ComfyUI-Standalone-Environments/releases?per_page=30'),
+        fetchJSON('https://api.github.com/repos/Comfy-Org/ComfyUI-Standalone-Environments/releases/latest'),
         fetchJSON('https://api.github.com/repos/Comfy-Org/ComfyUI/releases?per_page=30'),
       ])
     } catch {}
@@ -485,7 +481,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   setInterval(() => checkInstallationUpdates(), UPDATE_CHECK_INTERVAL)
 
   // App version
-  ipcMain.handle('get-app-version', () => getLauncherVersion())
+  ipcMain.handle('get-app-version', () => getAppVersion())
 
   // Sources
   ipcMain.handle('get-sources', () =>
@@ -498,7 +494,10 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   ipcMain.handle('get-field-options', async (_event, sourceId: string, fieldId: string, selections: Record<string, unknown>) => {
     const source = sourceMap[sourceId]
     if (!source) return []
-    const gpu = _gpuPromise ? await _gpuPromise : null
+    if (!_gpuPromise) {
+      _gpuPromise = detectGPU().catch(() => null)
+    }
+    const gpu = await _gpuPromise
     const options = await source.getFieldOptions(
       fieldId,
       selections as Record<string, FieldOption | undefined>,
@@ -567,7 +566,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
 
   // Installations
   ipcMain.handle('get-installations', async () => {
-    const list = await installations.list()
+    const list = (await installations.list()).filter((i) => i.status !== 'installing')
 
     // Ensure a primary is always set when promotable local installs exist
     const currentPrimary = settings.get('primaryInstallId')
@@ -588,8 +587,12 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         : inst.status === 'failed'
         ? { label: i18n.t('errors.installFailed'), style: 'danger' }
         : (source.getStatusTag ? source.getStatusTag(inst) : undefined)
+      // Derive version display string from comfyVersion ground truth, falling back to legacy string
+      const cv = inst.comfyVersion as ComfyVersion | undefined
+      const version = cv ? formatComfyVersion(cv, 'short') : (inst.version as string | undefined)
       return {
         ...inst,
+        ...(version != null ? { version } : {}),
         sourceLabel: source.label,
         sourceCategory: source.category,
         hasConsole: source.hasConsole !== false,
@@ -628,11 +631,11 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     await installations.reorder(orderedIds)
   })
 
-  ipcMain.handle('probe-installation', (_event, dirPath: string) => {
+  ipcMain.handle('probe-installation', async (_event, dirPath: string) => {
     const results: Record<string, unknown>[] = []
     for (const source of sources) {
       if (source.probeInstallation) {
-        const data = source.probeInstallation(dirPath)
+        const data = await source.probeInstallation(dirPath)
         if (data) {
           results.push({ sourceId: source.id, sourceLabel: source.label, ...data })
         }
@@ -734,7 +737,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
             const restoreState = buildPostRestoreState(
               targetSnapshot, comfyResult,
               freshInst.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined,
-              freshInst.version as string | undefined
+              freshInst.comfyVersion as ComfyVersion | undefined
             )
             await update(restoreState)
 
@@ -1000,7 +1003,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       createdAt: s.createdAt,
       trigger: s.trigger,
       label: s.label,
-      comfyuiVersion: s.comfyui.displayVersion || s.comfyui.ref,
+      comfyuiVersion: formatSnapshotVersion(s.comfyui, 'short'),
       nodeCount: s.customNodes.length,
       pipPackageCount: Object.keys(s.pipPackages).length,
     }))
@@ -1014,6 +1017,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         createdAt: newest.createdAt,
         trigger: newest.trigger,
         label: newest.label,
+        comfyuiVersion: formatSnapshotVersion(newest.comfyui, 'detail'),
         comfyui: newest.comfyui,
         pythonVersion: newest.pythonVersion,
         updateChannel: newest.updateChannel,
@@ -1051,6 +1055,32 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       return { ok: true, preview: buildSnapshotPreview(stagedFile, envelope), snapshotPath: stagedFile }
     } catch (err) {
       console.warn('preview-desktop-migration failed:', err)
+      return { ok: false, message: (err as Error)?.message ?? String(err) }
+    }
+  })
+
+  const _lastLocalPreviewFiles = new Map<string, string>()
+  ipcMain.handle('preview-local-migration', async (_event, installationId: string) => {
+    try {
+      const prev = _lastLocalPreviewFiles.get(installationId)
+      if (prev) {
+        fs.promises.unlink(prev).catch(() => {})
+        _lastLocalPreviewFiles.delete(installationId)
+      }
+
+      const inst = await installations.get(installationId)
+      if (!inst) return { ok: false, message: 'Installation not found.' }
+
+      const { envelope, stagedFile } = await stageLocalSnapshot(
+        inst.installPath,
+        inst.sourceId as string,
+        inst.name,
+      )
+
+      _lastLocalPreviewFiles.set(installationId, stagedFile)
+      return { ok: true, preview: buildSnapshotPreview(stagedFile, envelope), snapshotPath: stagedFile }
+    } catch (err) {
+      console.warn('preview-local-migration failed:', err)
       return { ok: false, message: (err as Error)?.message ?? String(err) }
     }
   })
@@ -1165,7 +1195,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
 
     // Copy snapshot file to a temp location so it survives if the user
     // moves/deletes the original during the (potentially long) installation.
-    const stagingDir = path.join(os.tmpdir(), 'comfyui-launcher-snapshots')
+    const stagingDir = path.join(os.tmpdir(), 'comfyui-desktop-2-snapshots')
     await fs.promises.mkdir(stagingDir, { recursive: true })
     const stagedFile = path.join(stagingDir, `pending-${Date.now()}.json`)
     await fs.promises.copyFile(filePath, stagedFile)
@@ -1202,7 +1232,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
               { value: 'github', label: i18n.t('settings.themeGithub') },
             ] },
           { id: 'autoUpdate', label: i18n.t('settings.autoUpdate'), type: 'boolean', value: s.autoUpdate !== false },
-          { id: 'onLauncherClose', label: i18n.t('settings.onLauncherClose'), type: 'select', value: s.onLauncherClose || settings.defaults.onLauncherClose,
+          { id: 'onAppClose', label: i18n.t('settings.onAppClose'), type: 'select', value: s.onAppClose || settings.defaults.onAppClose,
             options: [
               { value: 'quit', label: i18n.t('settings.closeQuit') },
               { value: 'tray', label: i18n.t('settings.closeTray') },
@@ -1240,7 +1270,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       }
       return []
     })
-    const version = getLauncherVersion()
+    const version = getAppVersion()
     const aboutSection = {
       title: i18n.t('settings.about'),
       fields: [
@@ -1248,7 +1278,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         { label: i18n.t('settings.platform'), value: `${process.platform} (${process.arch})`, readonly: true },
       ],
       actions: [
-        { id: 'github', label: 'GitHub', url: 'https://github.com/Comfy-Org/ComfyUI-Launcher' },
+        { id: 'github', label: 'GitHub', url: 'https://github.com/Comfy-Org/ComfyUI-Desktop-2.0-Beta' },
       ],
     }
     return [...appSections, ...sourceSections, aboutSection]
@@ -1408,7 +1438,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       let markerContent: string | null
       try { markerContent = fs.readFileSync(markerPath, 'utf-8').trim() } catch { markerContent = null }
       if (!markerContent) {
-        return { ok: false, message: 'Safety check failed: this directory was not created by ComfyUI Launcher. Use Untrack to remove it from the list, then delete the files manually.' }
+        return { ok: false, message: 'Safety check failed: this directory was not created by ComfyUI Desktop 2.0. Use Untrack to remove it from the list, then delete the files manually.' }
       }
       if (markerContent !== inst.id && markerContent !== 'tracked') {
         return { ok: false, message: 'Safety check failed: the marker file does not match this installation. Use Untrack instead.' }
@@ -1589,19 +1619,19 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       let entry: InstallationRecord | null = null
       let destPath = ''
       try {
-        const result = await performDesktopMigration(actionData, {
+        const migrationTools = {
           sendProgress,
           sendOutput,
           signal: abort.signal,
           sourceMap,
           uniqueName,
           ensureDefaultPrimary,
-        })
+        }
+        const result = inst.sourceId === 'desktop'
+          ? await performDesktopMigration(actionData, migrationTools)
+          : await performLocalMigration(inst, actionData, migrationTools)
         entry = result.entry
         destPath = result.destPath
-
-        // Promote the new standalone install to primary so the dashboard features it
-        settings.set('primaryInstallId', entry.id)
 
         _operationAborts.delete(installationId)
         sendProgress('done', { percent: 100, status: 'Complete' })
