@@ -385,7 +385,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     {
       name: 'Comfy Cloud',
       sourceId: 'cloud',
-      version: 'cloud',
       remoteUrl: 'https://cloud.comfy.org/',
       launchMode: 'window',
       browserPartition: 'shared',
@@ -394,7 +393,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   installations.ensureExists('cloud', {
     name: 'Comfy Cloud',
     sourceId: 'cloud',
-    version: 'cloud',
     remoteUrl: 'https://cloud.comfy.org/',
     launchMode: 'window',
     browserPartition: 'shared',
@@ -409,7 +407,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         name: 'ComfyUI Legacy Desktop',
         sourceId: 'desktop',
         installPath: desktopInfo.basePath,
-        version: 'desktop',
         launchMode: 'external',
         desktopExePath: desktopInfo.executablePath || undefined,
         status: 'installed',

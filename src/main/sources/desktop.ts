@@ -30,7 +30,6 @@ export const desktop: SourcePlugin = {
 
   buildInstallation(): Record<string, unknown> {
     return {
-      version: 'desktop',
       launchMode: 'external',
     }
   },
@@ -125,7 +124,6 @@ export const desktop: SourcePlugin = {
     if (!hasVenv) return null
 
     return {
-      version: 'desktop',
       launchMode: 'external',
       desktopExePath: findDesktopExecutable() || undefined,
     }
