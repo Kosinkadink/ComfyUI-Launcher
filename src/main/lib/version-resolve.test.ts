@@ -6,15 +6,17 @@ vi.mock('./git', () => ({
   findLatestVersionTag: vi.fn(),
   countCommitsAhead: vi.fn(),
   isAncestorOf: vi.fn(),
+  findMergeBase: vi.fn(),
 }))
 
-import { findNearestTag, findLatestVersionTag, countCommitsAhead, isAncestorOf } from './git'
+import { findNearestTag, findLatestVersionTag, countCommitsAhead, isAncestorOf, findMergeBase } from './git'
 import { resolveLocalVersion, clearVersionCache } from './version-resolve'
 
 const mockedFindNearestTag = vi.mocked(findNearestTag)
 const mockedFindLatestVersionTag = vi.mocked(findLatestVersionTag)
 const mockedCountCommitsAhead = vi.mocked(countCommitsAhead)
 const mockedIsAncestorOf = vi.mocked(isAncestorOf)
+const mockedFindMergeBase = vi.mocked(findMergeBase)
 
 describe('resolveLocalVersion', () => {
   beforeEach(() => {
@@ -36,10 +38,11 @@ describe('resolveLocalVersion', () => {
     mockedFindLatestVersionTag.mockResolvedValue('v0.17.1')
     mockedCountCommitsAhead.mockImplementation(async (_repo, tag) => {
       if (tag === 'v0.16.4') return 38
-      if (tag === 'v0.17.1') return 7
+      if (tag === 'merge-base-sha') return 7
       return undefined
     })
     mockedIsAncestorOf.mockResolvedValue(true)
+    mockedFindMergeBase.mockResolvedValue('merge-base-sha')
 
     const result = await resolveLocalVersion('/repo', 'abc1234')
     expect(result).toEqual({ commit: 'abc1234', baseTag: 'v0.17.1', commitsAhead: 7 })
@@ -55,15 +58,12 @@ describe('resolveLocalVersion', () => {
     expect(result).toEqual({ commit: 'abc1234', baseTag: 'v0.16.4', commitsAhead: 38 })
   })
 
-  it('falls back to ancestor tag when countCommitsAhead for latest tag fails', async () => {
+  it('falls back to ancestor tag when merge-base fails', async () => {
     mockedFindNearestTag.mockResolvedValue('v0.16.4')
     mockedFindLatestVersionTag.mockResolvedValue('v0.17.1')
-    mockedCountCommitsAhead.mockImplementation(async (_repo, tag) => {
-      if (tag === 'v0.16.4') return 38
-      if (tag === 'v0.17.1') return undefined
-      return undefined
-    })
+    mockedCountCommitsAhead.mockResolvedValue(38)
     mockedIsAncestorOf.mockResolvedValue(true)
+    mockedFindMergeBase.mockResolvedValue(undefined)
 
     const result = await resolveLocalVersion('/repo', 'abc1234')
     expect(result).toEqual({ commit: 'abc1234', baseTag: 'v0.16.4', commitsAhead: 38 })
@@ -159,6 +159,52 @@ describe('resolveLocalVersion', () => {
 
       // findLatestVersionTag should only be called once (cached for same repo)
       expect(mockedFindLatestVersionTag).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('latestTagOverride', () => {
+    it('uses override instead of findLatestVersionTag', async () => {
+      mockedFindNearestTag.mockResolvedValue('v0.16.4')
+      mockedCountCommitsAhead.mockImplementation(async (_repo, tag) => {
+        if (tag === 'v0.16.4') return 38
+        if (tag === 'merge-base-sha') return 7
+        return undefined
+      })
+      mockedIsAncestorOf.mockResolvedValue(true)
+      mockedFindMergeBase.mockResolvedValue('merge-base-sha')
+
+      const result = await resolveLocalVersion('/repo', 'abc1234', undefined, {
+        name: 'v0.17.1',
+        sha: 'sha-of-v0.17.1',
+      })
+      expect(result).toEqual({ commit: 'abc1234', baseTag: 'v0.17.1', commitsAhead: 7 })
+      expect(mockedFindLatestVersionTag).not.toHaveBeenCalled()
+    })
+
+    it('uses SHA for isAncestorOf and findMergeBase checks', async () => {
+      mockedFindNearestTag.mockResolvedValue('v0.16.4')
+      mockedCountCommitsAhead.mockResolvedValue(38)
+      mockedIsAncestorOf.mockResolvedValue(true)
+      mockedFindMergeBase.mockResolvedValue('merge-base-sha')
+
+      await resolveLocalVersion('/repo', 'abc1234', undefined, {
+        name: 'v0.17.1',
+        sha: 'sha-of-v0.17.1',
+      })
+      expect(mockedIsAncestorOf).toHaveBeenCalledWith('/repo', 'v0.16.4', 'sha-of-v0.17.1')
+      expect(mockedFindMergeBase).toHaveBeenCalledWith('/repo', 'sha-of-v0.17.1', 'abc1234')
+    })
+
+    it('falls back to ancestor tag when override ancestry check fails', async () => {
+      mockedFindNearestTag.mockResolvedValue('v0.16.4')
+      mockedCountCommitsAhead.mockResolvedValue(38)
+      mockedIsAncestorOf.mockResolvedValue(false)
+
+      const result = await resolveLocalVersion('/repo', 'abc1234', undefined, {
+        name: 'v0.17.1',
+        sha: 'sha-of-v0.17.1',
+      })
+      expect(result).toEqual({ commit: 'abc1234', baseTag: 'v0.16.4', commitsAhead: 38 })
     })
   })
 })

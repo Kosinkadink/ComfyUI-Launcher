@@ -1,5 +1,13 @@
-import { findNearestTag, findLatestVersionTag, countCommitsAhead, isAncestorOf } from './git'
+import { findNearestTag, findLatestVersionTag, countCommitsAhead, isAncestorOf, findMergeBase } from './git'
 import type { ComfyVersion } from './version'
+
+/** Pre-resolved latest tag info, shared across repos with the same origin. */
+export interface LatestTagOverride {
+  /** Tag name, e.g. "v0.17.1". */
+  name: string
+  /** Full commit SHA the tag points to. */
+  sha: string
+}
 
 /**
  * In-memory cache for resolved versions, keyed by "repoPath\0commitSha".
@@ -31,11 +39,20 @@ async function getCachedLatestTag(repoPath: string): Promise<string | undefined>
  * Results are cached by (repoPath, commit) so repeated calls (e.g. for
  * multiple snapshots sharing the same commit) only spawn git once.
  *
- * @param comfyuiDir  Path to the ComfyUI git working tree.
- * @param commit      The commit SHA to resolve.
- * @param fallbackTag Optional tag to use when no git tags exist (e.g. manifest comfyui_ref).
+ * @param comfyuiDir         Path to the ComfyUI git working tree.
+ * @param commit             The commit SHA to resolve.
+ * @param fallbackTag        Optional tag to use when no git tags exist (e.g. manifest comfyui_ref).
+ * @param latestTagOverride  Pre-resolved latest tag info from a sibling repo
+ *                           that shares the same origin.  When provided, skips
+ *                           findLatestVersionTag and uses the SHA directly
+ *                           (works even if the tag ref doesn't exist locally).
  */
-export async function resolveLocalVersion(comfyuiDir: string, commit: string, fallbackTag?: string): Promise<ComfyVersion> {
+export async function resolveLocalVersion(
+  comfyuiDir: string,
+  commit: string,
+  fallbackTag?: string,
+  latestTagOverride?: LatestTagOverride,
+): Promise<ComfyVersion> {
   const cacheKey = `${comfyuiDir}\0${commit}`
   const cached = _cache.get(cacheKey)
   if (cached) {
@@ -47,10 +64,13 @@ export async function resolveLocalVersion(comfyuiDir: string, commit: string, fa
     return cached
   }
 
-  const [ancestorTag, latestTag] = await Promise.all([
-    findNearestTag(comfyuiDir, commit),
-    getCachedLatestTag(comfyuiDir),
-  ])
+  // When an override is provided, use its SHA for git operations (works
+  // in any clone of the same repo, even without the tag ref locally).
+  // Otherwise fall back to the per-repo tag lookup.
+  const latestTagName = latestTagOverride?.name ?? await getCachedLatestTag(comfyuiDir)
+  const latestTagRef = latestTagOverride?.sha ?? latestTagName
+
+  const ancestorTag = await findNearestTag(comfyuiDir, commit)
   const ancestorDist = ancestorTag ? await countCommitsAhead(comfyuiDir, ancestorTag, commit) : undefined
 
   // Use the global latest tag only when the commit is ahead of the ancestor
@@ -59,20 +79,28 @@ export async function resolveLocalVersion(comfyuiDir: string, commit: string, fa
   // release branched from a point the commit has already passed — i.e. the
   // backport's commits are accounted for by the commit's position in history.
   let useLatest = false
-  if (latestTag && latestTag !== ancestorTag && ancestorDist !== undefined && ancestorDist > 0) {
-    useLatest = ancestorTag ? await isAncestorOf(comfyuiDir, ancestorTag, latestTag) : false
+  if (latestTagName && latestTagName !== ancestorTag && ancestorDist !== undefined && ancestorDist > 0) {
+    useLatest = ancestorTag ? await isAncestorOf(comfyuiDir, ancestorTag, latestTagRef!) : false
   }
 
   let baseTag: string | undefined
   let commitsAhead: number | undefined
   if (useLatest) {
-    const latestDist = await countCommitsAhead(comfyuiDir, latestTag!, commit)
+    // Find the merge-base (branch point) of the latest tag and the commit.
+    // When the tag is on a release branch, this gives the point where the
+    // branch diverged from master — counting from there gives the meaningful
+    // "+N" relative to the content included in the backport release.
+    // When the tag is a direct ancestor (same branch), merge-base = tag
+    // commit, so the count is the same as a direct rev-list.
+    const mergeBase = await findMergeBase(comfyuiDir, latestTagRef!, commit)
+    const latestDist = mergeBase
+      ? await countCommitsAhead(comfyuiDir, mergeBase, commit)
+      : undefined
     if (latestDist !== undefined) {
-      // Successfully counted relative to the latest tag.
-      baseTag = latestTag
+      baseTag = latestTagName
       commitsAhead = latestDist
     } else {
-      // Could not count relative to latestTag — fall back to ancestorTag
+      // Could not determine merge-base or count — fall back to ancestorTag
       // so the tag and count stay consistent.
       baseTag = ancestorTag
       commitsAhead = ancestorDist

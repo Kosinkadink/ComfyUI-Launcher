@@ -170,6 +170,63 @@ export function isAncestorOf(repoPath: string, ancestor: string, descendant: str
   })
 }
 
+/**
+ * Find the merge-base (common ancestor) of two refs.  Runs `git merge-base`
+ * (local, no network).  Returns the SHA on success, undefined on error
+ * (e.g. if either ref is missing from the object store).
+ */
+export function findMergeBase(repoPath: string, ref1: string, ref2: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile('git', ['merge-base', ref1, ref2], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 1000,
+    }, (error, stdout) => {
+      if (error) { resolve(undefined); return }
+      const sha = stdout.trim()
+      resolve(sha || undefined)
+    })
+  })
+}
+
+/**
+ * Resolve a ref (tag name, branch, etc.) to its full SHA.  Runs `git rev-parse`
+ * asynchronously (local operation, no network).  Returns the SHA on success,
+ * undefined on error.
+ */
+export function revParseRef(repoPath: string, ref: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile('git', ['rev-parse', ref], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 1000,
+    }, (error, stdout) => {
+      if (error) { resolve(undefined); return }
+      const sha = stdout.trim()
+      resolve(sha || undefined)
+    })
+  })
+}
+
+/**
+ * Fetch all tags from the remote.  Runs `git fetch origin --tags`
+ * asynchronously (network operation).  Returns true if exit code is 0,
+ * false otherwise.
+ */
+export function fetchTags(repoPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile('git', ['fetch', 'origin', '--tags'], {
+      cwd: repoPath,
+      windowsHide: true,
+      timeout: 15000,
+    }, (error) => {
+      resolve(!error)
+    })
+  })
+}
+
 /** Check whether a path has a .git directory or file (worktree/submodule). */
 export function hasGitDir(nodePath: string): boolean {
   return resolveGitDir(nodePath) !== null
@@ -311,8 +368,8 @@ export function gitFetchAndCheckout(
   // tags. Use --unshallow to handle shallow clones; fall back to a
   // regular fetch if the repo is already complete.
   const refspec = '+refs/heads/master:refs/remotes/origin/master'
-  return runGit(['fetch', '--unshallow', 'origin', refspec]).then((result) => {
-    if (result.exitCode !== 0) return runGit(['fetch', 'origin', refspec])
+  return runGit(['fetch', '--unshallow', '--tags', 'origin', refspec]).then((result) => {
+    if (result.exitCode !== 0) return runGit(['fetch', '--tags', 'origin', refspec])
     return result
   }).then((result) => {
     if (result.exitCode !== 0) return result
