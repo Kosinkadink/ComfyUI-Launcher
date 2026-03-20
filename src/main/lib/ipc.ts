@@ -26,6 +26,7 @@ import { detectDesktopInstall, stageDesktopSnapshot } from './desktopDetect'
 import { performDesktopMigration } from './desktopMigration'
 import { performLocalMigration, stageLocalSnapshot } from './localMigration'
 import { getDiskSpace, getDirectorySize, validateInstallPath } from './disk'
+import { syncOemSeed } from './oem'
 import type { GpuInfo } from './gpu'
 import { formatTime } from './util'
 import { getActiveDownloads } from './comfyDownloadManager'
@@ -47,6 +48,14 @@ const MARKER_FILE = '.comfyui-desktop-2'
 const COMFYUI_REPO = 'Comfy-Org/ComfyUI'
 const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000
 const IGNORE_FILES = new Set([MARKER_FILE, '.DS_Store', 'Thumbs.db', 'desktop.ini'])
+
+async function syncOemSeedBestEffort(): Promise<void> {
+  try {
+    await syncOemSeed()
+  } catch (err) {
+    console.warn('OEM sync failed:', err)
+  }
+}
 
 
 function isEffectivelyEmptyInstallDir(dirPath: string): boolean {
@@ -624,6 +633,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     }
     const entry = await installations.add({ ...data, seen: false })
     ensureDefaultPrimary(entry)
+    await syncOemSeedBestEffort()
     return { ok: true, entry }
   })
 
@@ -659,6 +669,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     }
     const entry = await installations.add({ ...data, status: 'installed', seen: false })
     ensureDefaultPrimary(entry)
+    await syncOemSeedBestEffort()
     return { ok: true, entry }
   })
 
@@ -811,6 +822,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       }
       _operationAborts.delete(installationId)
       await installations.update(installationId, { status: 'installed' })
+      await syncOemSeedBestEffort()
       return { ok: true }
     }
 

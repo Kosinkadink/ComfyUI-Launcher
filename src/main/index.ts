@@ -9,6 +9,7 @@ import { getAppVersion } from './lib/ipc'
 import * as updater from './lib/updater'
 import * as settings from './settings'
 import * as i18n from './lib/i18n'
+import { syncOemSeed } from './lib/oem'
 import { configDir, migrateXdgPaths } from './lib/paths'
 import { waitForPort } from './lib/process'
 import { isQuitInProgress, setQuitReason } from './lib/quit-state'
@@ -585,12 +586,17 @@ if (app.isPackaged && !app.requestSingleInstanceLock()) {
     })
   }
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     migrateXdgPaths()
     registerProcessErrorHandlers()
 
     const locale = (settings.get('language') as string | undefined) || app.getLocale().split('-')[0]
     i18n.init(locale)
+    try {
+      await syncOemSeed()
+    } catch (err) {
+      console.warn('OEM sync failed:', err)
+    }
     registerDownloadIpc()
     cleanupTempDownloads()
     ipc.register({ onLaunch, onStop, onComfyExited, onComfyRestarted, onLocaleChanged: updateTrayMenu })
