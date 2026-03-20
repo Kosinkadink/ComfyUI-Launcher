@@ -193,7 +193,10 @@ function load(): Settings {
     }
   }
 
-  // Ensure modelsDirs is a valid array; inject system default only as a fallback
+  // Ensure modelsDirs is a valid array of non-empty strings; inject system default only as a fallback
+  if (Array.isArray(result.modelsDirs)) {
+    result.modelsDirs = result.modelsDirs.filter((d): d is string => typeof d === 'string' && d.trim() !== '')
+  }
   if (!Array.isArray(result.modelsDirs) || result.modelsDirs.length === 0) {
     result.modelsDirs = [systemDefault]
     changed = true
