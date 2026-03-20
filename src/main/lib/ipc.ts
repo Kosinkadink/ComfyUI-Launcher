@@ -723,7 +723,6 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     }
     const entry = await installations.add({ ...data, seen: false })
     ensureDefaultPrimary(entry)
-    await syncOemSeedBestEffort()
     return { ok: true, entry }
   })
 
