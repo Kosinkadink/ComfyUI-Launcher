@@ -1431,7 +1431,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         {
           title: i18n.t('models.directories'),
           fields: [
-            { id: 'modelsDirs', label: i18n.t('models.directoriesDesc'), type: 'pathList', value: s.modelsDirs || [], tooltip: i18n.t('tooltips.sharedDirs') },
+            { id: 'modelsDirs', label: i18n.t('models.directoriesDesc'), type: 'pathList', value: s.modelsDirs || [], tooltip: i18n.t('tooltips.sharedModelsDirs') },
           ],
         },
       ],
@@ -1445,8 +1445,8 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       {
         title: i18n.t('media.sharedDirs'),
         fields: [
-          { id: 'inputDir', label: i18n.t('media.inputDir'), type: 'path' as const, value: s.inputDir || settings.defaults.inputDir, openable: true },
-          { id: 'outputDir', label: i18n.t('media.outputDir'), type: 'path' as const, value: s.outputDir || settings.defaults.outputDir, openable: true },
+          { id: 'inputDir', label: i18n.t('media.inputDir'), type: 'path' as const, value: s.inputDir || settings.defaults.inputDir, openable: true, tooltip: i18n.t('tooltips.inputDir') },
+          { id: 'outputDir', label: i18n.t('media.outputDir'), type: 'path' as const, value: s.outputDir || settings.defaults.outputDir, openable: true, tooltip: i18n.t('tooltips.outputDir') },
         ],
       },
     ]

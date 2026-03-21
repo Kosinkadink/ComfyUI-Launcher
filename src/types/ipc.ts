@@ -251,6 +251,7 @@ export interface ModelsField {
   label: string
   type: 'pathList'
   value: string[]
+  tooltip?: string
 }
 
 // --- Probe types ---
