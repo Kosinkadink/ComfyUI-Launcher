@@ -124,7 +124,10 @@ describe('settings path sanitization', () => {
     fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
     const customModelsDir = path.join(tmpRoot, 'custom-models')
     const expectedModelsDirs = shouldRewriteCopiedDefaults
-      ? [customModelsDir]
+      ? [
+          customModelsDir,
+          path.join(homePath, 'ComfyUI-Shared', 'models'),
+        ]
       : [
           path.join(adminHomePath, 'ComfyUI-Shared', 'models'),
           customModelsDir,

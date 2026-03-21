@@ -135,10 +135,11 @@ function sanitizeModelsDirs(value: unknown, currentDefault: string): string[] {
     result.push(candidate)
   }
 
-  // Only inject the system default when the list would otherwise be empty.
-  // The user's chosen ordering (and primary path) is preserved.
-  if (result.length === 0) {
-    result.push(path.resolve(currentDefault))
+  // Ensure the system default is present, but preserve user ordering.
+  // Append (don't prepend) so the user's chosen primary path stays at [0].
+  const resolvedDefault = path.resolve(currentDefault)
+  if (!seen.has(resolvedDefault)) {
+    result.push(resolvedDefault)
   }
 
   return result
