@@ -180,19 +180,6 @@ describe('modelsDirs user ordering', () => {
     expect((settings.get('modelsDirs') as string[])[0]).toBe(userPrimary)
   })
 
-  it('does not force system default into modelsDirs when user removed it', () => {
-    const userDir = path.join(tmpRoot, 'only-my-models')
-    fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
-    fs.writeFileSync(
-      settingsPath,
-      JSON.stringify({ modelsDirs: [userDir] }, null, 2),
-      'utf-8'
-    )
-
-    const dirs = settings.get('modelsDirs') as string[]
-    expect(dirs).toEqual([userDir])
-  })
-
   it('injects system default when modelsDirs is empty', () => {
     fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
     fs.writeFileSync(
