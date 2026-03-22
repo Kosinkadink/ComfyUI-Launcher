@@ -239,12 +239,28 @@ function createMainWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
     },
   })
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show()
-    if (process.platform === 'win32') mainWindow?.moveTop()
-    mainWindow?.focus()
+  let shown = false
+  function showMainWindowOnce(): void {
+    if (shown || !mainWindow || mainWindow.isDestroyed()) return
+    shown = true
+    mainWindow.show()
+    if (process.platform === 'win32') mainWindow.moveTop()
+    mainWindow.focus()
     createTray()
-  })
+  }
+
+  mainWindow.once('ready-to-show', showMainWindowOnce)
+
+  // Fallback: if ready-to-show never fires (e.g. renderer fails to load in dev),
+  // force-show after a timeout so the window isn't invisible forever.
+  const SHOW_TIMEOUT_MS = 10_000
+  const showFallbackTimer = setTimeout(() => {
+    if (!shown) {
+      console.warn('[main] ready-to-show did not fire within timeout — forcing window visible')
+      showMainWindowOnce()
+    }
+  }, SHOW_TIMEOUT_MS)
+  mainWindow.once('ready-to-show', () => clearTimeout(showFallbackTimer))
 
   attachContextMenu(mainWindow)
   mainWindow.setMenuBarVisibility(false)
@@ -253,6 +269,25 @@ function createMainWindow(): void {
       mainWindow.webContents.setZoomLevel(0)
     }
   })
+
+  // Retry on load failure (mirrors comfy window behaviour)
+  let mainRetryTimer: ReturnType<typeof setTimeout> | null = null
+  mainWindow.webContents.on('did-fail-load', (_e, code, description, failUrl, isMainFrame) => {
+    if (!isMainFrame || code === -3 || mainRetryTimer) return
+    console.error(`[main] did-fail-load: code=${code} desc="${description}" url=${failUrl}`)
+    showMainWindowOnce()
+    mainRetryTimer = setTimeout(() => {
+      mainRetryTimer = null
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (process.env['ELECTRON_RENDERER_URL']) {
+          mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+        } else {
+          mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+        }
+      }
+    }, 2000)
+  })
+
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     forwardDatadogError({
       source: 'main-render-process-gone',
