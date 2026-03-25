@@ -13,7 +13,7 @@ export type { MigrationTools }
 export async function performDesktopMigration(
   actionData: Record<string, unknown> | undefined,
   tools: MigrationTools,
-  sourceInstallation?: { id: string; name: string },
+  sourceInstallation?: Pick<InstallationRecord, 'id' | 'name'>,
 ): Promise<{ entry: InstallationRecord; destPath: string }> {
   const { sendProgress } = tools
 

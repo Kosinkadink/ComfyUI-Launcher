@@ -699,12 +699,13 @@ export function register(callbacks: RegisterCallbacks = {}): void {
   ipcMain.handle('get-installations', async () => {
     const allInstalls = await installations.list()
 
-    // Hide source installs that have been migrated to standalone, as long as
+    // Hide legacy desktop installs that have been migrated to standalone, as long as
     // at least one child install (with copiedFrom pointing to them) still exists.
+    const desktopIds = new Set(allInstalls.filter((i) => i.sourceId === 'desktop').map((i) => i.id))
     const migratedSourceIds = new Set(
       allInstalls
-        .filter((i) => (i.copyReason as string | undefined) === 'standalone-migration' && i.status !== 'installing')
-        .map((i) => i.copiedFrom as string)
+        .filter((i) => i.copyReason === 'standalone-migration' && i.status !== 'installing' && i.copiedFrom && desktopIds.has(i.copiedFrom))
+        .map((i) => i.copiedFrom!)
         .filter(Boolean)
     )
     const list = allInstalls.filter((i) => i.status !== 'installing' && !migratedSourceIds.has(i.id))
@@ -1833,6 +1834,9 @@ export function register(callbacks: RegisterCallbacks = {}): void {
           : await performLocalMigration(inst, actionData, migrationTools)
         entry = result.entry
         destPath = result.destPath
+
+        // Place the new install at the same position as the source install
+        await installations.moveTo(entry.id, inst.id)
 
         _operationAborts.delete(installationId)
         sendProgress('done', { percent: 100, status: 'Complete' })

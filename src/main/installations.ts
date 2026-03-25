@@ -12,6 +12,10 @@ export interface InstallationRecord {
   status?: string
   seen?: boolean
   comfyVersion?: ComfyVersion
+  copiedFrom?: string
+  copiedFromName?: string
+  copiedAt?: string
+  copyReason?: string
   [key: string]: unknown
 }
 
@@ -102,6 +106,19 @@ export async function reorder(orderedIds: string[]): Promise<void> {
       if (!orderedIds.includes(inst.id)) reordered.push(inst)
     }
     await save(reordered)
+  })
+}
+
+export async function moveTo(id: string, targetId: string): Promise<void> {
+  return enqueue(async () => {
+    const installations = await load()
+    const fromIndex = installations.findIndex((i) => i.id === id)
+    if (fromIndex === -1) return
+    const [entry] = installations.splice(fromIndex, 1)
+    const toIndex = installations.findIndex((i) => i.id === targetId)
+    if (toIndex === -1) { installations.splice(fromIndex, 0, entry!); return }
+    installations.splice(toIndex, 0, entry!)
+    await save(installations)
   })
 }
 
