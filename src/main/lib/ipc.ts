@@ -317,6 +317,11 @@ function _broadcastToRenderer(channel: string, data: Record<string, unknown>): v
 async function _fetchAndResolveLatestTags(
   installs: Array<{ comfyuiDir: string }>
 ): Promise<Map<string, LatestTagOverride>> {
+  // Ensure remotes point to the correct host (github.com vs gitcode.com)
+  // BEFORE grouping, so the origin keys are stable.
+  const mirrorEnabled = settings.get('useChineseGitMirror') === true
+  await Promise.all(installs.map(({ comfyuiDir }) => ensureRemoteUrl(comfyuiDir, mirrorEnabled)))
+
   // Group by remote origin URL
   const originGroups = new Map<string, string[]>()
   for (const { comfyuiDir } of installs) {
@@ -331,8 +336,6 @@ async function _fetchAndResolveLatestTags(
   await Promise.all([...originGroups.entries()].map(async ([origin, dirs]) => {
     // Fetch tags into ALL repos in the group so every repo has the
     // commit objects needed for SHA-based merge-base / ancestry checks.
-    const mirrorEnabled = settings.get('useChineseGitMirror') === true
-    await Promise.all(dirs.map((d) => ensureRemoteUrl(d, mirrorEnabled)))
     await Promise.all(dirs.map((d) => fetchTags(d)))
     const representative = dirs[0]!
     const tagName = await findLatestVersionTag(representative)
