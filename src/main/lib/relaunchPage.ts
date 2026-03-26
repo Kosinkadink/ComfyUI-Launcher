@@ -8,31 +8,22 @@ export async function showModelFolderRelaunchPage(win: BrowserWindow): Promise<v
 <html><head><meta charset="utf-8"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#171717;color:#d4d4d4;font-family:system-ui,-apple-system,sans-serif;
-display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;contain:strict}
-svg{width:min(200px,50vw);height:auto;transform:translateZ(0)}
-.wave-group{animation:splash-rise 4s ease-in-out infinite alternate;will-change:transform;transform:translateZ(0)}
-.wave-path{animation:splash-wave 1.2s linear infinite;will-change:transform;transform:translateZ(0)}
-@keyframes splash-rise{from{transform:translateY(280px)}to{transform:translateY(-80px)}}
-@keyframes splash-wave{from{transform:translateX(0)}to{transform:translateX(-880px)}}
-p{margin-top:24px;font-size:14px;opacity:0.7}
+display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}
+svg{width:min(420px,70vw);height:auto;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+p{margin-top:32px;font-size:15px;opacity:0.7}
+.dots::after{content:'';animation:dots 1.5s steps(4,end) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
 </style></head><body>
 <svg viewBox="0 0 879 284" fill="none" xmlns="http://www.w3.org/2000/svg">
-<defs><mask id="comfy-mask-splash"><path d="${COMFY_LOGO_PATH}" fill="white"/></mask></defs>
-<path d="${COMFY_LOGO_PATH}" stroke="currentColor" stroke-width="2" fill="none" opacity="0.4"/>
-<g mask="url(#comfy-mask-splash)"><g class="wave-group"><path class="wave-path" d="M 0 50 Q 110 0 220 50 T 440 50 T 660 50 T 880 50 T 1100 50 T 1320 50 T 1540 50 T 1760 50 V 400 H 0 Z" fill="currentColor"/></g></g>
+<path d="${COMFY_LOGO_PATH}" fill="currentColor"/>
 </svg>
-<p>Restarting \u2014 configuring new model folders\u2026</p>
+<p>Restarting<span class="dots"></span></p>
 </body></html>`
-  // Block page-initiated navigations (e.g. ComfyUI frontend reconnect logic
-  // calling location.reload()) so they can't cancel our loadURL.
-  const blockNav = (e: Electron.Event) => e.preventDefault()
-  win.webContents.on('will-navigate', blockNav)
+  // The caller (onModelFolderRelaunch) attaches a persistent will-navigate
+  // blocker before calling us, so we just need to stop + load the data URL.
   win.webContents.stop()
-  try {
-    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-  } finally {
-    win.webContents.off('will-navigate', blockNav)
-  }
+  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
   // Give the renderer a frame to paint before the caller kills ComfyUI
   await new Promise((r) => setTimeout(r, 100))
 }

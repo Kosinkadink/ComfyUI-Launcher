@@ -2339,6 +2339,7 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       // Check if custom nodes created new model folders during startup.
       // If so, sync them to the shared root, rewrite the YAML, and relaunch
       // so ComfyUI picks them up in this session (not the next one).
+      let site1Relaunched = false
       if (useSharedPaths) {
         const { newFolders } = syncCustomModelFolders(inst.installPath, sharedModelsDirs, preLaunchExtras)
         if (newFolders.length > 0) {
@@ -2360,12 +2361,17 @@ export function register(callbacks: RegisterCallbacks = {}): void {
               sendProgress('launch', { percent: -1, status: i18n.t('launch.waitingTime', { secs }) })
             },
           })
+          site1Relaunched = true
         }
       }
 
       // Mutable set of known extra folders — used to detect truly new folders
       // across reboot cycles without blocking subsequent checks.
-      const knownExtras = new Set(preLaunchExtras)
+      // After a site-1 relaunch, re-discover so we don't detect the same folders
+      // again in the post-reboot check and trigger a redundant second relaunch.
+      const knownExtras = new Set(
+        site1Relaunched ? discoverExtraModelFolders(inst.installPath) : preLaunchExtras,
+      )
       // Set when we intentionally kill ComfyUI for a model-folder relaunch so
       // the exit handler knows to respawn instead of reporting a crash.
       let pendingModelFolderRelaunch = false
