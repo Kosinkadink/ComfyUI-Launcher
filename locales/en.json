@@ -536,6 +536,7 @@
     "copyAndUpdateTitle": "Copy & Update",
     "copyAndUpdateMessage": "Create a copy of this install and update the copy from {installed} to {latest}.\nThe original install will not be modified.\n\nEnter a name for the copy:",
     "copyAndUpdateConfirm": "Copy & Update",
+    "releaseNotesLabel": "Release Notes",
     "copyUpdatingTitle": "Copy & Update to {version}",
     "releaseUpdate": "Release Update",
     "releaseUpdateSelectRelease": "Select Release",

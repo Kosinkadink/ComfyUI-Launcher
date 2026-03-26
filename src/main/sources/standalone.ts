@@ -526,6 +526,7 @@ export const standalone: SourcePlugin = {
             confirmLabel: t('standalone.copyAndUpdateConfirm'),
             required: true,
             field: 'name',
+            messageDetails: notes ? [{ label: t('standalone.releaseNotesLabel'), items: [notes] }] : undefined,
           },
         })
       } else if (card.value !== channel && hasGit) {

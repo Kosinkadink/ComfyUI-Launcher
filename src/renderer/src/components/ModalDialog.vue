@@ -46,13 +46,15 @@ function escapeHtml(text: string): string {
 
 const URL_RE = /https?:\/\/[^\s<>"']+/g
 
-const linkifiedMessage = computed(() => {
-  if (!state.message) return ''
-  const escaped = escapeHtml(state.message)
+function linkify(text: string): string {
+  if (!text) return ''
+  const escaped = escapeHtml(text)
   return escaped.replace(URL_RE, (url) => {
     return `<a href="#" class="modal-link" data-url="${escapeHtml(url)}">${escapeHtml(url)}</a>`
   })
-})
+}
+
+const linkifiedMessage = computed(() => linkify(state.message))
 
 function handleMessageClick(event: MouseEvent): void {
   const target = event.target as HTMLElement
@@ -299,7 +301,7 @@ onUnmounted(() => {
             <div v-for="(group, gi) in state.messageDetails" :key="gi" class="modal-detail-group">
               <span class="modal-detail-label">{{ group.label }}</span>
               <ul class="modal-detail-list">
-                <li v-for="(item, ii) in group.items" :key="ii">{{ item }}</li>
+                <li v-for="(item, ii) in group.items" :key="ii" @click="handleMessageClick" v-html="linkify(item)"></li>
               </ul>
             </div>
           </div>
@@ -341,9 +343,19 @@ onUnmounted(() => {
       </div>
 
       <!-- Prompt -->
-      <div v-else-if="state.type === 'prompt'" class="modal-box">
+      <div v-else-if="state.type === 'prompt'" class="modal-box" :class="{ 'modal-box-wide': state.messageDetails.length > 0 }">
         <div class="modal-title">{{ state.title }}</div>
-        <div class="modal-message">{{ state.message }}</div>
+        <div class="modal-body">
+          <div class="modal-message">{{ state.message }}</div>
+          <div v-if="state.messageDetails.length" class="modal-details">
+            <div v-for="(group, gi) in state.messageDetails" :key="gi" class="modal-detail-group">
+              <span class="modal-detail-label">{{ group.label }}</span>
+              <ul class="modal-detail-list">
+                <li v-for="(item, ii) in group.items" :key="ii" @click="handleMessageClick" v-html="linkify(item)"></li>
+              </ul>
+            </div>
+          </div>
+        </div>
         <div class="modal-input-wrap">
           <input
             ref="inputRef"

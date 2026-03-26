@@ -402,6 +402,7 @@
     "copyAndUpdateTitle": "复制并更新",
     "copyAndUpdateMessage": "创建此安装的副本，并将副本从 {installed} 更新到 {latest}。\n原始安装不会被修改。\n\n输入副本名称：",
     "copyAndUpdateConfirm": "复制并更新",
+    "releaseNotesLabel": "发行说明",
     "copyUpdatingTitle": "复制并更新到 {version}",
     "releaseUpdate": "版本更新",
     "releaseUpdateSelectRelease": "选择版本",

@@ -172,6 +172,12 @@ export interface PromptDef {
   confirmLabel?: string
   field: string
   required?: boolean | string
+  messageDetails?: ModalDetailGroup[]
+}
+
+export interface ModalDetailGroup {
+  label: string
+  items: string[]
 }
 
 // --- List actions ---
