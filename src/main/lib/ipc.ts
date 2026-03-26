@@ -2158,8 +2158,10 @@ export function register(callbacks: RegisterCallbacks = {}): void {
         const sendOutput = (text: string): void => {
           if (!sender.isDestroyed()) sender.send('comfy-output', { installationId, text })
         }
+        const userEnvVars = (inst.envVars as Record<string, string> | undefined) ?? {}
         const launchEnv: Record<string, string | undefined> = {
           ...process.env,
+          ...userEnvVars,
           PYTHONIOENCODING: 'utf-8',
           ...(inst.sourceId === 'standalone' ? { CM_USE_PYGIT2: '1' } : {}),
         }
@@ -2276,8 +2278,10 @@ export function register(callbacks: RegisterCallbacks = {}): void {
       _broadcastToRenderer('instance-launching', { installationId, installationName: inst.name })
 
       const sessionPath = createSessionPath()
+      const userEnvVars = (inst.envVars as Record<string, string> | undefined) ?? {}
       const launchEnv: Record<string, string | undefined> = {
         ...process.env,
+        ...userEnvVars,
         PYTHONIOENCODING: 'utf-8',
         __COMFY_CLI_SESSION__: sessionPath,
         ...(inst.sourceId === 'standalone' ? { CM_USE_PYGIT2: '1' } : {}),

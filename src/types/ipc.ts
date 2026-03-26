@@ -106,9 +106,9 @@ export interface ComfyArgDef {
 export interface DetailField {
   id: string
   label: string
-  value: string | boolean | number | null
+  value: string | boolean | number | Record<string, string> | null
   editable?: boolean
-  editType?: 'select' | 'boolean' | 'text' | 'path' | 'channel-cards' | 'args-builder'
+  editType?: 'select' | 'boolean' | 'text' | 'path' | 'channel-cards' | 'args-builder' | 'env-vars'
   options?: DetailFieldOption[]
   refreshSection?: boolean
   onChangeAction?: string
