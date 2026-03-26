@@ -118,7 +118,8 @@
     "tabUpdate": "Update",
     "tabSnapshots": "Snapshots",
     "tabSettings": "Settings",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "envVars": "Environment Variables"
   },
 
   "list": {
@@ -749,7 +750,17 @@
     "customNodes": "Third-party extensions that add new node types and functionality to ComfyUI.",
     "pipPackages": "Python packages installed in the environment. Custom nodes often install their own pip dependencies.",
     "updateNow": "Update this installation in-place.",
-    "copyAndUpdate": "Create a copy of this installation and update the copy. The original will not be modified."
+    "copyAndUpdate": "Create a copy of this installation and update the copy. The original will not be modified.",
+    "envVars": "Custom environment variables passed to ComfyUI when it starts. Warning: values are stored unencrypted in the configuration file — do not add API keys, tokens, or other sensitive information."
+  },
+
+  "envVars": {
+    "name": "Name",
+    "value": "Value",
+    "add": "Add Variable",
+    "namePlaceholder": "VARIABLE_NAME",
+    "valuePlaceholder": "value",
+    "securityWarning": "Environment variable values are stored unencrypted on disk. Do not add API keys, tokens, passwords, or other secrets."
   },
 
   "contextMenu": {

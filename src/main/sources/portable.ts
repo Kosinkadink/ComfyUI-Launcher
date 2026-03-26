@@ -221,6 +221,7 @@ export const portable: SourcePlugin = {
               { value: 'ask', label: t('common.portConflictAsk') },
               { value: 'auto', label: t('common.portConflictAuto') },
             ] },
+          { id: 'envVars', label: t('common.envVars'), value: (installation.envVars as Record<string, string> | undefined) ?? {}, editable: true, editType: 'env-vars', tooltip: t('tooltips.envVars') },
         ],
       },
       {

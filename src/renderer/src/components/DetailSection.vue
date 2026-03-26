@@ -4,6 +4,7 @@ import type { DetailItem, DetailField, DetailFieldOption, ActionDef } from '../t
 import InfoTooltip from './InfoTooltip.vue'
 import TooltipWrap from './TooltipWrap.vue'
 import ArgsBuilder from './ArgsBuilder.vue'
+import EnvVarsEditor from './EnvVarsEditor.vue'
 
 interface Props {
   title?: string
@@ -70,7 +71,7 @@ async function toggleCollapse(): Promise<void> {
   }
 }
 
-async function handleFieldChange(field: DetailField, value: string | boolean): Promise<void> {
+async function handleFieldChange(field: DetailField, value: string | boolean | Record<string, string>): Promise<void> {
   await window.api.updateInstallation(props.installationId, { [field.id]: value })
   if (field.refreshSection && props.title) {
     emit('refresh', props.title)
@@ -193,6 +194,14 @@ v-for="a in item.actions" :key="a.id"
             <ArgsBuilder
               :model-value="String(f.value ?? '')"
               :installation-id="installationId"
+              @update:model-value="handleFieldChange(f, $event)"
+            />
+          </template>
+          <!-- Env vars editor -->
+          <template v-else-if="f.editable && f.editType === 'env-vars'">
+            <div class="detail-field-label">{{ f.label }}<InfoTooltip v-if="f.tooltip" :text="f.tooltip" /></div>
+            <EnvVarsEditor
+              :model-value="(f.value as Record<string, string>) ?? {}"
               @update:model-value="handleFieldChange(f, $event)"
             />
           </template>
