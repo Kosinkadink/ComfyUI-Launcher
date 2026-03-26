@@ -2391,6 +2391,18 @@ export function register(callbacks: RegisterCallbacks = {}): void {
               if (config) {
                 for (const f of config.extraFolders) knownExtras.add(f)
               }
+              // After a normal (non-model-folder) reboot, reset known extras to
+              // the current state so newly created folders are detected again.
+              // Only skip the reset after a model-folder relaunch to prevent
+              // relaunching twice in a row for the same folders.
+              if (!isModelRelaunch) {
+                knownExtras.clear()
+                const freshExtras = discoverExtraModelFolders(inst.installPath)
+                for (const f of freshExtras) knownExtras.add(f)
+                if (config) {
+                  for (const f of config.extraFolders) knownExtras.add(f)
+                }
+              }
             }
             const spawned = spawnComfy()
             proc = spawned.proc
