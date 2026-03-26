@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, screen, net } from 'electron'
+import { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, screen, net, nativeTheme } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { execFile } from 'child_process'
@@ -24,7 +24,7 @@ import {
 import { getModelDownloadContentScript } from './lib/comfyContentScript'
 import { shouldOpenInPopup } from './lib/allowedPopups'
 import { showModelFolderRelaunchPage } from './lib/relaunchPage'
-import { COMFY_BG } from './lib/theme'
+import { COMFY_BG, SPLASH_DARK, SPLASH_LIGHT, type SplashTheme } from './lib/theme'
 
 todesktop.init({ autoUpdater: false })
 
@@ -401,6 +401,9 @@ const comfyNavBlockers = new Map<string, (e: Electron.Event) => void>()
 // Stores cancel functions for pending did-fail-load retry timers per
 // installation so we can cancel them when a model-folder relaunch starts.
 const comfyFailRetryTimerCancels = new Map<string, () => void>()
+// Stores the detected splash theme per installation so onComfyRestarted
+// can set the correct background color for the transition.
+const comfySplashThemes = new Map<string, SplashTheme>()
 
 async function onModelFolderRelaunch({ installationId }: { installationId: string }): Promise<void> {
   console.log(`[comfy] onModelFolderRelaunch called, hasWindow=${comfyWindows.has(installationId)}`)
@@ -420,7 +423,30 @@ async function onModelFolderRelaunch({ installationId }: { installationId: strin
   if (prev) win.webContents.off('will-navigate', prev)
   comfyNavBlockers.set(installationId, blockNav)
   win.webContents.on('will-navigate', blockNav)
-  await showModelFolderRelaunchPage(win)
+  // Detect the ComfyUI frontend's current theme before replacing the page.
+  // Mirrors the frontend's index.html logic: check CSS --bg-color, fall back to OS preference.
+  let theme: SplashTheme = nativeTheme.shouldUseDarkColors ? SPLASH_DARK : SPLASH_LIGHT
+  try {
+    const bgColor = await win.webContents.executeJavaScript(
+      `getComputedStyle(document.documentElement).getPropertyValue('--bg-color').trim()`,
+    )
+    if (typeof bgColor === 'string' && bgColor) {
+      // Parse brightness: dark backgrounds → dark theme, light backgrounds → light theme
+      const hex = bgColor.replace('#', '')
+      if (hex.length >= 6) {
+        const r = parseInt(hex.slice(0, 2), 16)
+        const g = parseInt(hex.slice(2, 4), 16)
+        const b = parseInt(hex.slice(4, 6), 16)
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        theme = luminance < 0.5
+          ? { bg: bgColor, fg: '#ffffff', isDark: true }
+          : { bg: bgColor, fg: '#000000', isDark: false }
+      }
+    }
+  } catch {}
+  console.log(`[comfy] detected splash theme: bg=${theme.bg} isDark=${theme.isDark}`)
+  comfySplashThemes.set(installationId, theme)
+  await showModelFolderRelaunchPage(win, theme)
 }
 
 function onComfyRestarted({ installationId, process: _proc }: { installationId?: string; process?: ChildProcess } = {}): void {
@@ -439,8 +465,11 @@ function onComfyRestarted({ installationId, process: _proc }: { installationId?:
   const port = parseInt(url.port, 10)
   if (!port) return
 
+  const splashTheme = comfySplashThemes.get(installationId)
+
   const cleanupRelaunchState = (): void => {
     modelFolderRelaunching.delete(installationId)
+    comfySplashThemes.delete(installationId)
     const blockNav = comfyNavBlockers.get(installationId)
     if (blockNav && !win.isDestroyed()) {
       win.webContents.off('will-navigate', blockNav)
@@ -477,9 +506,8 @@ function onComfyRestarted({ installationId, process: _proc }: { installationId?:
       }
       console.log(`[comfy] loading ComfyUI URL: ${currentUrl}`)
       cleanupRelaunchState()
-      // Force the background color so the brief gap between splash unload
-      // and ComfyUI page paint is dark instead of white.
-      win.setBackgroundColor(COMFY_BG)
+      // Match the splash/ComfyUI background color for a seamless transition.
+      win.setBackgroundColor(splashTheme?.bg ?? COMFY_BG)
       await win.loadURL(currentUrl)
     })
     .catch((err) => {
