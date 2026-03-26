@@ -100,7 +100,7 @@ function tokenize(raw: string): string[] {
 
 function parseArgs(raw: string): ParsedArgs {
   const tokens = tokenize(raw)
-  const schemaNames = new Set(schema.value.map((a) => a.name))
+  const schemaMap = new Map(schema.value.map((a) => [a.name, a]))
   const known = new Map<string, string>()
   const extra: string[] = []
 
@@ -113,8 +113,8 @@ function parseArgs(raw: string): ParsedArgs {
       const eqIdx = raw.indexOf('=')
       const name = eqIdx >= 0 ? raw.slice(0, eqIdx) : raw
       const eqValue = eqIdx >= 0 ? raw.slice(eqIdx + 1) : undefined
-      if (schemaNames.has(name)) {
-        const def = schema.value.find((a) => a.name === name)
+      const def = schemaMap.get(name)
+      if (def) {
         if (def?.type === 'boolean') {
           known.set(name, eqValue ?? '')
           i++
