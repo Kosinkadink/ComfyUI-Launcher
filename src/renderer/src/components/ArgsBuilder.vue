@@ -210,7 +210,7 @@ const searchQuery = computed(() => {
     if (prev.startsWith('--') && !prev.includes('=')) {
       const prevName = prev.slice(2)
       const prevDef = schema.value.find((a) => a.name === prevName)
-      if (prevDef && prevDef.type !== 'boolean') return ''
+      if (prevDef && prevDef.type === 'value') return ''
     }
   }
   if (lastToken === '-' || lastToken === '--') return '--' // bare - or -- triggers full list
