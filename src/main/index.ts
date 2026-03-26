@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, screen, net, nativeTheme } from 'electron'
+import { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, screen, net, nativeTheme } from 'electron' // nativeTheme used by _detectComfyTheme
 import path from 'path'
 import fs from 'fs'
 import { execFile } from 'child_process'
@@ -405,6 +405,42 @@ const comfyFailRetryTimerCancels = new Map<string, () => void>()
 // can set the correct background color for the transition.
 const comfySplashThemes = new Map<string, SplashTheme>()
 
+/**
+ * Detect the ComfyUI frontend's current theme from a running comfy window.
+ * Uses the same approach as comfyContentScript.ts readTheme():
+ * checks for .dark-theme class on body, then parses --fg-color luminance
+ * (dark foreground = light theme, light foreground = dark theme).
+ * Falls back to the OS dark/light preference via nativeTheme.
+ *
+ * Currently unused — the frontend's own loading screen is always dark,
+ * so we hardcode SPLASH_DARK. Enable this when the frontend loader
+ * respects light mode to avoid a jarring theme mismatch.
+ */
+async function _detectComfyTheme(win: BrowserWindow): Promise<SplashTheme> {
+  try {
+    const isDark = await win.webContents.executeJavaScript(
+      `(function(){` +
+        `if(document.body.classList.contains('dark-theme'))return true;` +
+        `var fg=getComputedStyle(document.documentElement).getPropertyValue('--fg-color').trim();` +
+        `if(!fg)return true;` +
+        `var d=document.createElement('div');d.style.color=fg;` +
+        `document.body.appendChild(d);` +
+        `var c=getComputedStyle(d).color;` +
+        `document.body.removeChild(d);` +
+        `var m=c.match(/` + '\\d+' + `/g);` +
+        `if(!m||m.length<3)return true;` +
+        `var lum=(+m[0]*299+ +m[1]*587+ +m[2]*114)/1000;` +
+        `return lum>=140;` +
+      `})()`,
+    )
+    return isDark ? SPLASH_DARK : SPLASH_LIGHT
+  } catch {
+    return nativeTheme.shouldUseDarkColors ? SPLASH_DARK : SPLASH_LIGHT
+  }
+}
+// Suppress unused warning — kept for future use
+void _detectComfyTheme
+
 async function onModelFolderRelaunch({ installationId }: { installationId: string }): Promise<void> {
   console.log(`[comfy] onModelFolderRelaunch called, hasWindow=${comfyWindows.has(installationId)}`)
   const win = comfyWindows.get(installationId)
@@ -423,28 +459,11 @@ async function onModelFolderRelaunch({ installationId }: { installationId: strin
   if (prev) win.webContents.off('will-navigate', prev)
   comfyNavBlockers.set(installationId, blockNav)
   win.webContents.on('will-navigate', blockNav)
-  // Detect the ComfyUI frontend's current theme before replacing the page.
-  // Mirrors the frontend's index.html logic: check CSS --bg-color, fall back to OS preference.
-  let theme: SplashTheme = nativeTheme.shouldUseDarkColors ? SPLASH_DARK : SPLASH_LIGHT
-  try {
-    const bgColor = await win.webContents.executeJavaScript(
-      `getComputedStyle(document.documentElement).getPropertyValue('--bg-color').trim()`,
-    )
-    if (typeof bgColor === 'string' && bgColor) {
-      // Parse brightness: dark backgrounds → dark theme, light backgrounds → light theme
-      const hex = bgColor.replace('#', '')
-      if (hex.length >= 6) {
-        const r = parseInt(hex.slice(0, 2), 16)
-        const g = parseInt(hex.slice(2, 4), 16)
-        const b = parseInt(hex.slice(4, 6), 16)
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-        theme = luminance < 0.5
-          ? { bg: bgColor, fg: '#ffffff', isDark: true }
-          : { bg: bgColor, fg: '#000000', isDark: false }
-      }
-    }
-  } catch {}
-  console.log(`[comfy] detected splash theme: bg=${theme.bg} isDark=${theme.isDark}`)
+  // Always use dark splash — the frontend's own loading screen is always dark,
+  // so a light splash would cause a jarring dark flash when ComfyUI loads.
+  // Theme detection is implemented and ready to enable when the frontend's
+  // loader respects light mode (see detectComfyTheme below).
+  const theme: SplashTheme = SPLASH_DARK
   comfySplashThemes.set(installationId, theme)
   await showModelFolderRelaunchPage(win, theme)
 }
