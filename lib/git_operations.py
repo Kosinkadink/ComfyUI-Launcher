@@ -466,7 +466,10 @@ def cmd_ls_remote_tags(url):
     try:
         repo = pygit2.init_repository(tmp, bare=True)
         remote = repo.remotes.create_anonymous(url)
-        heads = remote.ls_remotes()
+        try:
+            heads = remote.list_heads()
+        except AttributeError:
+            heads = remote.ls_remotes()
         for head in heads:
             name = head.get("name", "") if isinstance(head, dict) else getattr(head, "name", "")
             if not name.startswith("refs/tags/"):
@@ -491,7 +494,10 @@ def cmd_ls_remote_ref(url, ref):
     try:
         repo = pygit2.init_repository(tmp, bare=True)
         remote = repo.remotes.create_anonymous(url)
-        heads = remote.ls_remotes()
+        try:
+            heads = remote.list_heads()
+        except AttributeError:
+            heads = remote.ls_remotes()
         for head in heads:
             name = head.get("name", "") if isinstance(head, dict) else getattr(head, "name", "")
             oid = head.get("oid", None) if isinstance(head, dict) else getattr(head, "oid", None)

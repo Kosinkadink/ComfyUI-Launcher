@@ -75,10 +75,11 @@ async function fetchLatestTag(): Promise<string | null> {
           best = { tag: name, version: v }
         }
       }
-      // If ls-remote succeeded with results, use them; otherwise fall through
-      // to the API path (e.g. pygit2-only systems where git is unavailable).
       if (best) return best.tag
     } catch {}
+    // Mirror is on but no results — do NOT fall through to GitHub API
+    // (it would hang/timeout in China).
+    return null
   }
   try {
     const tags = await fetchJSON(
