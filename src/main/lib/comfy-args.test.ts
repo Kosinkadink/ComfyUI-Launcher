@@ -101,6 +101,16 @@ describe('parseHelpOutput', () => {
     expect(byName.get('gpu-only')?.category).toBe('GPU & VRAM')
     expect(byName.get('enable-manager')?.category).toBe('Manager')
   })
+
+  it('handles Windows \\r\\n line endings', () => {
+    const windowsHelp = SAMPLE_HELP.replace(/\n/g, '\r\n')
+    const schema = parseHelpOutput(windowsHelp)
+    expect(schema.args.length).toBeGreaterThan(0)
+    const byName = new Map(schema.args.map((a) => [a.name, a]))
+    expect(byName.get('port')?.type).toBe('value')
+    expect(byName.get('listen')?.type).toBe('optional-value')
+    expect(byName.get('enable-manager')?.type).toBe('boolean')
+  })
 })
 
 describe('validateArgs', () => {

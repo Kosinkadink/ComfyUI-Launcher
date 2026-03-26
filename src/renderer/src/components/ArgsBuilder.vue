@@ -17,7 +17,7 @@ const emit = defineEmits<{
 const expanded = ref(false)
 const schema = ref<ComfyArgDef[]>([])
 const loading = ref(false)
-const loadError = ref(false)
+const loadError = ref<string | null>(null)
 const fetched = ref(false)
 
 // --- Fetch schema (deferred until panel is opened) ---
@@ -26,16 +26,18 @@ async function fetchSchema(): Promise<void> {
   if (fetched.value) return
   fetched.value = true
   loading.value = true
-  loadError.value = false
+  loadError.value = null
   try {
     const result = await window.api.getComfyArgs(props.installationId)
     if (result?.args?.length) {
       schema.value = result.args
+    } else if (result === null || result === undefined) {
+      loadError.value = '[debug] IPC result was null — main process handler may not be registered'
     } else {
-      loadError.value = true
+      loadError.value = result.error || '[debug] Result had empty args and no error field'
     }
-  } catch {
-    loadError.value = true
+  } catch (err) {
+    loadError.value = (err as Error).message || 'Failed to fetch argument definitions'
   } finally {
     loading.value = false
   }
@@ -339,6 +341,7 @@ function toggleGroup(group: string): void {
       <div v-if="loading" class="args-loading">Loading argument definitions…</div>
       <div v-else-if="loadError" class="args-error">
         Could not load argument definitions. You can still edit the text field directly.
+        <div class="args-error-detail">{{ loadError }}</div>
       </div>
       <template v-else>
         <div v-for="[group, args] in groupedArgs" :key="group" class="args-group">
@@ -436,6 +439,7 @@ function toggleGroup(group: string): void {
 }
 .args-field-row .detail-field-input {
   flex: 1;
+  margin-top: 0;
 }
 .args-field-row .detail-field-input.has-unsupported {
   border-color: var(--danger, #e53e3e);
@@ -444,7 +448,8 @@ function toggleGroup(group: string): void {
 .args-configure-btn {
   flex-shrink: 0;
   width: 30px;
-  height: 30px;
+  align-self: stretch;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -454,9 +459,6 @@ function toggleGroup(group: string): void {
   color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
-}
-.args-configure-btn :deep(svg) {
-  stroke: currentColor;
 }
 .args-configure-btn:hover {
   color: var(--text);
@@ -526,6 +528,15 @@ function toggleGroup(group: string): void {
 }
 .args-error {
   color: var(--danger, #e53e3e);
+}
+.args-error-detail {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  word-break: break-all;
+  white-space: pre-wrap;
+  text-align: left;
 }
 
 .args-group {

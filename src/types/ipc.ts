@@ -540,7 +540,7 @@ export interface ElectronApi {
   // Actions
   getListActions(installationId: string): Promise<ListAction[]>
   getDetailSections(installationId: string): Promise<DetailSection[]>
-  getComfyArgs(installationId: string): Promise<{ args: ComfyArgDef[] } | null>
+  getComfyArgs(installationId: string): Promise<{ args: ComfyArgDef[]; error?: string } | null>
   runAction(
     installationId: string,
     actionId: string,

@@ -292,6 +292,8 @@ function parseOptionBlock(flagLine: string, helpText: string): ParsedOption {
  * Parse the full --help output into a structured schema.
  */
 export function parseHelpOutput(helpText: string): ComfyArgsSchema {
+  // Normalize Windows line endings
+  helpText = helpText.replace(/\r\n/g, '\n')
   // Split into usage section and options section
   const usageMatch = helpText.match(/^usage:.*?(?=\n\noptions:|$)/s)
   const usageLine = usageMatch ? usageMatch[0].replace(/\n\s+/g, ' ') : ''
@@ -364,12 +366,16 @@ export async function getComfyArgsSchema(
 function runHelp(pythonPath: string, mainPyPath: string, cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const mainPyRel = path.relative(cwd, mainPyPath)
-    execFile(pythonPath, ['-s', mainPyRel, '--help'], { cwd, timeout: 15000 }, (err, stdout) => {
+    execFile(pythonPath, ['-s', mainPyRel, '--help'], { cwd, timeout: 15000 }, (err, stdout, stderr) => {
       // argparse prints help to stdout and exits with code 0
       if (stdout && stdout.includes('usage:')) {
         resolve(stdout)
+      } else if (stderr && stderr.includes('usage:')) {
+        // Some configurations may print help to stderr
+        resolve(stderr)
       } else if (err) {
-        reject(new Error(`Failed to get ComfyUI --help: ${err.message}`))
+        const detail = stderr ? `\nstderr: ${stderr.slice(0, 500)}` : ''
+        reject(new Error(`Failed to get ComfyUI --help: ${err.message}${detail}`))
       } else {
         reject(new Error('No help output from ComfyUI'))
       }

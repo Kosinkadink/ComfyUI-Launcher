@@ -1035,23 +1035,29 @@ export function register(callbacks: RegisterCallbacks = {}): void {
     return source.getDetailSections(inst)
   })
 
-  ipcMain.handle('get-comfy-args', async (_event, installationId: string): Promise<{ args: ComfyArgDef[] } | null> => {
+  ipcMain.handle('get-comfy-args', async (_event, installationId: string): Promise<{ args: ComfyArgDef[]; error?: string } | null> => {
     const inst = await installations.get(installationId)
-    if (!inst) return null
+    if (!inst) return { args: [], error: 'Installation not found' }
     const source = sourceMap[inst.sourceId]
-    if (!source) return null
+    if (!source) return { args: [], error: `Unknown source: ${inst.sourceId}` }
     const launchCmd = source.getLaunchCommand(inst)
-    if (!launchCmd?.cmd || !launchCmd.args || !launchCmd.cwd) return null
+    if (!launchCmd?.cmd || !launchCmd.args || !launchCmd.cwd) {
+      return { args: [], error: `No launch command available (source: ${inst.sourceId})` }
+    }
     // Extract main.py path from args (after -s flag)
     const sIdx = launchCmd.args.indexOf('-s')
-    if (sIdx === -1 || sIdx + 1 >= launchCmd.args.length) return null
+    if (sIdx === -1 || sIdx + 1 >= launchCmd.args.length) {
+      return { args: [], error: `No -s flag in launch args: [${launchCmd.args.join(', ')}]` }
+    }
     const mainPyRel = launchCmd.args[sIdx + 1]!
     const mainPyAbs = path.resolve(launchCmd.cwd, mainPyRel)
     try {
       const schema = await getComfyArgsSchema(launchCmd.cmd, mainPyAbs, launchCmd.cwd, installationId, inst.version as string | undefined)
       return { args: schema.args }
-    } catch {
-      return null
+    } catch (err) {
+      const msg = (err as Error).message ?? String(err)
+      console.warn('[get-comfy-args] Failed to get schema:', msg)
+      return { args: [], error: msg }
     }
   })
 
