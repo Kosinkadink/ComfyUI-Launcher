@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import type { ComfyArgDef } from '../../../types/ipc'
-import InfoTooltip from './InfoTooltip.vue'
+import ArgRow from './ArgRow.vue'
 import { Settings } from 'lucide-vue-next'
 
 interface Props {
@@ -14,13 +14,19 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
+// Local value for immediate UI feedback (parent updates async via IPC)
+const localValue = ref(props.modelValue)
+watch(() => props.modelValue, (v) => { if (!inputFocused.value) localValue.value = v })
+
+const inputFocused = ref(false)
 const expanded = ref(false)
-const schema = ref<ComfyArgDef[]>([])
+type SearchableArgDef = ComfyArgDef & { _searchFlag: string; _searchHelp: string }
+const schema = ref<SearchableArgDef[]>([])
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const fetched = ref(false)
 
-// --- Fetch schema (deferred until panel is opened) ---
+// --- Fetch schema eagerly (autocomplete + validation work without opening panel) ---
 
 async function fetchSchema(): Promise<void> {
   if (fetched.value) return
@@ -30,7 +36,11 @@ async function fetchSchema(): Promise<void> {
   try {
     const result = await window.api.getComfyArgs(props.installationId)
     if (result?.args?.length) {
-      schema.value = result.args
+      schema.value = result.args.map((a) => ({
+        ...a,
+        _searchFlag: a.flag.toLowerCase(),
+        _searchHelp: a.help.toLowerCase(),
+      }))
     } else if (result === null || result === undefined) {
       loadError.value = '[debug] IPC result was null — main process handler may not be registered'
     } else {
@@ -43,11 +53,10 @@ async function fetchSchema(): Promise<void> {
   }
 }
 
+onMounted(fetchSchema)
+
 function togglePanel(): void {
   expanded.value = !expanded.value
-  if (expanded.value) {
-    fetchSchema()
-  }
 }
 
 // --- Parsing ---
@@ -88,11 +97,19 @@ function parseArgs(raw: string): ParsedArgs {
   while (i < tokens.length) {
     const token = tokens[i]!
     if (token.startsWith('--')) {
-      const name = token.slice(2)
+      const raw = token.slice(2)
+      // Support --flag=value syntax
+      const eqIdx = raw.indexOf('=')
+      const name = eqIdx >= 0 ? raw.slice(0, eqIdx) : raw
+      const eqValue = eqIdx >= 0 ? raw.slice(eqIdx + 1) : undefined
       if (schemaNames.has(name)) {
         const def = schema.value.find((a) => a.name === name)
         if (def?.type === 'boolean') {
-          known.set(name, '')
+          known.set(name, eqValue ?? '')
+          i++
+        } else if (eqValue) {
+          // --flag=value syntax: value is inline (non-empty)
+          known.set(name, eqValue)
           i++
         } else if (def?.type === 'optional-value') {
           const next = tokens[i + 1]
@@ -116,11 +133,17 @@ function parseArgs(raw: string): ParsedArgs {
         }
       } else {
         // Unknown flag — keep in extra
-        extra.push(token)
-        i++
-        if (i < tokens.length && !tokens[i]!.startsWith('--')) {
-          extra.push(tokens[i]!)
+        if (eqValue !== undefined) {
+          extra.push(`--${name}`)
+          extra.push(eqValue)
           i++
+        } else {
+          extra.push(token)
+          i++
+          if (i < tokens.length && !tokens[i]!.startsWith('--')) {
+            extra.push(tokens[i]!)
+            i++
+          }
         }
       }
     } else {
@@ -140,22 +163,31 @@ function serialize(known: Map<string, string>, extra: string[]): string {
       parts.push(value.includes(' ') ? `"${value}"` : value)
     }
   }
-  parts.push(...extra)
+  parts.push(...extra.map((e) => (e.includes(' ') ? `"${e}"` : e)))
   return parts.join(' ')
 }
 
-const parsed = computed(() => parseArgs(props.modelValue))
+const parsed = computed(() => parseArgs(localValue.value))
 
 // --- Unsupported args detection ---
 
 const unsupportedFlags = computed(() => {
   if (!schema.value.length) return []
   const schemaNames = new Set(schema.value.map((a) => a.name))
-  const tokens = tokenize(props.modelValue)
+  const tokens = tokenize(localValue.value)
+  // Exclude the trailing partial token (still being typed) from unsupported check
+  const partial = searchQuery.value
   const unsupported: string[] = []
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]!
     if (token.startsWith('--')) {
-      const name = token.slice(2)
+      const raw = token.slice(2)
+      const eqIdx = raw.indexOf('=')
+      const name = eqIdx >= 0 ? raw.slice(0, eqIdx) : raw
+      // Skip the last token if it matches the current partial search
+      if (partial && i === tokens.length - 1 && name.toLowerCase() === partial) continue
+      // Skip bare '--' (user is about to type a flag name)
+      if (name === '') continue
       if (!schemaNames.has(name)) {
         unsupported.push(name)
       }
@@ -164,11 +196,58 @@ const unsupportedFlags = computed(() => {
   return unsupported
 })
 
+// --- Search / filter ---
+
+/** Extract the partial flag being typed (last token if it starts with --) */
+const searchQuery = computed(() => {
+  const val = localValue.value
+  if (!val) return ''
+  // Find the last token: split on whitespace, take last
+  const lastToken = val.trimEnd() === val
+    ? val.split(/\s+/).pop() || ''
+    : '' // trailing space means no partial token
+  if (lastToken === '--') return '--' // bare -- triggers full list
+  if (lastToken.startsWith('--') && !schema.value.some((a) => a.name === lastToken.slice(2))) {
+    return lastToken.slice(2).toLowerCase()
+  }
+  return ''
+})
+
+const autocompleteMatches = computed(() => {
+  const q = searchQuery.value
+  if (!q || !schema.value.length) return []
+  const filter = q === '--' ? '' : q // bare -- shows all
+  return schema.value
+    .filter((a) => (!filter || a.name.includes(filter)) && !parsed.value.known.has(a.name))
+    .slice(0, 8)
+})
+
+const acIndex = ref(0)
+const acDismissed = ref(false)
+watch(autocompleteMatches, () => { acIndex.value = 0; acDismissed.value = false })
+
+const showAutocomplete = computed(() => autocompleteMatches.value.length > 0 && !acDismissed.value)
+
+// --- Active args (currently in the text) pinned to top ---
+
+const activeArgs = computed(() => {
+  if (!schema.value.length || !parsed.value.known.size) return []
+  return schema.value.filter((a) => parsed.value.known.has(a.name))
+})
+
 // --- Grouped args for the helper panel ---
 
 const groupedArgs = computed(() => {
+  const raw = searchQuery.value
+  const q = raw === '--' ? '' : raw // bare -- doesn't filter the panel
+  const activeNames = new Set(parsed.value.known.keys())
   const groups = new Map<string, ComfyArgDef[]>()
   for (const arg of schema.value) {
+    // Skip active args (they're shown in the pinned section)
+    if (activeNames.has(arg.name)) continue
+    if (q && !arg.name.includes(q) && !arg._searchFlag.includes(q) && !arg._searchHelp.includes(q)) {
+      continue
+    }
     const list = groups.get(arg.category) || []
     list.push(arg)
     groups.set(arg.category, list)
@@ -186,10 +265,46 @@ function getValue(name: string): string {
   return parsed.value.known.get(name) ?? ''
 }
 
+// --- Text input live update ---
+
+function onTextInput(value: string): void {
+  localValue.value = value
+}
+
+function completeArg(name: string): void {
+  const val = localValue.value
+  // Replace the partial --xxx at the end with the full flag + trailing space
+  const replaced = val.replace(/--[\w_-]*$/, `--${name} `)
+  localValue.value = replaced
+  emit('update:modelValue', replaced)
+}
+
+function onTextKeydown(event: KeyboardEvent): void {
+  if (!showAutocomplete.value) return
+  const matches = autocompleteMatches.value
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    acIndex.value = (acIndex.value + 1) % matches.length
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    acIndex.value = (acIndex.value - 1 + matches.length) % matches.length
+  } else if (event.key === 'Tab' || event.key === 'Enter') {
+    event.preventDefault()
+    completeArg(matches[acIndex.value]!.name)
+    const input = event.target as HTMLInputElement
+    input.value = localValue.value
+  } else if (event.key === 'Escape') {
+    event.preventDefault()
+    acDismissed.value = true
+  }
+}
+
 // --- Mutators ---
 
 function emitUpdate(known: Map<string, string>): void {
-  emit('update:modelValue', serialize(known, parsed.value.extra))
+  const newValue = serialize(known, parsed.value.extra)
+  localValue.value = newValue
+  emit('update:modelValue', newValue)
 }
 
 function toggleBoolean(name: string, def: ComfyArgDef): void {
@@ -250,41 +365,98 @@ function setOptionalValueText(name: string, value: string): void {
   emitUpdate(next)
 }
 
-// --- Highlighted text display ---
+// --- Highlighted text display with validation ---
+
+type TokenStatus = 'ok' | 'unsupported' | 'missing-value' | 'awaiting-value' | 'partial'
 
 interface TextToken {
   text: string
-  unsupported: boolean
+  status: TokenStatus
+  tooltip?: string
 }
 
 const textTokens = computed<TextToken[]>(() => {
-  if (!schema.value.length || !props.modelValue) return []
-  const schemaNames = new Set(schema.value.map((a) => a.name))
-  const tokens = tokenize(props.modelValue)
+  if (!schema.value.length || !localValue.value) return []
+  const schemaMap = new Map(schema.value.map((a) => [a.name, a]))
+  const tokens = tokenize(localValue.value)
+  const partial = searchQuery.value
   const result: TextToken[] = []
 
   let i = 0
   while (i < tokens.length) {
     const token = tokens[i]!
     if (token.startsWith('--')) {
-      const name = token.slice(2)
-      const isBad = !schemaNames.has(name)
-      result.push({ text: token, unsupported: isBad })
-      i++
-      // If next token is a value for this flag
-      if (i < tokens.length && !tokens[i]!.startsWith('--')) {
-        result.push({ text: tokens[i]!, unsupported: isBad })
+      const raw = token.slice(2)
+      const eqIdx = raw.indexOf('=')
+      const name = eqIdx >= 0 ? raw.slice(0, eqIdx) : raw
+      const eqValue = eqIdx >= 0 ? raw.slice(eqIdx + 1) : undefined
+      const isLastToken = i === tokens.length - 1
+      // Partial flag being typed (last token)
+      if (name === '' || (partial && isLastToken && name.toLowerCase() === partial)) {
+        result.push({ text: token, status: 'partial' })
         i++
+        continue
+      }
+      const def = schemaMap.get(name)
+      if (!def) {
+        // Unsupported flag
+        result.push({ text: token, status: 'unsupported', tooltip: 'Unrecognized argument — will not be passed when launching' })
+        i++
+        if (i < tokens.length && !tokens[i]!.startsWith('--')) {
+          result.push({ text: tokens[i]!, status: 'unsupported' })
+          i++
+        }
+      } else if (eqValue) {
+        // --flag=value with non-empty value — ok
+        result.push({ text: token, status: 'ok' })
+        i++
+      } else if (def.type === 'value') {
+        // Required value — check if next token is present and not a flag
+        const next = tokens[i + 1]
+        if (next !== undefined && !next.startsWith('--')) {
+          result.push({ text: token, status: 'ok' })
+          result.push({ text: next, status: 'ok' })
+          i += 2
+        } else if (isLastToken && inputFocused.value) {
+          // User is still in position to type the value — show as info hint
+          result.push({ text: token, status: 'awaiting-value', tooltip: `Next: provide ${def.metavar || 'VALUE'}` })
+          i++
+        } else {
+          result.push({ text: token, status: 'missing-value', tooltip: `Requires a value: ${def.metavar || 'VALUE'}` })
+          i++
+        }
+      } else {
+        // Boolean or optional-value — always ok
+        result.push({ text: token, status: 'ok' })
+        i++
+        if (def.type === 'optional-value' && i < tokens.length && !tokens[i]!.startsWith('--')) {
+          result.push({ text: tokens[i]!, status: 'ok' })
+          i++
+        }
       }
     } else {
-      result.push({ text: token, unsupported: false })
+      result.push({ text: token, status: 'ok' })
       i++
     }
   }
   return result
 })
 
-const hasUnsupported = computed(() => unsupportedFlags.value.length > 0)
+/** Args with missing required values (user has moved on) */
+const missingValueFlags = computed(() => {
+  return textTokens.value
+    .filter((t) => t.status === 'missing-value')
+    .map((t) => t.text)
+})
+
+/** Arg awaiting a value (user is still in position to type it) */
+const awaitingValue = computed(() => {
+  const t = textTokens.value.find((t) => t.status === 'awaiting-value')
+  return t ? t : null
+})
+
+const hasValidationIssues = computed(() => unsupportedFlags.value.length > 0 || missingValueFlags.value.length > 0)
+const hasAnyIndicators = computed(() => hasValidationIssues.value || awaitingValue.value !== null)
 
 // --- Collapsed groups ---
 const collapsedGroups = ref(new Set<string>())
@@ -300,39 +472,73 @@ function toggleGroup(group: string): void {
 
 <template>
   <div class="args-builder">
-    <!-- Text input row -->
-    <div class="args-field-row">
-      <input
-        type="text"
-        class="detail-field-input"
-        :class="{ 'has-unsupported': hasUnsupported }"
-        :value="modelValue"
-        placeholder="e.g. --port 8188 --lowvram"
-        @change="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-      >
-      <button
-        class="args-configure-btn"
-        :class="{ active: expanded }"
-        title="Configure startup arguments"
-        @click="togglePanel"
-      >
-        <Settings :size="15" />
-      </button>
+    <!-- Text input row (with autocomplete overlay) -->
+    <div class="args-field-row-wrap">
+      <div class="args-field-row">
+        <input
+          type="text"
+          class="detail-field-input"
+          :class="{ 'has-unsupported': hasValidationIssues }"
+          :value="localValue"
+          placeholder="e.g. --port 8188 --lowvram"
+          spellcheck="false"
+          autocomplete="off"
+          @focus="inputFocused = true"
+          @blur="inputFocused = false"
+          @input="onTextInput(($event.target as HTMLInputElement).value)"
+          @keydown="onTextKeydown"
+          @change="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+        >
+        <button
+          class="args-configure-btn"
+          :class="{ active: expanded }"
+          title="Configure startup arguments"
+          @click="togglePanel"
+        >
+          <Settings :size="15" />
+        </button>
+      </div>
+      <!-- Autocomplete dropdown -->
+      <div v-if="showAutocomplete" class="args-autocomplete">
+        <button
+          v-for="(m, i) in autocompleteMatches" :key="m.name"
+          class="args-autocomplete-item"
+          :class="{ selected: i === acIndex }"
+          @mousedown.prevent="completeArg(m.name)"
+          @mouseenter="acIndex = i"
+        >
+          <span class="args-autocomplete-flag">{{ m.flag }}</span>
+          <span v-if="m.type !== 'boolean'" class="args-autocomplete-meta">{{ m.metavar ? (m.type === 'optional-value' ? `[${m.metavar}]` : m.metavar) : '' }}</span>
+          <span class="args-autocomplete-help">{{ m.help.slice(0, 60) }}{{ m.help.length > 60 ? '…' : '' }}</span>
+        </button>
+        <div class="args-autocomplete-hint">↑↓ navigate · Tab/Enter select · Esc dismiss</div>
+      </div>
     </div>
 
-    <!-- Unsupported args warning -->
-    <div v-if="hasUnsupported" class="args-unsupported-warning">
+    <!-- Info hint for awaiting value -->
+    <div v-if="awaitingValue" class="args-info-hint">
+      <span class="args-info-icon">ℹ</span>
+      {{ awaitingValue.text }} expects a value<span v-if="awaitingValue.tooltip">: {{ awaitingValue.tooltip.replace('Next: provide ', '') }}</span>
+    </div>
+
+    <!-- Validation warnings -->
+    <div v-if="unsupportedFlags.length" class="args-validation-warning">
       <span class="args-warning-icon">⚠</span>
-      Unsupported arguments (will not be passed):
+      Unsupported:
       <span v-for="flag in unsupportedFlags" :key="flag" class="args-bad-flag">--{{ flag }}</span>
+    </div>
+    <div v-if="missingValueFlags.length" class="args-validation-warning args-warning-missing">
+      <span class="args-warning-icon">⚠</span>
+      Missing value for:
+      <span v-for="flag in missingValueFlags" :key="flag" class="args-bad-flag args-missing-flag">{{ flag }}</span>
     </div>
 
     <!-- Token display with highlights -->
-    <div v-if="hasUnsupported && textTokens.length" class="args-token-display">
+    <div v-if="hasAnyIndicators && textTokens.length" class="args-token-display">
       <span
         v-for="(tok, idx) in textTokens" :key="idx"
-        :class="{ 'token-bad': tok.unsupported }"
-        :title="tok.unsupported ? 'This argument is not supported by this ComfyUI version and will not be passed when launching.' : ''"
+        :class="{ 'token-bad': tok.status === 'unsupported', 'token-missing': tok.status === 'missing-value', 'token-awaiting': tok.status === 'awaiting-value', 'token-partial': tok.status === 'partial' }"
+        :title="tok.tooltip || ''"
       >{{ tok.text }}</span>
     </div>
 
@@ -344,80 +550,43 @@ function toggleGroup(group: string): void {
         <div class="args-error-detail">{{ loadError }}</div>
       </div>
       <template v-else>
+        <!-- Active args pinned to top -->
+        <div v-if="activeArgs.length" class="args-group args-group-active">
+          <div class="args-group-header args-active-header">
+            <span class="args-group-chevron">▸</span>
+            Active
+            <span class="args-active-count">{{ activeArgs.length }}</span>
+          </div>
+          <div class="args-group-body">
+            <ArgRow
+              v-for="a in activeArgs" :key="'active-' + a.name"
+              :arg="a"
+              :active="isActive(a.name)"
+              :value="getValue(a.name)"
+              @toggle-boolean="toggleBoolean"
+              @toggle-optional-value="toggleOptionalValue"
+              @set-value-arg="setValueArg"
+              @set-optional-value-text="setOptionalValueText"
+            />
+          </div>
+        </div>
+
         <div v-for="[group, args] in groupedArgs" :key="group" class="args-group">
           <div class="args-group-header" @click="toggleGroup(group)">
             <span class="args-group-chevron" :class="{ collapsed: collapsedGroups.has(group) }">▸</span>
             {{ group }}
           </div>
           <div v-show="!collapsedGroups.has(group)" class="args-group-body">
-            <div v-for="a in args" :key="a.name" class="args-row">
-
-              <!-- Boolean toggle -->
-              <template v-if="a.type === 'boolean'">
-                <label class="args-check-row">
-                  <input type="checkbox" :checked="isActive(a.name)" @change="toggleBoolean(a.name, a)">
-                  <span class="args-name">{{ a.flag }}</span>
-                  <InfoTooltip :text="a.help" />
-                </label>
-              </template>
-
-              <!-- Optional-value: toggle + optional text inline -->
-              <template v-else-if="a.type === 'optional-value'">
-                <div class="args-inline-row">
-                  <label class="args-check-row">
-                    <input type="checkbox" :checked="isActive(a.name)" @change="toggleOptionalValue(a.name, a)">
-                    <span class="args-name">{{ a.flag }}</span>
-                    <InfoTooltip :text="a.help" />
-                  </label>
-                  <template v-if="a.choices">
-                    <select
-                      v-if="isActive(a.name)"
-                      class="detail-field-input args-inline-input"
-                      :value="getValue(a.name)"
-                      @change="setOptionalValueText(a.name, ($event.target as HTMLSelectElement).value)"
-                    >
-                      <option value="">(default)</option>
-                      <option v-for="c in a.choices" :key="c" :value="c">{{ c }}</option>
-                    </select>
-                  </template>
-                  <input
-                    v-else-if="isActive(a.name)"
-                    type="text"
-                    class="detail-field-input args-inline-input"
-                    :value="getValue(a.name)"
-                    :placeholder="a.metavar || ''"
-                    @change="setOptionalValueText(a.name, ($event.target as HTMLInputElement).value)"
-                  >
-                </div>
-              </template>
-
-              <!-- Value type -->
-              <template v-else>
-                <div class="args-inline-row">
-                  <span class="args-name">{{ a.flag }}</span>
-                  <InfoTooltip :text="a.help" />
-                  <template v-if="a.choices">
-                    <select
-                      class="detail-field-input args-inline-input"
-                      :value="getValue(a.name)"
-                      @change="setValueArg(a.name, ($event.target as HTMLSelectElement).value, a)"
-                    >
-                      <option value="">(default)</option>
-                      <option v-for="c in a.choices" :key="c" :value="c">{{ c }}</option>
-                    </select>
-                  </template>
-                  <input
-                    v-else
-                    :type="a.metavar && /^(PORT|NUM|SIZE|DEVICE_ID|DEFAULT_DEVICE_ID|PREVIEW_SIZE|CACHE_LRU|NUM_STREAMS|RESERVE_VRAM|MAX_UPLOAD_SIZE|CACHE_RAM)$/i.test(a.metavar) ? 'number' : 'text'"
-                    class="detail-field-input args-inline-input"
-                    :value="getValue(a.name)"
-                    :placeholder="a.metavar || ''"
-                    @change="setValueArg(a.name, ($event.target as HTMLInputElement).value, a)"
-                  >
-                </div>
-              </template>
-
-            </div>
+            <ArgRow
+              v-for="a in args" :key="a.name"
+              :arg="a"
+              :active="isActive(a.name)"
+              :value="getValue(a.name)"
+              @toggle-boolean="toggleBoolean"
+              @toggle-optional-value="toggleOptionalValue"
+              @set-value-arg="setValueArg"
+              @set-optional-value-text="setOptionalValueText"
+            />
           </div>
         </div>
       </template>
@@ -430,6 +599,10 @@ function toggleGroup(group: string): void {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.args-field-row-wrap {
+  position: relative;
 }
 
 .args-field-row {
@@ -469,7 +642,19 @@ function toggleGroup(group: string): void {
   border-color: var(--accent);
 }
 
-.args-unsupported-warning {
+.args-info-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--info, #58a6ff);
+  padding: 4px 0;
+}
+.args-info-icon {
+  font-size: 13px;
+}
+
+.args-validation-warning {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -477,6 +662,9 @@ function toggleGroup(group: string): void {
   font-size: 12px;
   color: var(--danger, #e53e3e);
   padding: 4px 0;
+}
+.args-warning-missing {
+  color: var(--warning, #fd9903);
 }
 .args-warning-icon {
   font-size: 13px;
@@ -487,6 +675,10 @@ function toggleGroup(group: string): void {
   background: rgba(229, 62, 62, 0.15);
   padding: 1px 4px;
   border-radius: 3px;
+}
+.args-missing-flag {
+  background: rgba(253, 153, 3, 0.15);
+  color: var(--warning, #fd9903);
 }
 
 .args-token-display {
@@ -506,6 +698,22 @@ function toggleGroup(group: string): void {
   text-decoration: underline wavy;
   text-underline-offset: 3px;
   cursor: help;
+}
+.args-token-display .token-missing {
+  color: var(--warning, #fd9903);
+  text-decoration: underline wavy;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.args-token-display .token-awaiting {
+  color: var(--info, #58a6ff);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.args-token-display .token-partial {
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
 .args-helper {
@@ -611,5 +819,113 @@ function toggleGroup(group: string): void {
   flex: 1;
   min-width: 0;
   max-width: 200px;
+}
+.args-inline-input[type="number"] {
+  -moz-appearance: textfield;
+}
+.args-inline-input[type="number"]::-webkit-inner-spin-button,
+.args-inline-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.args-value-tag {
+  font-size: 10px;
+  font-family: monospace;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.args-value-tag.required {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.args-value-tag.optional {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+}
+
+.args-autocomplete {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.args-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--text);
+  border-radius: 0;
+}
+.args-autocomplete-item.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.args-autocomplete-item:hover {
+  background: var(--border);
+}
+.args-autocomplete-item.selected .args-autocomplete-flag {
+  text-decoration: underline;
+}
+.args-autocomplete-flag {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.args-autocomplete-meta {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.args-autocomplete-help {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.args-autocomplete-hint {
+  padding: 2px 10px;
+  font-size: 10px;
+  color: var(--text-faint, var(--text-muted));
+  border-top: 1px solid var(--border);
+  text-align: right;
+}
+
+.args-group-active {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.args-active-header {
+  color: var(--accent);
+}
+.args-active-count {
+  font-size: 10px;
+  background: var(--accent);
+  color: var(--bg);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
 }
 </style>
