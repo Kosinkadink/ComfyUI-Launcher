@@ -200,10 +200,19 @@ const searchQuery = computed(() => {
   const val = localValue.value
   if (!val) return ''
   // Find the last token: split on whitespace, take last
-  const lastToken = val.trimEnd() === val
-    ? val.split(/\s+/).pop() || ''
-    : '' // trailing space means no partial token
+  const allTokens = val.trimEnd() === val ? val.split(/\s+/) : []
+  const lastToken = allTokens.pop() || ''
   if (!lastToken) return ''
+  // If previous token is a flag that expects a value, the user is filling
+  // in that value — suppress autocomplete so it doesn't interfere.
+  if (!lastToken.startsWith('-') && allTokens.length > 0) {
+    const prev = allTokens[allTokens.length - 1]!
+    if (prev.startsWith('--') && !prev.includes('=')) {
+      const prevName = prev.slice(2)
+      const prevDef = schema.value.find((a) => a.name === prevName)
+      if (prevDef && prevDef.type !== 'boolean') return ''
+    }
+  }
   if (lastToken === '-' || lastToken === '--') return '--' // bare - or -- triggers full list
   // Strip leading dashes to get the name portion
   const stripped = lastToken.replace(/^-{1,2}/, '')
