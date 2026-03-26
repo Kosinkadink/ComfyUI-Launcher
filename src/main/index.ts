@@ -388,9 +388,15 @@ function onComfyExited({ installationId }: { installationId?: string } = {}): vo
   }
 }
 
+// Stores the real ComfyUI URL before we replace it with the splash page,
+// so onComfyRestarted can reload the correct URL after the relaunch.
+const comfyUrlBeforeRelaunch = new Map<string, string>()
+
 async function onModelFolderRelaunch({ installationId }: { installationId: string }): Promise<void> {
   const win = comfyWindows.get(installationId)
   if (!win || win.isDestroyed()) return
+  const currentUrl = win.webContents.getURL()
+  if (currentUrl) comfyUrlBeforeRelaunch.set(installationId, currentUrl)
   await showModelFolderRelaunchPage(win)
 }
 
@@ -399,7 +405,10 @@ function onComfyRestarted({ installationId, process: _proc }: { installationId?:
   const win = comfyWindows.get(installationId)
   if (!win || win.isDestroyed()) return
 
-  const currentUrl = win.webContents.getURL()
+  const savedUrl = comfyUrlBeforeRelaunch.get(installationId)
+  comfyUrlBeforeRelaunch.delete(installationId)
+
+  const currentUrl = savedUrl || win.webContents.getURL()
   if (!currentUrl) return
 
   const url = new URL(currentUrl)
