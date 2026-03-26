@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import type { ComfyArgDef } from '../../../types/ipc'
 import InfoTooltip from './InfoTooltip.vue'
 import { Settings } from 'lucide-vue-next'
@@ -18,10 +18,13 @@ const expanded = ref(false)
 const schema = ref<ComfyArgDef[]>([])
 const loading = ref(false)
 const loadError = ref(false)
+const fetched = ref(false)
 
-// --- Fetch schema ---
+// --- Fetch schema (deferred until panel is opened) ---
 
 async function fetchSchema(): Promise<void> {
+  if (fetched.value) return
+  fetched.value = true
   loading.value = true
   loadError.value = false
   try {
@@ -38,7 +41,12 @@ async function fetchSchema(): Promise<void> {
   }
 }
 
-onMounted(fetchSchema)
+function togglePanel(): void {
+  expanded.value = !expanded.value
+  if (expanded.value) {
+    fetchSchema()
+  }
+}
 
 // --- Parsing ---
 
@@ -304,7 +312,7 @@ function toggleGroup(group: string): void {
         class="args-configure-btn"
         :class="{ active: expanded }"
         title="Configure startup arguments"
-        @click="expanded = !expanded"
+        @click="togglePanel"
       >
         <Settings :size="15" />
       </button>
@@ -511,6 +519,10 @@ function toggleGroup(group: string): void {
   padding: 12px;
   font-size: 12px;
   color: var(--text-muted);
+  text-align: center;
+}
+.args-error {
+  color: var(--danger, #e53e3e);
 }
 
 .args-group {
