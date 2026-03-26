@@ -91,6 +91,10 @@ const _inFlight: Map<string, Promise<ReleaseCacheEntry | null>> = new Map()
 // Prevents spamming the GitHub API and triggering secondary rate limits.
 const MIN_RECHECK_INTERVAL = 10_000
 
+// Maximum age of a cached entry before it's considered stale (in ms).
+// Non-forced reads will refetch if the entry is older than this.
+const CACHE_TTL = 60 * 60 * 1000 // 1 hour
+
 /**
  * Fetch release info, deduplicating concurrent calls for the same key.
  * @param repo - e.g. "Comfy-Org/ComfyUI"
@@ -109,9 +113,10 @@ export async function getOrFetch(
   _ensureLoaded()
 
   const cached = _entries[key]
+  const age = cached?.checkedAt ? Date.now() - cached.checkedAt : Infinity
   if (!force) {
-    if (cached) return cached
-  } else if (cached?.checkedAt && Date.now() - cached.checkedAt < MIN_RECHECK_INTERVAL) {
+    if (cached && age < CACHE_TTL) return cached
+  } else if (cached && age < MIN_RECHECK_INTERVAL) {
     return cached
   }
 
@@ -127,7 +132,9 @@ export async function getOrFetch(
         _entries[key] = entry
         _persist()
       }
-      return entry
+      return entry ?? cached ?? null
+    } catch {
+      return cached ?? null
     } finally {
       _inFlight.delete(key)
     }

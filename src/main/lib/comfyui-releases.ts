@@ -1,6 +1,8 @@
 import { fetchJSON } from './fetch'
+import { lsRemoteLatestTag } from './git'
 
 const REPO = 'Comfy-Org/ComfyUI'
+const REPO_URL = `https://github.com/${REPO}.git`
 
 interface GitHubCommit {
   sha: string
@@ -30,7 +32,7 @@ interface GitHubComparison {
 }
 
 function isStableRelease(r: GitHubRelease): boolean {
-  return !r.prerelease && !!r.tag_name
+  return !r.draft && !r.prerelease && !!r.tag_name
 }
 
 /**
@@ -61,6 +63,13 @@ function compareVersions(a: number[], b: number[]): number {
  * (the releases API omits drafts for unauthenticated callers).
  */
 async function fetchLatestTag(): Promise<string | null> {
+  // Prefer pygit2 ls-remote (Git protocol, no API rate limit).
+  try {
+    const tag = await lsRemoteLatestTag(REPO_URL)
+    if (tag) return tag
+  } catch {
+    // fall through to GitHub API
+  }
   try {
     const tags = await fetchJSON(
       `https://api.github.com/repos/${REPO}/tags?per_page=30`

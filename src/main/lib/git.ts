@@ -240,6 +240,22 @@ export function findNearestTag(repoPath: string, commit: string = 'HEAD'): Promi
  * Returns undefined if git is unavailable, no `v*` tags exist, or any
  * error occurs.
  */
+
+/**
+ * List version tags from a remote URL via the Git protocol (not the GitHub API).
+ * Returns the latest version tag, or undefined on failure.
+ * Requires pygit2 to be configured.
+ */
+export function lsRemoteLatestTag(url: string): Promise<string | undefined> {
+  if (!isPygit2Configured()) return Promise.resolve(undefined)
+  return runPygit2(['ls-remote-tags', url], 15000).then(({ exitCode, stdout }) => {
+    if (exitCode !== 0) return undefined
+    const tag = stdout.trim().split('\n')[0]?.trim()
+    return tag || undefined
+  })
+}
+
+/** Find the highest version tag in the repository (see above). */
 export function findLatestVersionTag(repoPath: string): Promise<string | undefined> {
   if (isPygit2Configured()) {
     return runPygit2(['tag-list', repoPath]).then(({ exitCode, stdout }) => {

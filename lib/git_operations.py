@@ -16,6 +16,7 @@ Subcommands:
   merge-base         <repo_path> <ref1> <ref2>
   is-ancestor        <repo_path> <ancestor> <descendant>
   fetch-tags         <repo_path>
+  ls-remote-tags     <url>
   clone              <url> <dest>
   checkout           <repo_path> <commit>
   fetch-and-checkout <repo_path> <commit>
@@ -336,6 +337,35 @@ def cmd_fetch_tags(repo_path):
         sys.exit(1)
 
 
+def cmd_ls_remote_tags(url):
+    """List version tags from a remote repository URL, sorted by version descending.
+
+    Uses a temporary bare repo to query the remote via the Git protocol
+    (not the GitHub API), so it is not subject to REST API rate limits.
+    Prints one tag name per line on stdout.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo = pygit2.init_repository(tmpdir, bare=True)
+        remote = repo.remotes.create_anonymous(url)
+        refs = remote.ls_remotes()
+
+        tags = []
+        for ref in refs:
+            name = ref["name"] if isinstance(ref, dict) else ref.name
+            if not name.startswith("refs/tags/") or name.endswith("^{}"):
+                continue
+            tag_name = name[len("refs/tags/"):]
+            version = parse_version_tuple(tag_name)
+            if version is not None:
+                tags.append((version, tag_name))
+
+        tags.sort(reverse=True)
+        for _, tag_name in tags:
+            print(tag_name)
+
+
 def cmd_clone(url, dest):
     """Clone a repository. Print progress to stderr."""
     print("Cloning %s into %s..." % (url, dest), file=sys.stderr)
@@ -469,6 +499,7 @@ Subcommands:
   merge-base         <repo_path> <ref1> <ref2>
   is-ancestor        <repo_path> <ancestor> <descendant>
   fetch-tags         <repo_path>
+  ls-remote-tags     <url>
   clone              <url> <dest>
   checkout           <repo_path> <commit>
   fetch-and-checkout <repo_path> <commit>
@@ -533,6 +564,12 @@ if __name__ == "__main__":
                 print("Usage: git_operations.py fetch-tags <repo_path>", file=sys.stderr)
                 sys.exit(1)
             cmd_fetch_tags(sys.argv[2])
+
+        elif subcmd == "ls-remote-tags":
+            if len(sys.argv) < 3:
+                print("Usage: git_operations.py ls-remote-tags <url>", file=sys.stderr)
+                sys.exit(1)
+            cmd_ls_remote_tags(sys.argv[2])
 
         elif subcmd == "clone":
             if len(sys.argv) < 4:
