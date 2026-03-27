@@ -11,7 +11,7 @@ import { formatComfyVersion } from './version'
 import type { ComfyVersion } from './version'
 import { resolveLocalVersion, clearVersionCache } from './version-resolve'
 import type { LatestTagOverride } from './version-resolve'
-import { readGitRemoteUrl, fetchTags, findLatestVersionTag, revParseRef, hasGitDir, isGitAvailable, tryConfigurePygit2Fallback } from './git'
+import { readGitRemoteUrl, fetchTags, findLatestVersionTag, countCommitsAhead, revParseRef, hasGitDir, isGitAvailable, tryConfigurePygit2Fallback } from './git'
 import { ensureRemoteUrl } from './github-mirror'
 import * as settings from '../settings'
 import { defaultInstallDir } from './paths'
@@ -526,8 +526,36 @@ async function checkInstallationUpdates(): Promise<void> {
         }, true)
       )
     )
+    // Enrich the "latest" cache entry with locally-computed commitsAhead.
+    // ls-remote can't compute this, but after _resolveAndBroadcastVersions
+    // fetches tags into local repos we can use countCommitsAhead locally.
+    await _enrichLatestCommitsAhead()
     _broadcastToRenderer('installations-changed', {})
   } catch {}
+}
+
+/**
+ * If the "latest" channel cache entry has a commitSha and baseTag but no
+ * commitsAhead, compute it locally from any available standalone ComfyUI
+ * repo (which has tags fetched by _fetchAndResolveLatestTags).
+ */
+async function _enrichLatestCommitsAhead(): Promise<void> {
+  const entry = releaseCache.get(COMFYUI_REPO, 'latest')
+  if (!entry?.commitSha || !entry.baseTag || entry.commitsAhead !== undefined) return
+
+  const all = await installations.list()
+  for (const inst of all) {
+    if (!inst.installPath) continue
+    const comfyuiDir = path.join(inst.installPath, 'ComfyUI')
+    if (!hasGitDir(comfyuiDir)) continue
+    // Ensure tags are fetched so the base tag commit is available locally
+    await fetchTags(comfyuiDir)
+    const ahead = await countCommitsAhead(comfyuiDir, entry.baseTag, entry.commitSha)
+    if (ahead !== undefined) {
+      releaseCache.set(COMFYUI_REPO, 'latest', { ...entry, commitsAhead: ahead })
+      return
+    }
+  }
 }
 
 export function register(callbacks: RegisterCallbacks = {}): void {
