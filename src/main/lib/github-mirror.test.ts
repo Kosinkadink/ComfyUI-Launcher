@@ -4,22 +4,22 @@ import { rewriteCloneUrl, getComfyUIRemoteUrl, GITCODE_COMFY_ORG_BASE } from './
 describe('rewriteCloneUrl', () => {
   it('rewrites Comfy-Org HTTPS URLs when enabled', () => {
     expect(rewriteCloneUrl('https://github.com/Comfy-Org/ComfyUI', true))
-      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI`)
+      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI.git`)
   })
 
   it('rewrites Comfy-Org HTTPS URLs with .git suffix', () => {
     expect(rewriteCloneUrl('https://github.com/Comfy-Org/ComfyUI.git', true))
-      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI`)
+      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI.git`)
   })
 
   it('rewrites Comfy-Org HTTPS URLs with trailing slash', () => {
     expect(rewriteCloneUrl('https://github.com/Comfy-Org/ComfyUI/', true))
-      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI`)
+      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI.git`)
   })
 
   it('rewrites other Comfy-Org repos', () => {
     expect(rewriteCloneUrl('https://github.com/Comfy-Org/ComfyUI-Manager.git', true))
-      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI-Manager`)
+      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI-Manager.git`)
   })
 
   it('passes through non-Comfy-Org URLs unchanged', () => {
@@ -34,7 +34,7 @@ describe('rewriteCloneUrl', () => {
 
   it('handles SSH-style URLs', () => {
     expect(rewriteCloneUrl('git@github.com:Comfy-Org/ComfyUI.git', true))
-      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI`)
+      .toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI.git`)
   })
 })
 
@@ -44,6 +44,6 @@ describe('getComfyUIRemoteUrl', () => {
   })
 
   it('returns gitcode.com URL when enabled', () => {
-    expect(getComfyUIRemoteUrl(true)).toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI`)
+    expect(getComfyUIRemoteUrl(true)).toBe(`${GITCODE_COMFY_ORG_BASE}/ComfyUI.git`)
   })
 })

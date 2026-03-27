@@ -12,12 +12,14 @@ export function rewriteCloneUrl(url: string, enabled: boolean): string {
   if (!enabled) return url
   const match = url.match(COMFY_ORG_RE)
   if (!match) return url
-  return `${GITCODE_COMFY_ORG_BASE}/${match[1]}`
+  // .git suffix is required — gitcode redirects bare URLs and pygit2/libgit2
+  // does not follow the redirect.
+  return `${GITCODE_COMFY_ORG_BASE}/${match[1]}.git`
 }
 
 export function getComfyUIRemoteUrl(enabled: boolean): string {
   if (!enabled) return DEFAULT_COMFYUI_URL
-  return `${GITCODE_COMFY_ORG_BASE}/ComfyUI`
+  return `${GITCODE_COMFY_ORG_BASE}/ComfyUI.git`
 }
 
 const GITCODE_COMFY_RE = /^https?:\/\/gitcode\.com\/gh_mirrors\/co\/([^/]+?)(?:\.git)?\/?$/
