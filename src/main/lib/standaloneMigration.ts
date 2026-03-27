@@ -136,15 +136,16 @@ async function restoreSnapshotIntoInstallation(
     await importSnapshots(freshInst.installPath, importEnvelope)
     const targetSnapshot = importEnvelope.snapshots[0]!
     const pypiMirror = settings.get('pypiMirror')
+    const useChineseMirrors = settings.get('useChineseMirrors') === true
 
     sendOutput('\n── Restore Nodes ──\n')
-    await restoreCustomNodes(freshInst.installPath, freshInst, targetSnapshot, sendProgress, sendOutput, signal, pypiMirror)
+    await restoreCustomNodes(freshInst.installPath, freshInst, targetSnapshot, sendProgress, sendOutput, signal, pypiMirror, useChineseMirrors)
 
     if (!signal.aborted && !targetSnapshot.skipPipSync) {
       sendOutput('\n── Restore Packages ──\n')
       await restorePipPackages(freshInst.installPath, freshInst, targetSnapshot,
         (phase, data) => sendProgress(phase === 'restore' ? 'restore-pip' : phase, data),
-        sendOutput, signal, pypiMirror)
+        sendOutput, signal, pypiMirror, useChineseMirrors)
     }
 
     try {

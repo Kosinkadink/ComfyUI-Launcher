@@ -127,7 +127,9 @@ export async function getOrFetch(
         _entries[key] = entry
         _persist()
       }
-      return entry
+      return entry ?? cached ?? null
+    } catch {
+      return cached ?? null
     } finally {
       _inFlight.delete(key)
     }
