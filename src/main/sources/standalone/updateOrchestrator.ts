@@ -43,7 +43,7 @@ export interface UpdateOrchestrationResult {
   installation: InstallationRecord
 }
 
-function spawnCommand(
+export function spawnCommand(
   command: string,
   args: string[],
   cwd: string,
