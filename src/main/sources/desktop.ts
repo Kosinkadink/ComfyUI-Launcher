@@ -7,7 +7,6 @@ import { t } from '../lib/i18n'
 import type { InstallationRecord } from '../installations'
 import type {
   SourcePlugin,
-  FieldOption,
   ActionResult,
   ActionTools,
   LaunchCommand,
@@ -160,7 +159,4 @@ export const desktop: SourcePlugin = {
     return { ok: false, message: `Action "${actionId}" not implemented.` }
   },
 
-  async getFieldOptions(): Promise<FieldOption[]> {
-    return []
-  },
 }

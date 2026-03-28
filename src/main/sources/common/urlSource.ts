@@ -131,13 +131,5 @@ export function createUrlSource(config: UrlSourceConfig): SourcePlugin {
     ): Promise<ActionResult> {
       return { ok: false, message: `Action "${actionId}" not yet implemented.` }
     },
-
-    async getFieldOptions(
-      _fieldId: string,
-      _selections: Record<string, FieldOption | undefined>,
-      _context: Record<string, unknown>
-    ): Promise<FieldOption[]> {
-      return []
-    },
   }
 }

@@ -30,6 +30,7 @@ export function registerAppHandlers(): void {
       setGpuPromise(gpuPromise)
     }
     const gpu = await gpuPromise
+    if (!source.getFieldOptions) return []
     const options = await source.getFieldOptions(
       fieldId,
       selections as Record<string, FieldOption | undefined>,

@@ -297,7 +297,7 @@ export function registerSnapshotHandlers(): void {
     const baseGpu = strippedVariant.replace(/-.*$/, '')
 
     const source = sourceMap['standalone']!
-    const releaseOptions = await source.getFieldOptions('release', {}, {})
+    const releaseOptions = await source.getFieldOptions!('release', {}, {})
     if (releaseOptions.length === 0) return { ok: false, message: 'No releases available.' }
 
     let selectedRelease: FieldOption
@@ -311,7 +311,7 @@ export function registerSnapshotHandlers(): void {
     }
 
     const gpu = await detectGPU()
-    const variantOptions = await source.getFieldOptions('variant', { release: selectedRelease }, { gpu: gpu?.id })
+    const variantOptions = await source.getFieldOptions!('variant', { release: selectedRelease }, { gpu: gpu?.id })
     if (variantOptions.length === 0) return { ok: false, message: 'No compatible variants found for this platform.' }
 
     let matched: FieldOption | undefined
