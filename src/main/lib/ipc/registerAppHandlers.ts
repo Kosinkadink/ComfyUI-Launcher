@@ -151,37 +151,6 @@ export function registerAppHandlers(): void {
     const entries = await listSnapshots(inst.installPath)
     const latest = entries.length > 0 ? entries[0]!.snapshot : null
 
-    const diffs: Array<{
-      createdAt: string
-      trigger: string
-      label: string | null
-      nodesAdded: string[]
-      nodesRemoved: string[]
-      nodesChanged: string[]
-      pipsAdded: string[]
-      pipsRemoved: string[]
-      pipsChanged: string[]
-      comfyuiChanged: boolean
-    }> = []
-
-    for (let i = 0; i < entries.length - 1; i++) {
-      const newer = entries[i]!.snapshot
-      const older = entries[i + 1]!.snapshot
-      const diff = diffSnapshots(older, newer)
-      diffs.push({
-        createdAt: newer.createdAt,
-        trigger: newer.trigger,
-        label: newer.label,
-        nodesAdded: diff.nodesAdded.map((n) => n.dirName),
-        nodesRemoved: diff.nodesRemoved.map((n) => n.dirName),
-        nodesChanged: diff.nodesChanged.map((n) => n.id),
-        pipsAdded: diff.pipsAdded.map((p) => p.name),
-        pipsRemoved: diff.pipsRemoved.map((p) => p.name),
-        pipsChanged: diff.pipsChanged.map((p) => p.name),
-        comfyuiChanged: diff.comfyuiChanged,
-      })
-    }
-
     const result = {
       installation_id: inst.id,
       installation_name: inst.name,
@@ -212,14 +181,41 @@ export function registerAppHandlers(): void {
         pythonVersion: latest.pythonVersion,
         updateChannel: latest.updateChannel,
       } : null,
-      snapshot_diffs: diffs,
+      snapshot_diffs: [] as Array<{
+        createdAt: string
+        trigger: string
+        label: string | null
+        nodesAdded: string[]
+        nodesRemoved: string[]
+        nodesChanged: string[]
+        pipsAdded: string[]
+        pipsRemoved: string[]
+        pipsChanged: string[]
+        comfyuiChanged: boolean
+      }>,
     }
 
-    const estimatedSize = JSON.stringify(result).length
-    if (estimatedSize > MAX_CONTEXT_BYTES && diffs.length > 0) {
-      while (JSON.stringify(result).length > MAX_CONTEXT_BYTES && result.snapshot_diffs.length > 0) {
-        result.snapshot_diffs.pop()
+    let runningSize = JSON.stringify(result).length
+    for (let i = 0; i < entries.length - 1; i++) {
+      const newer = entries[i]!.snapshot
+      const older = entries[i + 1]!.snapshot
+      const diff = diffSnapshots(older, newer)
+      const entry = {
+        createdAt: newer.createdAt,
+        trigger: newer.trigger,
+        label: newer.label,
+        nodesAdded: diff.nodesAdded.map((n) => n.dirName),
+        nodesRemoved: diff.nodesRemoved.map((n) => n.dirName),
+        nodesChanged: diff.nodesChanged.map((n) => n.id),
+        pipsAdded: diff.pipsAdded.map((p) => p.name),
+        pipsRemoved: diff.pipsRemoved.map((p) => p.name),
+        pipsChanged: diff.pipsChanged.map((p) => p.name),
+        comfyuiChanged: diff.comfyuiChanged,
       }
+      const entrySize = JSON.stringify(entry).length + 1
+      if (runningSize + entrySize > MAX_CONTEXT_BYTES) break
+      result.snapshot_diffs.push(entry)
+      runningSize += entrySize
     }
 
     return result
