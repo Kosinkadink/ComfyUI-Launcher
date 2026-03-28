@@ -88,7 +88,8 @@ async function loadReleaseOptions(): Promise<void> {
 
     const options = await window.api.getFieldOptions('standalone', 'release', {})
     if (gen !== optionsGeneration) return
-    releaseOptions.value = options
+    // Exclude the synthetic "Latest Stable" entry — snapshot restore targets a specific release
+    releaseOptions.value = options.filter((o) => o.value !== 'latest')
 
     // Preselect the release matching the snapshot's releaseTag, or fall back to latest
     const snapshotTag = preview.value?.newestSnapshot.comfyui.releaseTag
