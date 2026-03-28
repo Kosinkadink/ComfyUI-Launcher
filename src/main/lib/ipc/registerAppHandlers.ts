@@ -8,6 +8,7 @@ import {
   sourceMap, getAppVersion, openPath,
   listSnapshots, diffSnapshots,
 } from './shared'
+import si from 'systeminformation'
 import { configDir } from '../paths'
 import type { FieldOption } from './shared'
 import { getGpuPromise, setGpuPromise } from './shared'
@@ -130,20 +131,48 @@ export function registerAppHandlers(): void {
     const nvidiaCheck = gpu?.id === 'nvidia' ? await checkNvidiaDriver() : null
     const cpus = os.cpus()
     const allInstalls = await installations.list()
+
+    let osDistro: string | null = null
+    let osRelease: string | null = null
+    let osArch: string | null = null
+    let cpuManufacturer: string | null = null
+    let cpuPhysicalCores: number | null = null
+    let cpuSpeedGhz: number | null = null
+    try {
+      const [osInfo, cpuInfo] = await Promise.all([
+        si.osInfo(),
+        si.cpu(),
+      ])
+      osDistro = osInfo.distro || null
+      osRelease = osInfo.release || null
+      osArch = osInfo.arch || null
+      cpuManufacturer = cpuInfo.manufacturer || null
+      cpuPhysicalCores = cpuInfo.physicalCores ?? null
+      cpuSpeedGhz = cpuInfo.speed ?? null
+    } catch {}
+
     return {
       gpu_vendor: gpu?.id ?? null,
       gpu_label: gpu?.label ?? null,
       gpu_model: gpu?.model ?? null,
+      gpu_vram_mb: gpu?.vramMb ?? null,
+      gpu_driver_version: gpu?.driverVersion ?? null,
       nvidia_driver_version: nvidiaCheck?.driverVersion ?? null,
       nvidia_driver_supported: nvidiaCheck?.supported ?? null,
       platform: process.platform,
       arch: process.arch,
       os_version: os.release(),
+      os_distro: osDistro,
+      os_release: osRelease,
+      os_arch: osArch,
       electron_version: process.versions.electron,
       chrome_version: process.versions.chrome,
       total_memory_gb: Math.round(os.totalmem() / 1073741824),
       cpu_model: cpus[0]?.model ?? 'unknown',
       cpu_cores: cpus.length,
+      cpu_physical_cores: cpuPhysicalCores,
+      cpu_speed_ghz: cpuSpeedGhz,
+      cpu_manufacturer: cpuManufacturer,
       app_version: getAppVersion(),
       auto_update: settings.get('autoUpdate') !== false,
       locale: settings.get('language') || 'en',
