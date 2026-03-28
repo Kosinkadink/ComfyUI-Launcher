@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { spawn } from 'child_process'
+import { killProcTree } from '../../lib/process'
 import { resolveInstalledVersion, clearVersionCache } from '../../lib/version-resolve'
 import { readGitHead } from '../../lib/git'
 import { PYTORCH_RE, installFilteredRequirements, getPipIndexArgs } from '../../lib/pip'
@@ -51,21 +52,17 @@ export function spawnCommand(
   onStderr: ((text: string) => void) | undefined,
   signal?: AbortSignal,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
+  if (signal?.aborted) return Promise.resolve({ code: 1, stdout: '', stderr: '' })
   return new Promise((resolve) => {
     const proc = spawn(command, args, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
-    if (signal) {
-      const onAbort = (): void => { proc.kill() }
-      if (signal.aborted) {
-        onAbort()
-      } else {
-        signal.addEventListener('abort', onAbort, { once: true })
-        proc.on('close', () => signal.removeEventListener('abort', onAbort))
-      }
-    }
+    const onAbort = (): void => { killProcTree(proc) }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) onAbort()
+
     let stdout = ''
     let stderr = ''
     proc.stdout.on('data', (chunk: Buffer) => {
@@ -79,10 +76,14 @@ export function spawnCommand(
       onStderr?.(text)
     })
     proc.on('error', (err) => {
+      signal?.removeEventListener('abort', onAbort)
       onStderr?.(`Error: ${err.message}\n`)
       resolve({ code: 1, stdout, stderr })
     })
-    proc.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }))
+    proc.on('close', (code) => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve({ code: code ?? 1, stdout, stderr })
+    })
   })
 }
 

@@ -140,8 +140,10 @@ describe('spawnCommand', { timeout: 15_000 }, () => {
     const result = await spawnCommand(command, args, tmpDir, undefined, undefined, controller.signal)
     const elapsed = Date.now() - start
 
-    expect(result.code).not.toBe(0)
-    expect(elapsed).toBeLessThan(5_000)
+    expect(result.code).toBe(1)
+    expect(result.stdout).toBe('')
+    expect(result.stderr).toBe('')
+    expect(elapsed).toBeLessThan(1_000)
   })
 
   it('invokes both callbacks when process writes to stdout and stderr', async () => {
