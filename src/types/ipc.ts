@@ -312,6 +312,7 @@ export interface ComfyExitedData {
 export interface GPUInfo {
   id?: string
   label: string
+  model?: string | null
 }
 
 export interface HardwareValidation {
@@ -375,6 +376,7 @@ export interface TrackResult {
 export interface SystemInfo {
   gpu_vendor: string | null
   gpu_label: string | null
+  gpu_model: string | null
   nvidia_driver_version: string | null
   nvidia_driver_supported: boolean | null
   platform: string
