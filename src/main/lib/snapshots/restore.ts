@@ -8,7 +8,7 @@ import { pipFreeze, runUvPip as sharedRunUvPip, installFilteredRequirements, get
 import { installCnrNode, switchCnrVersion, isSafePathComponent } from '../cnr'
 import { killProcTree } from '../process'
 import { formatComfyVersion } from '../version'
-import { getUvPath, getActivePythonPath } from './pythonEnv'
+import { getUvPath, getActivePythonPath } from '../pythonEnv'
 import type { Snapshot, RestoreResult, NodeRestoreResult } from './types'
 import type { ScannedNode } from '../nodes'
 import type { InstallationRecord } from '../../installations'

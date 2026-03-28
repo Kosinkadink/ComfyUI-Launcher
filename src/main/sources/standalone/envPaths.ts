@@ -1,11 +1,9 @@
 import fs from 'fs'
 import path from 'path'
 export {
+  ENVS_DIR, DEFAULT_ENV,
   getUvPath, getActivePythonPath, getEnvPythonPath, listEnvs, resolveActiveEnv,
 } from '../../lib/pythonEnv'
-
-export const ENVS_DIR = 'envs'
-export const DEFAULT_ENV = 'default'
 export const ENV_METHOD = 'copy'
 export const MANIFEST_FILE = 'manifest.json'
 export const DEFAULT_LAUNCH_ARGS = '--enable-manager'

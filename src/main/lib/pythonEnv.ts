@@ -2,8 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import type { InstallationRecord } from '../installations'
 
-const ENVS_DIR = 'envs'
-const DEFAULT_ENV = 'default'
+export const ENVS_DIR = 'envs'
+export const DEFAULT_ENV = 'default'
 
 export function getUvPath(installPath: string): string {
   if (process.platform === 'win32') {
