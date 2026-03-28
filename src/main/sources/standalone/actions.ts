@@ -155,7 +155,9 @@ export async function handleAction(
       const filename = await snapshots.saveSnapshot(installation.installPath, updatedInstallation, 'post-restore')
       const snapshotCount = await snapshots.getSnapshotCount(installation.installPath)
       await update({ lastSnapshot: filename, snapshotCount })
-    } catch {}
+    } catch (err) {
+      console.warn('Post-restore snapshot failed:', err)
+    }
 
     sendProgress('done', { percent: 100, status: t('standalone.snapshotRestoreComplete') })
     return { ok: totalFailures === 0, navigate: 'detail',

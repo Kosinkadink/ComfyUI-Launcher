@@ -315,7 +315,9 @@ export async function pruneAutoSnapshots(installPath: string, keep: number): Pro
     try {
       await deleteSnapshot(installPath, entry.filename)
       deleted++
-    } catch {}
+    } catch (err) {
+      console.warn(`Snapshot: failed to prune ${entry.filename}:`, (err as Error).message)
+    }
   }
   return deleted
 }
