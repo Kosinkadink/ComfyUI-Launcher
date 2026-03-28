@@ -43,6 +43,45 @@ export interface UpdateOrchestrationResult {
   installation: InstallationRecord
 }
 
+function spawnCommand(
+  command: string,
+  args: string[],
+  cwd: string,
+  onStdout: ((text: string) => void) | undefined,
+  onStderr: ((text: string) => void) | undefined,
+  signal?: AbortSignal,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn(command, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    if (signal) {
+      const onAbort = (): void => { proc.kill() }
+      signal.addEventListener('abort', onAbort, { once: true })
+      proc.on('close', () => signal.removeEventListener('abort', onAbort))
+    }
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', (chunk: Buffer) => {
+      const text = chunk.toString('utf-8')
+      stdout += text
+      onStdout?.(text)
+    })
+    proc.stderr.on('data', (chunk: Buffer) => {
+      const text = chunk.toString('utf-8')
+      stderr += text
+      onStderr?.(text)
+    })
+    proc.on('error', (err) => {
+      onStderr?.(`Error: ${err.message}\n`)
+      resolve({ code: 1, stdout, stderr })
+    })
+    proc.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }))
+  })
+}
+
 function spawnUpdateScript(
   masterPython: string,
   comfyuiDir: string,
@@ -153,8 +192,12 @@ export async function runComfyUIUpdate(opts: UpdateOrchestrationOptions): Promis
     result = await spawnUpdateScript(masterPython, comfyuiDir, channelArgs, sendOutput, signal)
   }
 
+  // Check for cancellation before inspecting exit code — aborted processes
+  // typically exit non-zero (SIGTERM) and shouldn't show an error message.
+  if (signal?.aborted) return { ok: false, message: 'Cancelled', installation }
+
   if (result.exitCode !== 0) {
-    const detail = (result.stderrBuf || result.stdoutBuf).trim().split('\n').slice(-20).join('\n')
+    const detail = [result.stderrBuf, result.stdoutBuf].filter(Boolean).join('\n').trim().split('\n').slice(-20).join('\n')
     if (sendOutput) {
       let message: string
       if (detail) {
@@ -171,7 +214,6 @@ export async function runComfyUIUpdate(opts: UpdateOrchestrationOptions): Promis
   }
 
   const { markers } = result
-  if (signal?.aborted) return { ok: false, message: 'Cancelled', installation }
 
   // Install updated requirements if changed
   let postReqs = ''
@@ -193,24 +235,10 @@ export async function runComfyUIUpdate(opts: UpdateOrchestrationOptions): Promis
           sendProgress('deps', { percent: -1, status: t('standalone.updateDepsDryRun') })
           if (signal?.aborted) return { ok: false, message: 'Cancelled', installation }
 
-          const dryRunResult = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-            const proc = spawn(uvPath, ['pip', 'install', '--dry-run', '-r', filteredReqPath, '--python', activeEnvPython, ...indexArgs], {
-              cwd: installPath,
-              stdio: ['ignore', 'pipe', 'pipe'],
-              windowsHide: true,
-            })
-            if (signal) {
-              const onAbort = (): void => { proc.kill() }
-              signal.addEventListener('abort', onAbort, { once: true })
-              proc.on('close', () => signal.removeEventListener('abort', onAbort))
-            }
-            let stdout = ''
-            let stderr = ''
-            proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8') })
-            proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf-8') })
-            proc.on('error', (err) => resolve({ code: 1, stdout: '', stderr: err.message }))
-            proc.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }))
-          })
+          const dryRunResult = await spawnCommand(
+            uvPath, ['pip', 'install', '--dry-run', '-r', filteredReqPath, '--python', activeEnvPython, ...indexArgs],
+            installPath, undefined, undefined, signal
+          )
 
           if (dryRunResult.code !== 0) {
             sendOutput?.(`\n⚠ Requirements dry-run detected potential conflicts:\n${dryRunResult.stderr || dryRunResult.stdout}\n`)
@@ -222,28 +250,13 @@ export async function runComfyUIUpdate(opts: UpdateOrchestrationOptions): Promis
           if (signal?.aborted) return { ok: false, message: 'Cancelled', installation }
           sendProgress('deps', { percent: -1, status: t('standalone.updateDepsInstalling') })
 
-          const installResult = await new Promise<number>((resolve) => {
-            const proc = spawn(uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', activeEnvPython, ...indexArgs], {
-              cwd: installPath,
-              stdio: ['ignore', 'pipe', 'pipe'],
-              windowsHide: true,
-            })
-            if (signal) {
-              const onAbort = (): void => { proc.kill() }
-              signal.addEventListener('abort', onAbort, { once: true })
-              proc.on('close', () => signal.removeEventListener('abort', onAbort))
-            }
-            proc.stdout.on('data', (chunk: Buffer) => sendOutput?.(chunk.toString('utf-8')))
-            proc.stderr.on('data', (chunk: Buffer) => sendOutput?.(chunk.toString('utf-8')))
-            proc.on('error', (err) => {
-              sendOutput?.(`Error: ${err.message}\n`)
-              resolve(1)
-            })
-            proc.on('close', (code) => resolve(code ?? 1))
-          })
+          const pipResult = await spawnCommand(
+            uvPath, ['pip', 'install', '-r', filteredReqPath, '--python', activeEnvPython, ...indexArgs],
+            installPath, sendOutput, sendOutput, signal
+          )
 
-          if (installResult !== 0) {
-            sendOutput?.(`\nWarning: requirements install exited with code ${installResult}\n`)
+          if (pipResult.code !== 0) {
+            sendOutput?.(`\nWarning: requirements install exited with code ${pipResult.code}\n`)
           }
         } finally {
           try { await fs.promises.unlink(filteredReqPath) } catch {}
@@ -307,29 +320,34 @@ export async function runComfyUIUpdate(opts: UpdateOrchestrationOptions): Promis
       installation.comfyVersion as ComfyVersion | undefined,
       checkedOutTag
     )
-    const installedTag = formatComfyVersion(comfyVersion, 'short')
+  }
 
-    const existing = (installation.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined) || {}
-    const updateData: Record<string, unknown> = {
-      comfyVersion,
-      updateChannel: channel,
-      updateInfoByChannel: {
-        ...existing,
-        [channel]: { installedTag },
-      },
+  const installedTag = comfyVersion
+    ? formatComfyVersion(comfyVersion, 'short')
+    : (checkedOutTag || 'unknown')
+
+  const existing = (installation.updateInfoByChannel as Record<string, Record<string, unknown>> | undefined) || {}
+  const updateData: Record<string, unknown> = {
+    ...(comfyVersion ? { comfyVersion } : {}),
+    updateChannel: channel,
+    updateInfoByChannel: {
+      ...existing,
+      [channel]: { installedTag },
+    },
+  }
+
+  if (saveRollback) {
+    updateData.lastRollback = {
+      preUpdateHead: markers.PRE_UPDATE_HEAD || null,
+      postUpdateHead: fullPostHead,
+      backupBranch: markers.BACKUP_BRANCH || null,
+      channel,
+      updatedAt: Date.now(),
     }
+  }
 
-    if (saveRollback) {
-      updateData.lastRollback = {
-        preUpdateHead: markers.PRE_UPDATE_HEAD || null,
-        postUpdateHead: fullPostHead,
-        backupBranch: markers.BACKUP_BRANCH || null,
-        channel,
-        updatedAt: Date.now(),
-      }
-    }
-
-    await update(updateData)
+  await update(updateData)
+  if (comfyVersion) {
     installation = { ...installation, comfyVersion } as InstallationRecord
   }
 
