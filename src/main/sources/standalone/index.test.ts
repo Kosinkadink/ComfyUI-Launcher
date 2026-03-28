@@ -46,20 +46,20 @@ describe('standalone.buildInstallation', () => {
     } as unknown as Record<string, unknown>,
   })
 
-  it('sets autoUpdate when release value is "latest"', () => {
+  it('sets autoUpdateComfyUI when release value is "latest"', () => {
     const result = standalone.buildInstallation({
       release: makeRelease('latest', 'standalone-v0.1.24'),
       variant: makeVariant('win-nvidia'),
     })
-    expect(result.autoUpdate).toBe(true)
+    expect(result.autoUpdateComfyUI).toBe(true)
   })
 
-  it('does NOT set autoUpdate for a specific release tag', () => {
+  it('does NOT set autoUpdateComfyUI for a specific release tag', () => {
     const result = standalone.buildInstallation({
       release: makeRelease('standalone-v0.1.24'),
       variant: makeVariant('win-nvidia'),
     })
-    expect(result.autoUpdate).toBeUndefined()
+    expect(result.autoUpdateComfyUI).toBeUndefined()
   })
 
   it('uses underlying tag_name as releaseTag when "latest" is selected', () => {

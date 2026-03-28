@@ -150,7 +150,7 @@ export function registerInstallationHandlers(): void {
       fs.writeFileSync(path.join(inst.installPath, MARKER_FILE), installationId)
       if (source.installSteps) {
         let steps = [...source.installSteps]
-        if (!inst.autoUpdate) {
+        if (!inst.autoUpdateComfyUI) {
           steps = steps.filter((s) => s.phase !== 'update')
         }
         if (inst.pendingSnapshotRestore) {

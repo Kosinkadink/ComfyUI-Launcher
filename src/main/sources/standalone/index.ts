@@ -102,7 +102,7 @@ export const standalone: SourcePlugin = {
       launchArgs: isCpu ? `${DEFAULT_LAUNCH_ARGS} --cpu` : DEFAULT_LAUNCH_ARGS,
       launchMode: 'window',
       browserPartition: 'unique',
-      ...(isLatest ? { autoUpdate: true } : {}),
+      ...(isLatest ? { autoUpdateComfyUI: true } : {}),
     }
   },
 
