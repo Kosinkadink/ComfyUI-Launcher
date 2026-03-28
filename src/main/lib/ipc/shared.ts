@@ -451,9 +451,6 @@ export async function _fetchAndResolveLatestTags(
   return result
 }
 
-/** Tracks installations already reconciled against snapshot history this session. */
-const _reconciledInstalls = new Set<string>()
-
 export async function _resolveAndBroadcastVersions(list: InstallationRecord[]): Promise<void> {
   const candidates = list.flatMap((inst) => {
     const cv = inst.comfyVersion as ComfyVersion | undefined
@@ -476,32 +473,7 @@ export async function _resolveAndBroadcastVersions(list: InstallationRecord[]): 
       // made external changes (manual git pull, checkout, etc.).
       const actualHead = readGitHead(comfyuiDir) || cv.commit
 
-      // Reconcile against snapshot history before applying the write-gate.
-      // The old background refresh may have corrupted cv.baseTag; the
-      // post-restore / post-update snapshot has the authoritative value.
-      // Only scan snapshots once per installation per session.
-      let effectiveCv = cv
-      if (actualHead === cv.commit && cv.baseTag && inst.installPath && !_reconciledInstalls.has(inst.id)) {
-        _reconciledInstalls.add(inst.id)
-        try {
-          const entries = await listSnapshots(inst.installPath)
-          const matching = entries.filter(
-            (e) => e.snapshot.comfyui.commit === cv.commit && e.snapshot.comfyui.baseTag !== undefined
-          )
-          if (matching.length > 0) {
-            const authoritative = matching.find(
-              (e) => e.snapshot.trigger === 'post-restore' || e.snapshot.trigger === 'post-update'
-            )
-            const best = authoritative || matching[matching.length - 1]!
-            const snap = best.snapshot.comfyui
-            if (snap.baseTag !== cv.baseTag || snap.commitsAhead !== cv.commitsAhead) {
-              effectiveCv = { commit: cv.commit, baseTag: snap.baseTag, commitsAhead: snap.commitsAhead }
-            }
-          }
-        } catch { /* best effort */ }
-      }
-
-      const resolved = await resolveInstalledVersion(comfyuiDir, actualHead, effectiveCv, undefined, override)
+      const resolved = await resolveInstalledVersion(comfyuiDir, actualHead, cv, undefined, override)
       const resolvedStr = formatComfyVersion(resolved, 'short')
       const storedStr = formatComfyVersion(cv, 'short')
       const versionChanged = resolvedStr !== storedStr
