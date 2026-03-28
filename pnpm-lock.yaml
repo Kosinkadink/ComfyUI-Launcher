@@ -21,8 +21,8 @@ importers:
         specifier: ^6.7.3
         version: 6.8.3
       smol-toml:
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.6.1
+        version: 1.6.1
       systeminformation:
         specifier: ^5.31.5
         version: 5.31.5
@@ -79,8 +79,8 @@ importers:
         specifier: ^17.3.0
         version: 17.3.0
       happy-dom:
-        specifier: ^20.7.0
-        version: 20.7.0
+        specifier: ^20.8.9
+        version: 20.8.9
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -116,7 +116,7 @@ importers:
         version: 7.3.1(@types/node@22.19.12)(jiti@2.6.1)(lightningcss@1.31.1)
       vitest:
         specifier: ^4.0.18
-        version: 4.0.18(@types/node@22.19.12)(happy-dom@20.7.0)(jiti@2.6.1)(lightningcss@1.31.1)
+        version: 4.0.18(@types/node@22.19.12)(happy-dom@20.8.9)(jiti@2.6.1)(lightningcss@1.31.1)
       vue:
         specifier: ^3.5.25
         version: 3.5.29(typescript@5.9.3)
@@ -2076,6 +2076,10 @@ packages:
     resolution: {integrity: sha512-VWSRii4t0AFm6ixFFmLLx1t7wS1gh+ckoa84aOeapGum0h+EZd1EhEumSB+ZdDLnEPuucsVB9oB7cxJHap6Afg==}
     engines: {node: '>=14.14'}
 
+  fs-extra@11.3.4:
+    resolution: {integrity: sha512-CTXd6rk/M3/ULNQj8FBqBWHYBVYybQ3VPBw0xGKFe3tuH7ytT6ACnvzpIQ3UZtB8yvUKC2cXn1a+x+5EVQLovA==}
+    engines: {node: '>=14.14'}
+
   fs-extra@7.0.1:
     resolution: {integrity: sha512-YJDaCJZEnBmcbw13fvdAM9AwNOJwOzrE4pqMqBq5nFiEqXUqHwlK4B+3pUw6JNvfSPtX05xFHtYy/1ni01eGCw==}
     engines: {node: '>=6 <7 || >=8'}
@@ -2184,8 +2188,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  happy-dom@20.7.0:
-    resolution: {integrity: sha512-hR/uLYQdngTyEfxnOoa+e6KTcfBFyc1hgFj/Cc144A5JJUuHFYqIEBDcD4FeGqUeKLRZqJ9eN9u7/GDjYEgS1g==}
+  happy-dom@20.8.9:
+    resolution: {integrity: sha512-Tz23LR9T9jOGVZm2x1EPdXqwA37G/owYMxRwU0E4miurAtFsPMQ1d2Jc2okUaSjZqAFz2oEn3FLXC5a0a+siyA==}
     engines: {node: '>=20.0.0'}
 
   has-flag@4.0.0:
@@ -3088,8 +3092,8 @@ packages:
     resolution: {integrity: sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==}
     engines: {node: '>= 6.0.0', npm: '>= 3.0.0'}
 
-  smol-toml@1.6.0:
-    resolution: {integrity: sha512-4zemZi0HvTnYwLfrpk/CF9LOd9Lt87kAt50GnqhMpyF9U3poDAP2+iukq2bZsO/ufegbYehBkqINbsWxj4l4cw==}
+  smol-toml@1.6.1:
+    resolution: {integrity: sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg==}
     engines: {node: '>= 18'}
 
   socks-proxy-agent@8.0.5:
@@ -3902,7 +3906,7 @@ snapshots:
     dependencies:
       cross-dirname: 0.1.0
       debug: 4.4.3
-      fs-extra: 11.3.3
+      fs-extra: 11.3.4
       minimist: 1.2.8
       postject: 1.0.0-alpha.6
     transitivePeerDependencies:
@@ -5649,6 +5653,13 @@ snapshots:
       jsonfile: 6.2.0
       universalify: 2.0.1
 
+  fs-extra@11.3.4:
+    dependencies:
+      graceful-fs: 4.2.11
+      jsonfile: 6.2.0
+      universalify: 2.0.1
+    optional: true
+
   fs-extra@7.0.1:
     dependencies:
       graceful-fs: 4.2.11
@@ -5795,7 +5806,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  happy-dom@20.7.0:
+  happy-dom@20.8.9:
     dependencies:
       '@types/node': 22.19.12
       '@types/whatwg-mimetype': 3.0.2
@@ -6672,7 +6683,7 @@ snapshots:
 
   smart-buffer@4.2.0: {}
 
-  smol-toml@1.6.0: {}
+  smol-toml@1.6.1: {}
 
   socks-proxy-agent@8.0.5:
     dependencies:
@@ -6913,7 +6924,7 @@ snapshots:
       jiti: 2.6.1
       lightningcss: 1.31.1
 
-  vitest@4.0.18(@types/node@22.19.12)(happy-dom@20.7.0)(jiti@2.6.1)(lightningcss@1.31.1):
+  vitest@4.0.18(@types/node@22.19.12)(happy-dom@20.8.9)(jiti@2.6.1)(lightningcss@1.31.1):
     dependencies:
       '@vitest/expect': 4.0.18
       '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@22.19.12)(jiti@2.6.1)(lightningcss@1.31.1))
@@ -6937,7 +6948,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.12
-      happy-dom: 20.7.0
+      happy-dom: 20.8.9
     transitivePeerDependencies:
       - jiti
       - less
