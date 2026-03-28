@@ -5,6 +5,7 @@ import { fetchJSON } from '../lib/fetch'
 import { untrackAction } from '../lib/actions'
 import { parseArgs, extractPort } from '../lib/util'
 import { t } from '../lib/i18n'
+import { buildLaunchSettingsFields } from './common/launchSettingsFields'
 import type { InstallationRecord } from '../installations'
 import type { SourcePlugin, FieldOption, ActionResult, ActionTools, LaunchCommand, StatusTag } from '../types/sources'
 
@@ -183,26 +184,13 @@ export const gitSource: SourcePlugin = {
       {
         tab: 'settings',
         title: t('common.launchSettings'),
-        fields: [
-          { id: 'venvPath', label: t('git.venv'), value: venvPath || '', editable: true, editType: 'path' },
-          { id: 'launchArgs', label: t('common.startupArgs'), value: (installation.launchArgs as string | undefined) ?? DEFAULT_LAUNCH_ARGS, editable: true, editType: 'args-builder', tooltip: t('tooltips.startupArgs') },
-          { id: 'launchMode', label: t('common.launchMode'), value: (installation.launchMode as string | undefined) || DEFAULT_GIT_SETTINGS.launchMode, editable: true,
-            editType: 'select', options: [
-              { value: 'window', label: t('common.launchModeWindow') },
-              { value: 'console', label: t('common.launchModeConsole') },
-            ] },
-          { id: 'browserPartition', label: t('common.browserPartition'), value: (installation.browserPartition as string | undefined) || 'shared', editable: true,
-            editType: 'select', options: [
-              { value: 'shared', label: t('common.partitionShared') },
-              { value: 'unique', label: t('common.partitionUnique') },
-            ], tooltip: t('tooltips.browserPartition') },
-          { id: 'portConflict', label: t('common.portConflict'), value: (installation.portConflict as string | undefined) || 'ask', editable: true,
-            editType: 'select', options: [
-              { value: 'ask', label: t('common.portConflictAsk') },
-              { value: 'auto', label: t('common.portConflictAuto') },
-            ] },
-          { id: 'envVars', label: t('common.envVars'), value: (installation.envVars as Record<string, string> | undefined) ?? {}, editable: true, editType: 'env-vars', tooltip: t('tooltips.envVars') },
-        ],
+        fields: buildLaunchSettingsFields(installation, {
+          defaultLaunchArgs: DEFAULT_LAUNCH_ARGS,
+          includeUseSharedPaths: false,
+          extraFields: [
+            { id: 'venvPath', label: t('git.venv'), value: venvPath || '', editable: true, editType: 'path' },
+          ],
+        }),
       },
       {
         title: 'Actions',

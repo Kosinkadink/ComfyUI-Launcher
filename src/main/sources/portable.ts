@@ -11,6 +11,7 @@ import { t } from '../lib/i18n'
 import { fetchLatestRelease, truncateNotes } from '../lib/comfyui-releases'
 import { buildChannelCards, buildChannelLabelMap } from '../lib/channel-cards'
 import type { ChannelDef } from '../lib/channel-cards'
+import { buildLaunchSettingsFields } from './common/launchSettingsFields'
 import type { InstallationRecord } from '../installations'
 import type {
   SourcePlugin,
@@ -205,26 +206,7 @@ export const portable: SourcePlugin = {
       {
         tab: 'settings',
         title: t('common.launchSettings'),
-        fields: [
-          { id: 'useSharedPaths', label: t('common.useSharedPaths'), value: (installation.useSharedPaths as boolean | undefined) !== false, editable: true, editType: 'boolean', tooltip: t('tooltips.useSharedPaths') },
-          { id: 'launchArgs', label: t('common.startupArgs'), value: (installation.launchArgs as string | undefined) ?? DEFAULT_LAUNCH_ARGS, editable: true, editType: 'args-builder', tooltip: t('tooltips.startupArgs') },
-          { id: 'launchMode', label: t('common.launchMode'), value: (installation.launchMode as string | undefined) || 'window', editable: true,
-            editType: 'select', options: [
-              { value: 'window', label: t('common.launchModeWindow') },
-              { value: 'console', label: t('common.launchModeConsole') },
-            ] },
-          { id: 'browserPartition', label: t('common.browserPartition'), value: (installation.browserPartition as string | undefined) || 'shared', editable: true,
-            editType: 'select', options: [
-              { value: 'shared', label: t('common.partitionShared') },
-              { value: 'unique', label: t('common.partitionUnique') },
-            ], tooltip: t('tooltips.browserPartition') },
-          { id: 'portConflict', label: t('common.portConflict'), value: (installation.portConflict as string | undefined) || 'ask', editable: true,
-            editType: 'select', options: [
-              { value: 'ask', label: t('common.portConflictAsk') },
-              { value: 'auto', label: t('common.portConflictAuto') },
-            ] },
-          { id: 'envVars', label: t('common.envVars'), value: (installation.envVars as Record<string, string> | undefined) ?? {}, editable: true, editType: 'env-vars', tooltip: t('tooltips.envVars') },
-        ],
+        fields: buildLaunchSettingsFields(installation, { defaultLaunchArgs: DEFAULT_LAUNCH_ARGS, defaultBrowserPartition: 'unique' }),
       },
       {
         title: 'Actions',
