@@ -8,6 +8,13 @@ import {
 export function registerSettingsHandlers(): void {
   ipcMain.handle('get-settings-sections', () => {
     const s = settings.getAll()
+    const mirrorFields = [
+      { id: 'pypiMirror', label: i18n.t('settings.pypiMirror'), type: 'text' as const, value: s.pypiMirror || '',
+        placeholder: i18n.t('settings.pypiMirrorPlaceholder') },
+      { id: 'useChineseMirrors', label: i18n.t('settings.useChineseMirrors'), type: 'boolean' as const, value: s.useChineseMirrors === true,
+        ...(s.useChineseMirrors === true ? { description: i18n.t('settings.chineseMirrorsDescription') } : {}) },
+    ]
+    const isChinese = i18n.getLocale().startsWith('zh')
     const appSections = [
       {
         title: i18n.t('settings.general'),
@@ -30,6 +37,7 @@ export function registerSettingsHandlers(): void {
               { value: 'quit', label: i18n.t('settings.closeQuit') },
               { value: 'tray', label: i18n.t('settings.closeTray') },
             ] },
+          ...(isChinese ? mirrorFields : []),
         ],
         actions: [
           { label: i18n.t('settings.checkForUpdates'), action: 'check-for-update' },
@@ -48,14 +56,10 @@ export function registerSettingsHandlers(): void {
           { id: 'maxCachedFiles', label: i18n.t('settings.maxCachedFiles'), type: 'number', value: s.maxCachedFiles, min: 1, max: 50 },
         ],
       },
-      {
+      ...(!isChinese ? [{
         title: i18n.t('settings.advanced'),
-        fields: [
-          { id: 'pypiMirror', label: i18n.t('settings.pypiMirror'), type: 'text', value: s.pypiMirror || '',
-            placeholder: i18n.t('settings.pypiMirrorPlaceholder') },
-          { id: 'useChineseMirrors', label: i18n.t('settings.useChineseMirrors'), type: 'boolean', value: s.useChineseMirrors === true },
-        ],
-      },
+        fields: mirrorFields,
+      }] : []),
     ]
     const sourceSections = sources.flatMap((src) => {
       const plugin = src as unknown as Record<string, unknown>

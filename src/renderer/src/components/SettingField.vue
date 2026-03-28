@@ -128,5 +128,7 @@ v-else-if="field.type === 'number'" type="number" class="detail-field-input"
     <input
 v-else type="text" class="detail-field-input"
            :value="field.value ?? ''" :placeholder="field.placeholder" @change="updateSetting(($event.target as HTMLInputElement).value)" />
+
+    <div v-if="field.description" class="detail-field-description">{{ field.description }}</div>
   </div>
 </template>
