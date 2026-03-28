@@ -374,20 +374,34 @@ export interface TrackResult {
   message?: string
 }
 
+export interface SystemGpuInfo {
+  vendor: string
+  model: string
+  vram_mb: number | null
+  driver_version: string | null
+}
+
 export interface SystemInfo {
   gpu_vendor: string | null
   gpu_label: string | null
   gpu_model: string | null
+  gpus: SystemGpuInfo[]
   nvidia_driver_version: string | null
   nvidia_driver_supported: boolean | null
   platform: string
   arch: string
   os_version: string
+  os_distro: string | null
+  os_release: string | null
+  os_arch: string | null
   electron_version: string
   chrome_version: string
   total_memory_gb: number
   cpu_model: string
   cpu_cores: number
+  cpu_physical_cores: number | null
+  cpu_speed_ghz: number | null
+  cpu_manufacturer: string | null
   app_version: string
   auto_update: boolean
   locale: string

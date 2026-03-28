@@ -8,6 +8,7 @@ import {
   sourceMap, getAppVersion, openPath,
   listSnapshots, diffSnapshots,
 } from './shared'
+import si from 'systeminformation'
 import { configDir } from '../paths'
 import type { FieldOption } from './shared'
 import { getGpuPromise, setGpuPromise } from './shared'
@@ -130,20 +131,59 @@ export function registerAppHandlers(): void {
     const nvidiaCheck = gpu?.id === 'nvidia' ? await checkNvidiaDriver() : null
     const cpus = os.cpus()
     const allInstalls = await installations.list()
+
+    let osDistro: string | null = null
+    let osRelease: string | null = null
+    let osArch: string | null = null
+    let cpuManufacturer: string | null = null
+    let cpuPhysicalCores: number | null = null
+    let cpuSpeedGhz: number | null = null
+    let allGpus: Array<{ vendor: string; model: string; vram_mb: number | null; driver_version: string | null }> = []
+    const [osResult, cpuResult, gpuResult] = await Promise.allSettled([
+      si.osInfo(),
+      si.cpu(),
+      si.graphics(),
+    ])
+    if (osResult.status === 'fulfilled') {
+      osDistro = osResult.value.distro || null
+      osRelease = osResult.value.release || null
+      osArch = osResult.value.arch || null
+    }
+    if (cpuResult.status === 'fulfilled') {
+      cpuManufacturer = cpuResult.value.manufacturer || null
+      cpuPhysicalCores = cpuResult.value.physicalCores ?? null
+      cpuSpeedGhz = cpuResult.value.speed ?? null
+    }
+    if (gpuResult.status === 'fulfilled') {
+      allGpus = gpuResult.value.controllers.map((ctrl) => ({
+        vendor: ctrl.vendor || '',
+        model: ctrl.model || '',
+        vram_mb: ctrl.vram ?? null,
+        driver_version: ctrl.driverVersion?.trim() || null,
+      }))
+    }
+
     return {
       gpu_vendor: gpu?.id ?? null,
       gpu_label: gpu?.label ?? null,
       gpu_model: gpu?.model ?? null,
+      gpus: allGpus,
       nvidia_driver_version: nvidiaCheck?.driverVersion ?? null,
       nvidia_driver_supported: nvidiaCheck?.supported ?? null,
       platform: process.platform,
       arch: process.arch,
       os_version: os.release(),
+      os_distro: osDistro,
+      os_release: osRelease,
+      os_arch: osArch,
       electron_version: process.versions.electron,
       chrome_version: process.versions.chrome,
       total_memory_gb: Math.round(os.totalmem() / 1073741824),
       cpu_model: cpus[0]?.model ?? 'unknown',
       cpu_cores: cpus.length,
+      cpu_physical_cores: cpuPhysicalCores,
+      cpu_speed_ghz: cpuSpeedGhz,
+      cpu_manufacturer: cpuManufacturer,
       app_version: getAppVersion(),
       auto_update: settings.get('autoUpdate') !== false,
       locale: settings.get('language') || 'en',
