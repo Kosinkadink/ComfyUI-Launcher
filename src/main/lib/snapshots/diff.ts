@@ -38,7 +38,8 @@ export async function resolveSnapshotVersion(
   // against the current repo can produce wrong results when newer tags exist.
   if (comfyui.baseTag !== undefined) return formatSnapshotVersion(comfyui, style)
   if (!comfyui.commit) return comfyui.ref
-  const comfyuiDir = options?.comfyuiDir ?? path.join(installPath, 'ComfyUI')
+  const comfyuiDir = options?.comfyuiDir ?? (installPath ? path.join(installPath, 'ComfyUI') : '')
+  if (!comfyuiDir) return formatSnapshotVersion(comfyui, style)
   if (!hasGitDir(comfyuiDir)) {
     return formatSnapshotVersion(comfyui, style)
   }
