@@ -92,12 +92,16 @@ Split into `src/main/lib/snapshots/` directory:
 
 ---
 
-## Phase 4: Break up large Vue components
+## Phase 4: Break up large Vue components — Skipped
 
-- `SnapshotTab.vue` (1041) → toolbar, list, detail panel, composable
-- `NewInstallModal.vue` (905) → source picker, fields form, path selector, summary
-- `ArgsBuilder.vue` (824) → category sections, manual editor, summary
-- `LoadSnapshotModal.vue` (764) → file picker, preview, shared snapshot components
+Evaluated all four candidates and decided not to split:
+
+- **`SnapshotTab.vue` (1041)** — ~500 lines is scoped CSS; script logic is cohesive single-tab state
+- **`NewInstallModal.vue` (905)** — multi-step wizard with shared state across steps; splitting creates prop-drilling with no reuse
+- **`ArgsBuilder.vue` (824)** — tightly coupled parser/autocomplete/schema logic; already has 11 tests
+- **`LoadSnapshotModal.vue` (764)** — half is scoped CSS; straightforward single-purpose modal
+
+Unlike the backend god files (5+ responsibilities entangled), each Vue file has one job. Splitting would create single-use child components with more indirection and no architectural benefit.
 
 ---
 
