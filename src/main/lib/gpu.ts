@@ -1,6 +1,5 @@
 import { execFile } from 'child_process'
 import fs from 'fs'
-import si from 'systeminformation'
 import type { HardwareValidation, NvidiaDriverCheck } from '../../types/ipc'
 
 type GpuId = 'nvidia' | 'amd' | 'intel' | 'mps'
@@ -9,8 +8,6 @@ export interface GpuInfo {
   id: GpuId
   label: string
   model: string | null
-  vramMb: number | null
-  driverVersion: string | null
 }
 
 const GPU_LABELS: Record<GpuId, string> = {
@@ -32,68 +29,21 @@ function pickGPU(hasNvidia: boolean, hasAmd: boolean, hasIntel: boolean): GpuId 
 }
 
 /**
- * Map a systeminformation vendor string to a GpuId.
- */
-function mapSiVendor(vendor: string): GpuId | null {
-  if (!vendor) return null
-  const v = vendor.toLowerCase()
-  if (v.includes("nvidia")) return "nvidia"
-  if (v.includes("amd") || v.includes("advanced micro")) return "amd"
-  if (v.includes("intel")) return "intel"
-  if (v.includes("apple")) return "mps"
-  return null
-}
-
-/**
- * Priority order for discrete GPU selection (matches legacy pickGPU).
- */
-const GPU_PRIORITY: GpuId[] = ["nvidia", "amd", "intel", "mps"]
-
-/**
- * Pick the best GPU from systeminformation controllers.
- */
-function pickFromSiControllers(controllers: Awaited<ReturnType<typeof si.graphics>>["controllers"]): GpuInfo | null {
-  let best: { id: GpuId; controller: (typeof controllers)[number] } | null = null
-
-  for (const ctrl of controllers) {
-    const id = mapSiVendor(ctrl.vendor)
-    if (!id) continue
-    if (!best || GPU_PRIORITY.indexOf(id) < GPU_PRIORITY.indexOf(best.id)) {
-      best = { id, controller: ctrl }
-    }
-  }
-
-  if (!best) return null
-
-  return {
-    id: best.id,
-    label: GPU_LABELS[best.id],
-    model: best.controller.model || null,
-    vramMb: best.controller.vram ?? null,
-    driverVersion: best.controller.driverVersion ?? null,
-  }
-}
-
-/**
  * Detect GPU type on the current system (async).
- * Uses systeminformation for cross-platform detection, with a fallback
- * to legacy platform-specific methods if si returns no results.
+ * Returns { id, label } or null if no supported GPU is found.
+ *
+ * Detection order (Windows):
+ *   1. WMI query — parses PCI vendor IDs from Win32_VideoController
+ *   2. nvidia-smi — fallback for NVIDIA driver detection
+ *
+ * Detection order (Linux / WSL):
+ *   1. lspci — parses PCI vendor IDs from VGA/3D controllers
+ *   2. /sys/class/drm — reads vendor IDs from sysfs
+ *   3. nvidia-smi — fallback for NVIDIA (especially useful on WSL)
+ *
+ * macOS returns "mps" for Apple Silicon, null for Intel.
  */
 async function detectGPU(): Promise<GpuInfo | null> {
-  try {
-    const graphics = await si.graphics()
-    const result = pickFromSiControllers(graphics.controllers)
-    if (result) return result
-  } catch {}
-
-  return legacyDetectGPU()
-}
-
-/**
- * Legacy detection: hand-rolled platform-specific GPU detection.
- * Kept as a fallback in case systeminformation fails or returns empty.
- */
-async function legacyDetectGPU(): Promise<GpuInfo | null> {
   let id: GpuId | null = null
   if (process.platform === "win32") {
     id = await detectWindowsGPU()
@@ -103,7 +53,7 @@ async function legacyDetectGPU(): Promise<GpuInfo | null> {
     id = await detectLinuxGPU()
   }
   if (!id) return null
-  return { id, label: GPU_LABELS[id], model: null, vramMb: null, driverVersion: null }
+  return { id, label: GPU_LABELS[id], model: null }
 }
 
 async function detectWindowsGPU(): Promise<GpuId | null> {

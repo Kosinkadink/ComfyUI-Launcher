@@ -163,8 +163,6 @@ export function registerAppHandlers(): void {
       gpu_vendor: gpu?.id ?? null,
       gpu_label: gpu?.label ?? null,
       gpu_model: gpu?.model ?? null,
-      gpu_vram_mb: gpu?.vramMb ?? null,
-      gpu_driver_version: gpu?.driverVersion ?? null,
       gpus: allGpus,
       nvidia_driver_version: nvidiaCheck?.driverVersion ?? null,
       nvidia_driver_supported: nvidiaCheck?.supported ?? null,

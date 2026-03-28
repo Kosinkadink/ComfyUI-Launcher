@@ -314,8 +314,6 @@ export interface GPUInfo {
   id?: string
   label: string
   model?: string | null
-  vramMb?: number | null
-  driverVersion?: string | null
 }
 
 export interface HardwareValidation {
@@ -387,8 +385,6 @@ export interface SystemInfo {
   gpu_vendor: string | null
   gpu_label: string | null
   gpu_model: string | null
-  gpu_vram_mb: number | null
-  gpu_driver_version: string | null
   gpus: SystemGpuInfo[]
   nvidia_driver_version: string | null
   nvidia_driver_supported: boolean | null
