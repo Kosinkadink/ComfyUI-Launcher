@@ -9,9 +9,9 @@ import * as installations from '../../installations'
 import type { InstallationRecord } from '../../installations'
 import { formatComfyVersion } from '../version'
 import type { ComfyVersion } from '../version'
-import { resolveLocalVersion, clearVersionCache } from '../version-resolve'
+import { resolveInstalledVersion, clearVersionCache } from '../version-resolve'
 import type { LatestTagOverride } from '../version-resolve'
-import { readGitRemoteUrl, fetchTags, findLatestVersionTag, revParseRef, hasGitDir, isGitAvailable, tryConfigurePygit2Fallback } from '../git'
+import { readGitHead, readGitRemoteUrl, fetchTags, findLatestVersionTag, revParseRef, hasGitDir, isGitAvailable, tryConfigurePygit2Fallback } from '../git'
 import { ensureRemoteUrl } from '../github-mirror'
 import * as settings from '../../settings'
 import { defaultInstallDir } from '../paths'
@@ -57,7 +57,7 @@ export {
   path, fs, os, app, ipcMain, dialog, shell, BrowserWindow, nativeTheme,
   execFile, spawn, execFileSync,
   sources, installations, settings, releaseCache, i18n,
-  formatComfyVersion, resolveLocalVersion, clearVersionCache,
+  formatComfyVersion, resolveInstalledVersion, clearVersionCache,
   readGitRemoteUrl, fetchTags, findLatestVersionTag, revParseRef, hasGitDir, isGitAvailable, tryConfigurePygit2Fallback,
   ensureRemoteUrl,
   defaultInstallDir, download, createCache, extract, deleteDir, deleteAction, untrackAction,
@@ -469,7 +469,34 @@ export async function _resolveAndBroadcastVersions(list: InstallationRecord[]): 
     const origin = readGitRemoteUrl(comfyuiDir)
     const override = origin ? tagOverrides.get(origin) : undefined
     try {
-      const resolved = await resolveLocalVersion(comfyuiDir, cv.commit, undefined, override)
+      // Read actual HEAD — it may differ from cv.commit if the user
+      // made external changes (manual git pull, checkout, etc.).
+      const actualHead = readGitHead(comfyuiDir) || cv.commit
+
+      // Reconcile against snapshot history before applying the write-gate.
+      // The old background refresh may have corrupted cv.baseTag; the
+      // post-restore / post-update snapshot has the authoritative value.
+      let effectiveCv = cv
+      if (actualHead === cv.commit && cv.baseTag && inst.installPath) {
+        try {
+          const entries = await listSnapshots(inst.installPath)
+          const matching = entries.filter(
+            (e) => e.snapshot.comfyui.commit === cv.commit && e.snapshot.comfyui.baseTag !== undefined
+          )
+          if (matching.length > 0) {
+            const authoritative = matching.find(
+              (e) => e.snapshot.trigger === 'post-restore' || e.snapshot.trigger === 'post-update'
+            )
+            const best = authoritative || matching[matching.length - 1]!
+            const snap = best.snapshot.comfyui
+            if (snap.baseTag !== cv.baseTag || snap.commitsAhead !== cv.commitsAhead) {
+              effectiveCv = { commit: cv.commit, baseTag: snap.baseTag, commitsAhead: snap.commitsAhead }
+            }
+          }
+        } catch { /* best effort */ }
+      }
+
+      const resolved = await resolveInstalledVersion(comfyuiDir, actualHead, effectiveCv, undefined, override)
       const resolvedStr = formatComfyVersion(resolved, 'short')
       const storedStr = formatComfyVersion(cv, 'short')
       const versionChanged = resolvedStr !== storedStr

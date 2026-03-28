@@ -4,7 +4,7 @@ import { execFile, spawn } from 'child_process'
 import { downloadAndExtract, downloadAndExtractMulti } from '../../lib/installer'
 import { copyDirWithProgress } from '../../lib/copy'
 import { readGitHead, isGitAvailable, isPygit2Configured, tryConfigurePygit2Fallback, fetchTags } from '../../lib/git'
-import { resolveLocalVersion, clearVersionCache } from '../../lib/version-resolve'
+import { resolveInstalledVersion, clearVersionCache } from '../../lib/version-resolve'
 import { formatTime } from '../../lib/util'
 import { t } from '../../lib/i18n'
 import * as snapshots from '../../lib/snapshots'
@@ -125,7 +125,7 @@ export async function postInstall(installation: InstallationRecord, { sendProgre
   const headCommit = readGitHead(comfyuiDir)
   if (headCommit) {
     const ref = installation.version as string | undefined
-    const comfyVersion = await resolveLocalVersion(comfyuiDir, headCommit, ref)
+    const comfyVersion = await resolveInstalledVersion(comfyuiDir, headCommit, undefined, ref)
     await update({ comfyVersion })
     // Use updated installation for snapshot so it captures the version
     installation = { ...installation, comfyVersion } as InstallationRecord
@@ -264,7 +264,7 @@ export async function postInstall(installation: InstallationRecord, { sendProgre
           const checkedOutTag = markers.CHECKED_OUT_TAG || undefined
           const fullPostHead = markers.POST_UPDATE_HEAD || readGitHead(comfyuiDir)
           if (fullPostHead) {
-            const newComfyVersion = await resolveLocalVersion(comfyuiDir, fullPostHead, checkedOutTag)
+            const newComfyVersion = await resolveInstalledVersion(comfyuiDir, fullPostHead, installation.comfyVersion as ComfyVersion | undefined, checkedOutTag)
             const installedTag = formatComfyVersion(newComfyVersion, 'short')
             await update({
               comfyVersion: newComfyVersion,
@@ -323,7 +323,7 @@ export async function probeInstallation(dirPath: string): Promise<Record<string,
     const commit = readGitHead(comfyuiDir)
     if (commit) {
       const manifestTag = version !== 'unknown' ? version : undefined
-      comfyVersion = await resolveLocalVersion(comfyuiDir, commit, manifestTag)
+      comfyVersion = await resolveInstalledVersion(comfyuiDir, commit, undefined, manifestTag)
     }
   }
 
