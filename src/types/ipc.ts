@@ -429,6 +429,8 @@ export interface InstallationDdContext {
   copied_from?: string
   copy_reason?: string
   snapshot_count: number
+  disk_free_gb: number | null
+  disk_total_gb: number | null
   latest_snapshot: {
     createdAt: string
     trigger: string

@@ -165,6 +165,14 @@ export function registerAppHandlers(): void {
     const copiedFrom = inst.copiedFrom as string | undefined
     const copyReason = inst.copyReason as string | undefined
 
+    let diskFreeGb: number | null = null
+    let diskTotalGb: number | null = null
+    try {
+      const disk = await getDiskSpace(inst.installPath)
+      diskFreeGb = Math.round(disk.free / 1073741824)
+      diskTotalGb = Math.round(disk.total / 1073741824)
+    } catch {}
+
     const result = {
       installation_id: inst.id,
       variant: (inst.variant as string) || '',
@@ -174,6 +182,8 @@ export function registerAppHandlers(): void {
       ...(copiedFrom ? { copied_from: copiedFrom } : {}),
       ...(copyReason ? { copy_reason: copyReason } : {}),
       snapshot_count: entries.length,
+      disk_free_gb: diskFreeGb,
+      disk_total_gb: diskTotalGb,
       latest_snapshot: latest ? {
         createdAt: latest.createdAt,
         trigger: latest.trigger,

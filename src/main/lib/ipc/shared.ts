@@ -392,9 +392,9 @@ export function _broadcastToRenderer(channel: string, data: unknown): void {
   })
 }
 
-export function _addSession(installationId: string, { proc, port, url, mode, installationName }: Omit<SessionInfo, 'startedAt'>): void {
+export function _addSession(installationId: string, { proc, port, url, mode, installationName }: Omit<SessionInfo, 'startedAt'>, bootTimeMs?: number): void {
   _runningSessions.set(installationId, { proc, port, url, mode, installationName, startedAt: Date.now() })
-  _broadcastToRenderer('instance-started', { installationId, port, url, mode, installationName })
+  _broadcastToRenderer('instance-started', { installationId, port, url, mode, installationName, bootTimeMs })
   installations.update(installationId, { lastLaunchedAt: Date.now() })
     .then(() => _broadcastToRenderer('installations-changed', {}))
     .catch((err) => {
