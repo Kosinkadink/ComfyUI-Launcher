@@ -275,6 +275,32 @@ export async function startAssetDownload(
   return true
 }
 
+export async function saveAssetBlob(
+  filename: string,
+  data: Buffer,
+  outputDir: string,
+): Promise<boolean> {
+  const savePath = path.join(outputDir, filename)
+
+  if (await fileExists(savePath)) return true
+
+  await fs.promises.mkdir(path.dirname(savePath), { recursive: true })
+  await fs.promises.writeFile(savePath, data)
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('model-download-progress', {
+      url: `blob:${filename}`,
+      filename,
+      directory: '',
+      savePath,
+      progress: 1,
+      status: 'completed',
+    } satisfies DownloadProgress)
+  }
+
+  return true
+}
+
 function attachDownloadListeners(item: Electron.DownloadItem, pending: PendingDownload): void {
   item.on('updated', (_ev, state) => {
     if (state !== 'progressing') return

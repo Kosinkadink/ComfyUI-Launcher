@@ -228,12 +228,53 @@ export function getModelDownloadContentScript(): string {
   }
 
   // ---- Auto-download outputs for remote/cloud sessions ----
-  // Intercept WebSocket messages to detect completed workflow outputs
+  // Intercept WebSocket messages to detect completed workflow outputs.
+  // For cloud sessions, fetch files with page credentials (Bearer auth) and
+  // send the blob to the main process.  For plain remote sessions, pass the
+  // URL so Electron can download it directly (session cookies suffice).
   if (window.__comfyDesktop2Remote && window.__comfyDesktop2 && window.__comfyDesktop2.downloadAsset) {
+    var _useBlobDownload = !!window.__comfyDesktop2.downloadAssetBlob;
+
+    function _buildViewUrl(baseUrl, item) {
+      var params = 'filename=' + encodeURIComponent(item.filename);
+      if (item.subfolder) params += '&subfolder=' + encodeURIComponent(item.subfolder);
+      if (item.type) params += '&type=' + encodeURIComponent(item.type);
+      return baseUrl + '/api/view?' + params;
+    }
+
+    function _downloadItem(baseUrl, authToken, item) {
+      if (!item || !item.filename) return;
+      // Skip temporary preview outputs (PreviewImage, etc.)
+      if (item.type === 'temp') return;
+      var viewUrl = _buildViewUrl(baseUrl, item);
+      if (_useBlobDownload) {
+        // Cloud path: fetch with auth token, send blob to main process
+        var fetchOpts = { credentials: 'include' };
+        if (authToken) {
+          fetchOpts.headers = { 'Authorization': 'Bearer ' + authToken };
+        }
+        fetch(viewUrl, fetchOpts)
+          .then(function(res) { return res.ok ? res.arrayBuffer() : null; })
+          .then(function(buf) {
+            if (buf) window.__comfyDesktop2.downloadAssetBlob(item.filename, buf).catch(function() {});
+          })
+          .catch(function() {});
+      } else {
+        window.__comfyDesktop2.downloadAsset(viewUrl, item.filename).catch(function() {});
+      }
+    }
+
     var OrigWebSocket = window.WebSocket;
     window.WebSocket = function(url, protocols) {
       var ws = protocols !== undefined ? new OrigWebSocket(url, protocols) : new OrigWebSocket(url);
       var wsUrl = typeof url === 'string' ? url : url.toString();
+      var httpBase = wsUrl.replace(/^ws(s?):/, 'http$1:').replace(/\\/ws(\\?.*)?$/, '');
+      // Extract auth token from WebSocket URL query params (cloud passes ?token=...)
+      var _authToken = null;
+      try {
+        var urlObj = new URL(wsUrl);
+        _authToken = urlObj.searchParams.get('token');
+      } catch(e) {}
 
       ws.addEventListener('message', function(event) {
         if (typeof event.data !== 'string') return;
@@ -241,34 +282,16 @@ export function getModelDownloadContentScript(): string {
           var msg = JSON.parse(event.data);
           if (msg.type !== 'executed' || !msg.data || !msg.data.output) return;
           var output = msg.data.output;
-          // Handle image outputs (SaveImage, PreviewImage, etc.)
-          var images = output.images || [];
-          for (var i = 0; i < images.length; i++) {
-            var img = images[i];
-            if (!img.filename) continue;
-            // Build the download URL relative to the ComfyUI server
-            var baseUrl = wsUrl.replace(/^ws(s?):/, 'http$1:').replace(/\\/ws.*$/, '');
-            var params = 'filename=' + encodeURIComponent(img.filename);
-            if (img.subfolder) params += '&subfolder=' + encodeURIComponent(img.subfolder);
-            if (img.type) params += '&type=' + encodeURIComponent(img.type);
-            var dlUrl = baseUrl + '/view?' + params;
-            window.__comfyDesktop2.downloadAsset(dlUrl, img.filename).catch(function() {});
+          // Process all known output arrays: images, gifs, audio, video
+          var keys = ['images', 'gifs', 'audio', 'video'];
+          for (var k = 0; k < keys.length; k++) {
+            var items = output[keys[k]];
+            if (!items || !items.length) continue;
+            for (var i = 0; i < items.length; i++) {
+              _downloadItem(httpBase, _authToken, items[i]);
+            }
           }
-          // Handle GIF/animated outputs
-          var gifs = output.gifs || [];
-          for (var g = 0; g < gifs.length; g++) {
-            var gif = gifs[g];
-            if (!gif.filename) continue;
-            var baseUrl2 = wsUrl.replace(/^ws(s?):/, 'http$1:').replace(/\\/ws.*$/, '');
-            var params2 = 'filename=' + encodeURIComponent(gif.filename);
-            if (gif.subfolder) params2 += '&subfolder=' + encodeURIComponent(gif.subfolder);
-            if (gif.type) params2 += '&type=' + encodeURIComponent(gif.type);
-            var dlUrl2 = baseUrl2 + '/view?' + params2;
-            window.__comfyDesktop2.downloadAsset(dlUrl2, gif.filename).catch(function() {});
-          }
-        } catch(e) {
-          // Ignore parse errors for non-JSON messages
-        }
+        } catch(e) {}
       });
 
       return ws;

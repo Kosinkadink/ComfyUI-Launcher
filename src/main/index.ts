@@ -21,6 +21,7 @@ import {
   registerDownloadIpc,
   setMainWindow,
   startAssetDownload,
+  saveAssetBlob,
 } from './lib/comfyDownloadManager'
 import { get as getInstallation } from './installations'
 import { getModelDownloadContentScript } from './lib/comfyContentScript'
@@ -791,6 +792,21 @@ function registerAssetDownloadIpc(): void {
       const outputDir = resolveOutputDir(inst)
       if (!outputDir) return false
       return startAssetDownload(win, url, filename, outputDir)
+    },
+  )
+
+  ipcMain.handle(
+    'desktop2-download-asset-blob',
+    async (event, { filename, data }: { filename: string; data: Buffer }) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win) return false
+      const installationId = findInstallationIdForWindow(win)
+      if (!installationId) return false
+      const inst = await getInstallation(installationId)
+      if (!inst) return false
+      const outputDir = resolveOutputDir(inst)
+      if (!outputDir) return false
+      return saveAssetBlob(filename, data, outputDir)
     },
   )
 }
