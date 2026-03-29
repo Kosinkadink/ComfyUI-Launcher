@@ -764,12 +764,19 @@ ipcMain.handle('focus-comfy-window', (_event, installationId: string) => {
 })
 
 function resolveOutputDir(inst: InstallationRecord): string | null {
-  if ((inst.autoDownloadOutputs as boolean | undefined) !== true) return null
+  if ((inst.autoDownloadOutputs as boolean | undefined) !== true) {
+    console.log('[asset-dl] autoDownloadOutputs is not true, skipping', inst.autoDownloadOutputs)
+    return null
+  }
   if ((inst.useSharedOutputDir as boolean | undefined) !== false) {
-    return (settings.get('outputDir') as string | undefined) || settings.defaults.outputDir
+    const dir = (settings.get('outputDir') as string | undefined) || settings.defaults.outputDir
+    console.log('[asset-dl] using shared output dir:', dir)
+    return dir
   }
   const custom = inst.outputDir as string | undefined
-  return custom && custom.trim() !== '' ? custom : (settings.get('outputDir') as string | undefined) || settings.defaults.outputDir
+  const dir = custom && custom.trim() !== '' ? custom : (settings.get('outputDir') as string | undefined) || settings.defaults.outputDir
+  console.log('[asset-dl] useSharedOutputDir=false, custom:', custom, '→ resolved:', dir)
+  return dir
 }
 
 function findInstallationIdForWindow(win: BrowserWindow): string | undefined {
@@ -798,14 +805,16 @@ function registerAssetDownloadIpc(): void {
   ipcMain.handle(
     'desktop2-download-asset-blob',
     async (event, { filename, data }: { filename: string; data: Buffer }) => {
+      console.log('[asset-dl] blob handler called, filename:', filename, 'data size:', data?.length)
       const win = BrowserWindow.fromWebContents(event.sender)
-      if (!win) return false
+      if (!win) { console.log('[asset-dl] no win'); return false }
       const installationId = findInstallationIdForWindow(win)
-      if (!installationId) return false
+      if (!installationId) { console.log('[asset-dl] no installationId'); return false }
       const inst = await getInstallation(installationId)
-      if (!inst) return false
+      if (!inst) { console.log('[asset-dl] no inst'); return false }
       const outputDir = resolveOutputDir(inst)
-      if (!outputDir) return false
+      if (!outputDir) { console.log('[asset-dl] no outputDir'); return false }
+      console.log('[asset-dl] saving to:', outputDir)
       return saveAssetBlob(win, filename, data, outputDir)
     },
   )
