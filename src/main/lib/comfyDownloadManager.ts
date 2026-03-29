@@ -437,6 +437,8 @@ function attachDownloadListeners(item: Electron.DownloadItem, pending: PendingDo
             return
           }
         }
+        // Try to remove the temp directory if it's now empty (safe — fails silently if not empty)
+        try { fs.rmdirSync(path.dirname(pending.tempPath)) } catch {}
       }
       reportProgress({
         url: pending.url,
@@ -447,7 +449,10 @@ function attachDownloadListeners(item: Electron.DownloadItem, pending: PendingDo
         status: 'completed',
       })
     } else if (state === 'cancelled') {
-      if (pending.tempPath) { try { fs.unlinkSync(pending.tempPath) } catch {} }
+      if (pending.tempPath) {
+        try { fs.unlinkSync(pending.tempPath) } catch {}
+        try { fs.rmdirSync(path.dirname(pending.tempPath)) } catch {}
+      }
       reportProgress({
         url: pending.url,
         filename: pending.filename,
@@ -456,7 +461,10 @@ function attachDownloadListeners(item: Electron.DownloadItem, pending: PendingDo
         status: 'cancelled',
       })
     } else {
-      if (pending.tempPath) { try { fs.unlinkSync(pending.tempPath) } catch {} }
+      if (pending.tempPath) {
+        try { fs.unlinkSync(pending.tempPath) } catch {}
+        try { fs.rmdirSync(path.dirname(pending.tempPath)) } catch {}
+      }
       reportProgress({
         url: pending.url,
         filename: pending.filename,
