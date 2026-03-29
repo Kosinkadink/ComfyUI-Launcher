@@ -806,7 +806,7 @@ function registerAssetDownloadIpc(): void {
       if (!inst) return false
       const outputDir = resolveOutputDir(inst)
       if (!outputDir) return false
-      return saveAssetBlob(filename, data, outputDir)
+      return saveAssetBlob(win, filename, data, outputDir)
     },
   )
 }

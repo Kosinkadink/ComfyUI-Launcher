@@ -290,6 +290,7 @@ async function deduplicatePath(filePath: string): Promise<string> {
 }
 
 export async function saveAssetBlob(
+  win: BrowserWindow | null,
   filename: string,
   data: Buffer,
   outputDir: string,
@@ -300,15 +301,22 @@ export async function saveAssetBlob(
 
   await fs.promises.writeFile(savePath, data)
 
+  const progress: DownloadProgress = {
+    url: `blob:${savedFilename}-${Date.now()}`,
+    filename: savedFilename,
+    directory: '',
+    savePath,
+    progress: 1,
+    status: 'completed',
+  }
+
+  // Send to the originating ComfyUI window (toast UI)
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('desktop2-download-progress', progress)
+  }
+  // Send to the Launcher window (DownloadsPanel)
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('model-download-progress', {
-      url: `blob:${savedFilename}-${Date.now()}`,
-      filename: savedFilename,
-      directory: '',
-      savePath,
-      progress: 1,
-      status: 'completed',
-    } satisfies DownloadProgress)
+    mainWindow.webContents.send('model-download-progress', progress)
   }
 
   return true
