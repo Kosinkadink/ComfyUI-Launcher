@@ -764,7 +764,7 @@ ipcMain.handle('focus-comfy-window', (_event, installationId: string) => {
 })
 
 function resolveOutputDir(inst: InstallationRecord): string | null {
-  if ((inst.autoDownloadOutputs as boolean | undefined) !== true) return null
+  if ((inst.autoDownloadOutputs as boolean | undefined) === false) return null
   if ((inst.useSharedOutputDir as boolean | undefined) !== false) {
     return (settings.get('outputDir') as string | undefined) || settings.defaults.outputDir
   }
