@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('__comfyDesktop2', {
   downloadModel: (url: string, filename: string, directory: string): Promise<boolean> => {
     return ipcRenderer.invoke('desktop2-download-model', { url, filename, directory })
   },
+  downloadAsset: (url: string, filename: string): Promise<boolean> => {
+    return ipcRenderer.invoke('desktop2-download-asset', { url, filename })
+  },
   pauseDownload: (url: string): Promise<boolean> => {
     return ipcRenderer.invoke('model-download-pause', { url })
   },

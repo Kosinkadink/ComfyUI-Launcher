@@ -210,6 +210,71 @@ export async function startModelDownload(
   return true
 }
 
+export async function startAssetDownload(
+  win: BrowserWindow,
+  url: string,
+  filename: string,
+  outputDir: string,
+): Promise<boolean> {
+  const savePath = path.join(outputDir, filename)
+  const tempDir = path.join(outputDir, TEMP_DIR_NAME)
+  const tempPath = path.join(tempDir, `${Date.now()}-${filename}.tmp`)
+
+  const makeProgress = (
+    overrides: Partial<DownloadProgress>,
+  ): DownloadProgress => ({
+    url,
+    filename,
+    directory: '',
+    progress: 0,
+    status: 'pending',
+    ...overrides,
+  })
+
+  if (await fileExists(savePath)) {
+    const progress = makeProgress({ progress: 1, status: 'completed', savePath })
+    broadcastProgress(progress)
+    return true
+  }
+
+  const existing = pendingDownloads.get(url)
+  if (existing) {
+    if (win !== existing.window) {
+      existing.subscriberWindows.add(win)
+    }
+    if (!win.isDestroyed()) {
+      win.webContents.send('desktop2-download-progress', existing.lastProgress)
+    }
+    return true
+  }
+
+  await fs.promises.mkdir(path.dirname(savePath), { recursive: true })
+  await fs.promises.mkdir(tempDir, { recursive: true })
+
+  if (win.isDestroyed()) return false
+
+  const initial = makeProgress({ status: 'pending' })
+  pendingDownloads.set(url, {
+    url,
+    filename,
+    directory: '',
+    savePath,
+    tempPath,
+    window: win,
+    subscriberWindows: new Set(),
+    lastProgress: initial,
+    lastSpeedBytes: 0,
+    lastSpeedTime: Date.now(),
+  })
+
+  const sess = win.webContents.session
+  attachSessionDownloadHandler(sess)
+  sess.downloadURL(url)
+
+  reportProgress(initial)
+  return true
+}
+
 function attachDownloadListeners(item: Electron.DownloadItem, pending: PendingDownload): void {
   item.on('updated', (_ev, state) => {
     if (state !== 'progressing') return

@@ -227,6 +227,59 @@ export function getModelDownloadContentScript(): string {
     };
   }
 
+  // ---- Auto-download outputs for remote/cloud sessions ----
+  // Intercept WebSocket messages to detect completed workflow outputs
+  if (window.__comfyDesktop2Remote && window.__comfyDesktop2 && window.__comfyDesktop2.downloadAsset) {
+    var OrigWebSocket = window.WebSocket;
+    window.WebSocket = function(url, protocols) {
+      var ws = protocols !== undefined ? new OrigWebSocket(url, protocols) : new OrigWebSocket(url);
+      var wsUrl = typeof url === 'string' ? url : url.toString();
+
+      ws.addEventListener('message', function(event) {
+        if (typeof event.data !== 'string') return;
+        try {
+          var msg = JSON.parse(event.data);
+          if (msg.type !== 'executed' || !msg.data || !msg.data.output) return;
+          var output = msg.data.output;
+          // Handle image outputs (SaveImage, PreviewImage, etc.)
+          var images = output.images || [];
+          for (var i = 0; i < images.length; i++) {
+            var img = images[i];
+            if (!img.filename) continue;
+            // Build the download URL relative to the ComfyUI server
+            var baseUrl = wsUrl.replace(/^ws(s?):/, 'http$1:').replace(/\\/ws.*$/, '');
+            var params = 'filename=' + encodeURIComponent(img.filename);
+            if (img.subfolder) params += '&subfolder=' + encodeURIComponent(img.subfolder);
+            if (img.type) params += '&type=' + encodeURIComponent(img.type);
+            var dlUrl = baseUrl + '/view?' + params;
+            window.__comfyDesktop2.downloadAsset(dlUrl, img.filename).catch(function() {});
+          }
+          // Handle GIF/animated outputs
+          var gifs = output.gifs || [];
+          for (var g = 0; g < gifs.length; g++) {
+            var gif = gifs[g];
+            if (!gif.filename) continue;
+            var baseUrl2 = wsUrl.replace(/^ws(s?):/, 'http$1:').replace(/\\/ws.*$/, '');
+            var params2 = 'filename=' + encodeURIComponent(gif.filename);
+            if (gif.subfolder) params2 += '&subfolder=' + encodeURIComponent(gif.subfolder);
+            if (gif.type) params2 += '&type=' + encodeURIComponent(gif.type);
+            var dlUrl2 = baseUrl2 + '/view?' + params2;
+            window.__comfyDesktop2.downloadAsset(dlUrl2, gif.filename).catch(function() {});
+          }
+        } catch(e) {
+          // Ignore parse errors for non-JSON messages
+        }
+      });
+
+      return ws;
+    };
+    window.WebSocket.prototype = OrigWebSocket.prototype;
+    window.WebSocket.CONNECTING = OrigWebSocket.CONNECTING;
+    window.WebSocket.OPEN = OrigWebSocket.OPEN;
+    window.WebSocket.CLOSING = OrigWebSocket.CLOSING;
+    window.WebSocket.CLOSED = OrigWebSocket.CLOSED;
+  }
+
   // ---- Theme integration ----
   // Read ComfyUI's CSS variables and derive toast colors
   var theme = {

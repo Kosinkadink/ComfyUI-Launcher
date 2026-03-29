@@ -109,6 +109,16 @@ export function createUrlSource(config: UrlSourceConfig): SourcePlugin {
                 { value: 'shared', label: t('common.partitionShared') },
                 { value: 'unique', label: t('common.partitionUnique') },
               ], tooltip: t('tooltips.browserPartition') },
+            { id: 'autoDownloadOutputs', label: t('common.autoDownloadOutputs'), value: (installation.autoDownloadOutputs as boolean | undefined) ?? false, editable: true,
+              editType: 'boolean', tooltip: t('tooltips.autoDownloadOutputs') },
+            ...((installation.autoDownloadOutputs as boolean | undefined) === true ? [
+              { id: 'useSharedOutputDir', label: t('common.useSharedOutputDir'), value: (installation.useSharedOutputDir as boolean | undefined) ?? true, editable: true,
+                editType: 'boolean', tooltip: t('tooltips.useSharedOutputDir') },
+              ...((installation.useSharedOutputDir as boolean | undefined) === false ? [
+                { id: 'outputDir', label: t('media.outputDir'), value: (installation.outputDir as string | undefined) || '', editable: true,
+                  editType: 'path', tooltip: t('tooltips.outputDirPerInstall') },
+              ] : []),
+            ] : []),
           ],
         },
         {
