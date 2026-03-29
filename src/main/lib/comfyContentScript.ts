@@ -254,6 +254,11 @@ export function getModelDownloadContentScript(): string {
       return match ? match[1] : null;
     }
 
+    function _withSubfolder(subfolder, name) {
+      if (!subfolder) return name;
+      return subfolder + '/' + name;
+    }
+
     function _downloadItem(baseUrl, authToken, item) {
       if (!item || !item.filename) return;
       // Skip temporary preview outputs (PreviewImage, etc.)
@@ -288,12 +293,12 @@ export function getModelDownloadContentScript(): string {
             return res.arrayBuffer();
           })
           .then(function(buf) {
-            var saveName = preferredName || item.filename;
+            var saveName = _withSubfolder(item.subfolder, preferredName || item.filename);
             if (buf) window.__comfyDesktop2.downloadAssetBlob(saveName, buf).catch(function() {});
           })
           .catch(function() {});
       } else {
-        var saveName = preferredName || item.filename;
+        var saveName = _withSubfolder(item.subfolder, preferredName || item.filename);
         window.__comfyDesktop2.downloadAsset(viewUrl, saveName).catch(function() {});
       }
     }
