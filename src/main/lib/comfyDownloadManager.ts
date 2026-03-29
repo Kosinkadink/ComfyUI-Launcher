@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import * as settings from '../settings'
@@ -288,29 +288,7 @@ export async function startAssetDownload(
     ...overrides,
   })
 
-  await fs.promises.mkdir(path.dirname(savePath), { recursive: true })
-  await fs.promises.mkdir(tempDir, { recursive: true })
-
-  if (win.isDestroyed()) return false
-
-  // For authenticated endpoints (Cloud), resolve the redirect to get a
-  // pre-signed URL that the native downloader can fetch without auth headers.
-  let downloadUrl = url
-  if (authToken) {
-    try {
-      const res = await net.fetch(url, {
-        headers: { Authorization: `Bearer ${authToken}` },
-        redirect: 'manual',
-      })
-      const location = res.headers.get('location')
-      if (location) downloadUrl = location
-    } catch {
-      // Fall through to download the original URL
-    }
-  }
-
-  // Dedup: check both the original view URL and the resolved download URL
-  const existing = pendingDownloads.get(downloadUrl) || (downloadUrl !== url ? pendingDownloads.get(url) : undefined)
+  const existing = pendingDownloads.get(url)
   if (existing) {
     if (win !== existing.window) {
       existing.subscriberWindows.add(win)
@@ -321,9 +299,14 @@ export async function startAssetDownload(
     return true
   }
 
-  const initial = makeProgress({ url: downloadUrl, status: 'pending' })
-  pendingDownloads.set(downloadUrl, {
-    url: downloadUrl,
+  await fs.promises.mkdir(path.dirname(savePath), { recursive: true })
+  await fs.promises.mkdir(tempDir, { recursive: true })
+
+  if (win.isDestroyed()) return false
+
+  const initial = makeProgress({ status: 'pending' })
+  pendingDownloads.set(url, {
+    url,
     filename: savedFilename,
     directory: '',
     savePath,
@@ -337,7 +320,12 @@ export async function startAssetDownload(
 
   const sess = win.webContents.session
   attachSessionDownloadHandler(sess)
-  sess.downloadURL(downloadUrl)
+  // Pass auth headers directly — Electron follows redirects internally and
+  // the original URL stays in item.getURLChain(), so findPendingForItem matches.
+  const downloadOptions = authToken
+    ? { headers: { Authorization: `Bearer ${authToken}` } }
+    : undefined
+  sess.downloadURL(url, downloadOptions)
 
   reportProgress(initial)
   return true
