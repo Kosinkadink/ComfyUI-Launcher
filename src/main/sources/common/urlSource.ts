@@ -118,7 +118,7 @@ export function createUrlSource(config: UrlSourceConfig): SourcePlugin {
               ...((installation.useSharedOutputDir as boolean | undefined) === false ? [
                 { id: 'outputDir', label: t('media.outputDir'),
                   value: (installation.outputDir as string | undefined) || settings.defaults.outputDir,
-                  editable: true, editType: 'path', tooltip: t('tooltips.outputDirPerInstall') },
+                  editable: true, editType: 'path', browseOnly: true, tooltip: t('tooltips.outputDirPerInstall') },
               ] : []),
             ] : []),
           ],
