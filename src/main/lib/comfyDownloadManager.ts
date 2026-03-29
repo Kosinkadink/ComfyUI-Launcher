@@ -52,12 +52,15 @@ function getTempDir(): string {
   return path.join(getModelsBaseDir(), TEMP_DIR_NAME)
 }
 
+function getAssetTempDir(): string {
+  const cacheDir = (settings.get('cacheDir') as string | undefined) || settings.defaults.cacheDir
+  return path.join(cacheDir, 'asset-downloads')
+}
+
 // Windows MAX_PATH is 260 chars (259 usable + null terminator).
-// Reserve space for deduplication suffix " (999)" = 6 chars, plus temp path
-// overhead: .desktop2-downloads/ (21) + timestamp (13) + dash (1) + .tmp (4) = 39.
+// Reserve space for deduplication suffix " (999)" = 6 chars.
 const WIN_MAX_PATH = 259
 const DEDUP_RESERVE = 6
-const TEMP_PATH_OVERHEAD = 39
 
 /**
  * Sanitize an asset filename to prevent path traversal and ensure it fits
@@ -85,16 +88,15 @@ export function sanitizeAssetFilename(filename: string, outputDir: string): stri
   }
 
   // On Windows, truncate filename stem if the full path exceeds MAX_PATH.
-  // Account for both deduplication suffix and temp file path overhead.
+  // Temp files are stored in the app cache dir, so only dedup reserve applies here.
   if (process.platform === 'win32') {
     const fullLen = resolved.length
-    const reserve = DEDUP_RESERVE + TEMP_PATH_OVERHEAD
-    if (fullLen + reserve > WIN_MAX_PATH) {
+    if (fullLen + DEDUP_RESERVE > WIN_MAX_PATH) {
       const ext = path.extname(safe)
       const dir = path.dirname(safe)
       const stem = path.basename(safe, ext)
       const dirPart = path.resolve(outputDir, dir)
-      const available = WIN_MAX_PATH - dirPart.length - 1 - ext.length - reserve
+      const available = WIN_MAX_PATH - dirPart.length - 1 - ext.length - DEDUP_RESERVE
       if (available <= 0) return null
       const truncatedStem = stem.substring(0, available)
       safe = dir && dir !== '.' ? dir + '/' + truncatedStem + ext : truncatedStem + ext
@@ -273,7 +275,7 @@ export async function startAssetDownload(
   if (!safeFilename) return false
   const savePath = await deduplicatePath(path.join(outputDir, safeFilename))
   const savedFilename = path.basename(savePath)
-  const tempDir = path.join(outputDir, TEMP_DIR_NAME)
+  const tempDir = getAssetTempDir()
   const tempPath = path.join(tempDir, `${Date.now()}-${savedFilename}.tmp`)
 
   const makeProgress = (
@@ -618,10 +620,13 @@ export function detachWindowDownloads(win: BrowserWindow): void {
 
 // ---- Temp file cleanup ----
 
-/** Remove the temp download directory and all its contents. */
+/** Remove the temp download directories and all their contents. */
 export async function cleanupTempDownloads(): Promise<void> {
   try {
     await fs.promises.rm(getTempDir(), { recursive: true, force: true })
+  } catch {}
+  try {
+    await fs.promises.rm(getAssetTempDir(), { recursive: true, force: true })
   } catch {}
 }
 
